@@ -7,11 +7,11 @@ Copyright (c) 2017 The SAGA Survey
 http://opensource.org/licenses/MIT
 """
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='SAGA',
-    version='0.1.0',
+    version='0.1.1',
     description='Code to access, create and edit SAGA Survey data catalogs.',
     url='https://github.com/sagasurvey/saga',
     author='The SAGA Survey',
@@ -27,6 +27,6 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     keywords='easyquery query numpy',
-    packages=['SAGA'],
+    packages=find_packages(),
     install_requires=['numpy', 'numexpr', 'astropy', 'easyquery', 'scipy', 'requests', 'casjobs'],
 )
