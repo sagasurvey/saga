@@ -37,5 +37,5 @@ for base in base_paper1:
     print(base['HOST_NSAID'][0], '# of satellites', C.is_sat.count(base))
 
 # load all base catalogs with the same basic cuts into a list
-base_all = list(saga_objects.load(query=C.basic_cut, iter_hosts=True))
+base_all = list(saga_objects.load(cuts=C.basic_cut, iter_hosts=True))
 ```
