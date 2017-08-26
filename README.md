@@ -14,19 +14,28 @@ See the [SAGA Survey website](http://sagasurvey.org/) for details about SAGA.
 
 ```python
 import SAGA
-import SAGA.objects.queries as Q
+from SAGA import ObjectCuts as C
 
 saga_database = SAGA.Database('/path/to/SAGA/data/folder')
-saga_hosts = SAGA.Hosts(saga_database)
-saga_objects = SAGA.Objects(saga_database)
+saga_hosts = SAGA.HostCatalog(saga_database)
+saga_objects = SAGA.ObjectCatalog(saga_database)
 
-# load host list
-hosts = saga_hosts.load()
+# load host list (no flags)
+hosts_no_flag = saga_hosts.load()
+
+# load host list (no SDSS flags)
+hosts_no_sdss_flags = saga_hosts.load('no_sdss_flags')
 
 # load all specs with some basic cuts
-basic_query = Q.is_clean & Q.sat_rcut & Q.is_galaxy & Q.fibermag_r_cut & Q.faint_end_limit
-specs = saga_objects.load(has_spec=True, query=basic_query)
+specs = saga_objects.load(has_spec=True, cuts=C.basic_cut)
 
-# load all base catalogs with the same basic cuts
-base_all = [saga_objects.load(hosts='all', query=basic_query, iter_hosts=True)]
+# load base catalogs for all paper1 hosts with the same basic cuts into a list:
+base_paper1 = list(saga_objects.load(hosts='paper1', cuts=C.basic_cut, iter_hosts=True))
+
+# count number of satellites
+for base in base_paper1:
+    print(base['HOST_NSAID'][0], '# of satellites', C.is_sat.count(base))
+
+# load all base catalogs with the same basic cuts into a list
+base_all = list(saga_objects.load(query=C.basic_cut, iter_hosts=True))
 ```

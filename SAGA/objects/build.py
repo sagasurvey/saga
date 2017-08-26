@@ -2,13 +2,9 @@ import numpy as np
 import numexpr as ne
 from astropy.coordinates import SkyCoord
 from easyquery import Query
-from . import queries
+from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
-from ..utils import join_table_by_coordinates, fill_values_by_query
-
-
-def _get_empty_str_array(array_length, string_length=48):
-    return np.chararray((array_length,), itemsize=string_length, unicode=False)
+from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array
 
 
 def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
@@ -46,7 +42,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     cols = ('HOST_SAGA_NAME', 'HOST_NGC_NAME')
     for col in cols:
         if col not in base:
-            base[col] = _get_empty_str_array(len(base))
+            base[col] = get_empty_str_array(len(base))
 
     if saga_names:
         idx = np.where(saga_names['NSA'] == host['NSAID'])[0]
@@ -112,7 +108,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
     del ids_to_remove
 
-    fill_values_by_query(base, queries.too_close_to_host, {'REMOVE': 1})
+    fill_values_by_query(base, C.too_close_to_host, {'REMOVE': 1})
 
     q  = Query('BINNED1 == 0')
     q |= Query('SATURATED != 0')
@@ -225,9 +221,9 @@ def add_spectra(base, spectra, ignore_imacs=False):
     if 'REMOVE' not in base:
         base['REMOVE'] = -1
     if 'TELNAME' not in base:
-        base['TELNAME'] = _get_empty_str_array(len(base), 6)
+        base['TELNAME'] = get_empty_str_array(len(base), 6)
     if 'MASKNAME' not in base:
-        base['MASKNAME'] = _get_empty_str_array(len(base))
+        base['MASKNAME'] = get_empty_str_array(len(base))
     if 'ZQUALITY' not in base:
         base['ZQUALITY'] = -1
     if 'SPEC_Z' not in base:
@@ -235,9 +231,9 @@ def add_spectra(base, spectra, ignore_imacs=False):
     if 'SPEC_Z_ERR' not in base:
         base['SPEC_Z_ERR'] = -1.0
     if 'SPEC_REPEAT' not in base:
-        base['SPEC_REPEAT'] = _get_empty_str_array(len(base))
+        base['SPEC_REPEAT'] = get_empty_str_array(len(base))
     if 'SPECOBJID' not in base:
-        base['SPECOBJID'] = _get_empty_str_array(len(base), 48)
+        base['SPECOBJID'] = get_empty_str_array(len(base), 48)
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     spectra_sc = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
@@ -326,10 +322,10 @@ def find_satelites(base):
     if 'SATS' not in base:
         base['SATS'] = -1
 
-    fill_values_by_query(base, queries.is_galaxy & queries.is_high_z, {'SATS':0})
-    fill_values_by_query(base, queries.is_galaxy & ~queries.is_high_z, {'SATS':2})
-    fill_values_by_query(base, queries.is_galaxy & queries.sat_rcut & queries.sat_vcut, {'SATS':1})
-    fill_values_by_query(base, queries.obj_is_host, {'SATS':3})
+    fill_values_by_query(base, C.is_galaxy & C.is_high_z, {'SATS':0})
+    fill_values_by_query(base, C.is_galaxy & ~C.is_high_z, {'SATS':2})
+    fill_values_by_query(base, C.is_galaxy & C.sat_rcut & C.sat_vcut, {'SATS':1})
+    fill_values_by_query(base, C.obj_is_host, {'SATS':3})
 
     return base
 

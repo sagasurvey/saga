@@ -1,9 +1,8 @@
-__all__ = ['Spectra']
+"""
+SAGA.spectra
 
-class Spectra(object):
+This subpackage contains spectrum-related routines, including SpectrumCatalog
 
-    def __init__(self, database):
-        self._database = database
-
-    def load(self, telescope=None):
-        raise NotImplementedError #TODO: implement this
+This subpackage is still under construction! DO NOT USE YET!
+"""
+from .spectrum_catalog import SpectrumCatalog

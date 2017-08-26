@@ -1,6 +1,9 @@
-from .database import Database
-from .hosts import Hosts
-from .objects import Objects
-from .spectra import Spectra
+"""
+This is the top directory of the SAGA package
+"""
 
-__version__ = '0.1.2'
+from .database import Database
+from .hosts import HostCatalog
+from .objects import ObjectCatalog, ObjectCuts
+
+__version__ = '0.2.0'

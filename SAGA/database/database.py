@@ -1,9 +1,6 @@
 import os
 from astropy.table import Table
-from .utils import gzip_compress
-
-__all__ = ['Database']
-
+from ..utils import gzip_compress
 
 class DataObject(object):
     _table = None
@@ -61,20 +58,49 @@ class FitsTable(DataObject):
 
 
 class Database(object):
-    def __init__(self, root_dir):
-        if not os.path.isdir(root_dir):
+    """
+    This class provide the interface between the filesystem and other parts of
+    the SAGA package.
+
+    Parameters
+    ----------
+    root_dir : str, optional
+        path to the shared SAGA Dropbox root directory
+        if you don't have access, set to None.
+
+    Examples
+    --------
+    >>> import SAGA
+    >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
+    >>> saga_hosts = SAGA.HostCatalog(saga_database)
+    >>> saga_objects = SAGA.ObjectCatalog(saga_database)
+
+
+    If you don't have access to SAGA Dropbox, you can do:
+
+    >>> saga_database = SAGA.Database()
+    >>> saga_database.set_base_fits_file_path('base_catalogs/base_sql_nsa32.fits.gz', 32)
+    >>> saga_database.set_spectra_clean_fits_file_path('saga_spectra_clean.fits.gz')
+    >>> saga_hosts = SAGA.HostCatalog(saga_database)
+    >>> saga_objects = SAGA.ObjectCatalog(saga_database)
+
+    """
+    def __init__(self, root_dir=None):
+        if root_dir is not None and not os.path.isdir(root_dir):
             raise ValueError('cannot locate {}'.format(root_dir))
 
         self._root_dir = root_dir
 
         self._tables = {
-            'spectra_clean': FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz')),
             'hosts_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 0, include_names=['SAGA', 'NSA', 'NGC']),
             'hosts_no_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1136984451),
             'hosts_no_sdss_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
             'objects_to_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1),
             'objects_to_add': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1),
         }
+
+        if self._root_dir is not None:
+            self._tables['spectra_clean'] = FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))
 
     def __getitem__(self, key):
         if key in self._tables:
@@ -88,5 +114,32 @@ class Database(object):
 
         raise KeyError('cannot find {} in database'.format(key))
 
-    def set_nsa_path(self, path, download=False):
-        raise NotImplementedError
+    def set_base_fits_file_path(self, host_nsa_id, path):
+        """
+        this function should not be used, but just in case you don't
+        have access to the SAGA dropbox but a single fits file for one host
+
+        Parameters
+        ----------
+        host_nsa_id : int
+            host nsa id
+
+        path : str:
+            path to the fits (or fits.gz) file
+        """
+        if os.path.isfile(path):
+            self._tables[('base', int(host_nsa_id))] = FitsTable(path)
+
+    def set_spectra_clean_fits_file_path(self, path):
+        """
+        this function should not be used, but just in case you don't
+        have access to the SAGA dropbox but a single fits file for spectra
+
+        Parameters
+        ----------
+        path : str:
+            path to the fits (or fits.gz) file
+        """
+        if os.path.isfile(path):
+            self._tables['spectra_clean'] = FitsTable(path)
+

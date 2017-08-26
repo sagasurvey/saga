@@ -6,12 +6,14 @@ import shutil
 import requests
 import numpy as np
 from easyquery import Query
+from astropy.coordinates import search_around_sky, SkyCoord
+from astropy.units import Quantity
 
-try:
-    from pyspherematch import spherematch
-except ImportError:
-    from .pyspherematch import spherematch
+SPEED_OF_LIGHT = 299792.458 # in km/s
 
+
+def get_empty_str_array(array_length, string_length=48):
+    return np.chararray((array_length,), itemsize=string_length, unicode=False)
 
 
 def get_logger(level='WARNING'):
@@ -53,7 +55,7 @@ def join_table_by_coordinates(table, table_to_join,
                               max_distance=1.0/3600.0, missing_value=np.nan,
                               table_ra_name='RA', table_dec_name='DEC',
                               table_to_join_ra_name='RA',
-                              table_to_join_dec_name='DEC'):
+                              table_to_join_dec_name='DEC', unit='deg'):
     """
     join two table by matching the sky coordinates
 
@@ -72,8 +74,9 @@ def join_table_by_coordinates(table, table_to_join,
     ra2 = table_to_join_ra_name
     dec2 = table_to_join_dec_name
 
-    idx1, idx2, _ = spherematch(t1[ra1], t1[dec1], t2[ra2], t2[dec2],
-                                tol=max_distance)
+    idx1, idx2 = search_around_sky(SkyCoord(t1[ra1], t1[dec1], unit=unit),
+                                   SkyCoord(t1[ra1], t1[dec1], unit=unit),
+                                   Quantity(max_distance, unit=unit))[:2]
 
     n_matched = len(idx1)
 
