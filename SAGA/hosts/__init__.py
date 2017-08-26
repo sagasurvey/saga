@@ -7,7 +7,7 @@ class Hosts(object):
 
     def __init__(self, database):
         self._database = database
-        self._all_host_ids = self._database['hosts_flag0'].read()['NSAID'].tolist()
+        self._all_host_ids = self.load()['NSAID'].tolist()
 
         t = self._database['hosts_named'].read()
         self._host_name_to_id = dict(zip((n.lower() for n in t['SAGA']), t['NSA']))
@@ -50,5 +50,5 @@ class Hosts(object):
         return self._host_id_to_name.get(host_id)
 
 
-    def load(self, host_type='flag0', reload=False):
+    def load(self, host_type='no_flags', reload=False):
         return self._database['hosts_{}'.format(host_type)].read(reload=reload)
