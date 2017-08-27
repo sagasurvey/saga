@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.coordinates import SkyCoord
-from ..utils import SPEED_OF_LIGHT
+from astropy.constants import c
 
 def clean_repeats(spectra):
 
@@ -30,7 +30,7 @@ def clean_repeats(spectra):
         spec_sc = SkyCoord(spec['RA'], spec['DEC'], unit='deg')
 
         # search nearby spectra in 3D
-        nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/SPEED_OF_LIGHT)
+        nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
         nearby_mask &= (spectra_sc.separation(spec_sc).arcsec < 30.0)
 
         specs_nearby = spectra[spectra_idx[nearby_mask]]
