@@ -9,8 +9,6 @@ from easyquery import Query
 from astropy.coordinates import search_around_sky, SkyCoord
 from astropy.units import Quantity
 
-SPEED_OF_LIGHT = 299792.458 # in km/s
-
 _sdss_bands = 'ugriz'
 
 
