@@ -4,6 +4,7 @@ from easyquery import Query
 from . import cuts as C
 from ..hosts import HostCatalog
 
+__all__ = ['ObjectCatalog']
 
 def _slice_columns(table, columns):
     return table[columns] if columns is not None else table
@@ -32,6 +33,7 @@ class ObjectCatalog(object):
 
     Here specs and base_anak are both astropy tables.
     """
+
     def __init__(self, database):
         self._database = database
         self._hosts = HostCatalog(self._database)

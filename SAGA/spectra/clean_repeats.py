@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.coordinates import SkyCoord
-from ..utils import SPEED_OF_LIGHT
+from astropy.constants import c
 
 def clean_repeats(spectra):
 
@@ -17,8 +17,6 @@ def clean_repeats(spectra):
     spectra : astropy.table.Table
     """
 
-    done_spectra_indices = []
-
     # make copies of the ra, dec, z, and indices of the whole spectra
     # we need copies as these will be later sliced in place
     spectra_sc = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
@@ -32,7 +30,7 @@ def clean_repeats(spectra):
         spec_sc = SkyCoord(spec['RA'], spec['DEC'], unit='deg')
 
         # search nearby spectra in 3D
-        nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/SPEED_OF_LIGHT)
+        nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
         nearby_mask &= (spectra_sc.separation(spec_sc).arcsec < 30.0)
 
         specs_nearby = spectra[spectra_idx[nearby_mask]]
@@ -40,6 +38,8 @@ def clean_repeats(spectra):
         spectra_sc = spectra_sc[~nearby_mask]
         spectra_z = spectra_z[~nearby_mask]
         spectra_idx = spectra_idx[~nearby_mask]
+
+        done_spectra_indices = []
 
         spec_repeat = set()
         for r in specs_nearby['SPEC_REPEAT']:

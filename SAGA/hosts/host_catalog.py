@@ -4,6 +4,8 @@ SAGA.host.host_catalog
 This file defines the HostCatalog class
 """
 
+__all__ = ['HostCatalog']
+
 class HostCatalog(object):
     """
     This class provides a high-level interface to access host catalogs

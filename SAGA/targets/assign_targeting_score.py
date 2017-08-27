@@ -4,6 +4,8 @@ from ..objects import cuts as C
 from ..utils import fill_values_by_query, get_empty_str_array
 from .gmm import calc_satellite_probability
 
+__all__ = ['assign_targeting_score']
+
 def assign_targeting_score(base, manual_selected_objids=None,
                            gmm_parameters=None, weight_func_parameters=None):
 
