@@ -39,6 +39,8 @@ def clean_repeats(spectra):
         spectra_z = spectra_z[~nearby_mask]
         spectra_idx = spectra_idx[~nearby_mask]
 
+        done_spectra_indices = []
+
         spec_repeat = set()
         for r in specs_nearby['SPEC_REPEAT']:
             spec_repeat.update(r.split('+'))

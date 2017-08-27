@@ -5,6 +5,8 @@ from ..utils import get_sdss_colors
 
 from .assign_targeting_score import assign_targeting_score
 
+__all__ = ['TargetSelection']
+
 _colors = ['ug', 'gr', 'ri', 'iz']
 
 class TargetSelection(object):

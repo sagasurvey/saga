@@ -1,3 +1,5 @@
+__all__ = ['SpectrumCatalog']
+
 class SpectrumCatalog(object):
 
     def __init__(self, database):
