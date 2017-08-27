@@ -3,6 +3,10 @@ import numpy as np
 from astropy.table import Table
 from ..utils import gzip_compress
 
+
+__all__ = ['Database', 'GoogleSheets', 'FitsTable', 'DataObject']
+
+
 class DataObject(object):
     _table = None
     _keep_table_default = False
@@ -156,4 +160,3 @@ class Database(object):
         """
         if os.path.isfile(path):
             self._tables['spectra_clean'] = FitsTable(path)
-
