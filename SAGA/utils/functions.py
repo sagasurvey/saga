@@ -7,7 +7,7 @@ import requests
 import numpy as np
 from easyquery import Query
 from astropy.coordinates import search_around_sky, SkyCoord
-from astropy.units import Quantity
+from astropy import units as u
 
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors',
@@ -65,12 +65,15 @@ def gzip_compress(path, out_path=None, delete_original=True):
 
 def join_table_by_coordinates(table, table_to_join,
                               columns_to_join=None, columns_to_rename=None,
-                              max_distance=1.0/3600.0, missing_value=np.nan,
+                              max_distance=1.0*u.arcsec, missing_value=np.nan,
                               table_ra_name='RA', table_dec_name='DEC',
                               table_to_join_ra_name='RA',
                               table_to_join_dec_name='DEC', unit='deg'):
     """
-    join two table by matching the sky coordinates
+    Join two table by matching the sky coordinates.
+
+    The `unit` input controls how the tables' coordinates are interpreted, and
+    also the `max_distance`, but *only* if they are not quantity objects.
 
     Examples
     --------
@@ -87,9 +90,14 @@ def join_table_by_coordinates(table, table_to_join,
     ra2 = table_to_join_ra_name
     dec2 = table_to_join_dec_name
 
+    if not hasattr(max_distance, 'unit'):
+        max_distance = u.Quantity(max_distance, unit=unit)
+
+    # note that if a unit-ful ra/dec are present, the *unit* argument here is
+    # ignored
     idx1, idx2 = search_around_sky(SkyCoord(t1[ra1], t1[dec1], unit=unit),
                                    SkyCoord(t2[ra2], t2[dec2], unit=unit),
-                                   Quantity(max_distance, unit=unit))[:2]
+                                   max_distance)[:2]
 
     n_matched = len(idx1)
 
