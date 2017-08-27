@@ -17,8 +17,6 @@ def clean_repeats(spectra):
     spectra : astropy.table.Table
     """
 
-    done_spectra_indices = []
-
     # make copies of the ra, dec, z, and indices of the whole spectra
     # we need copies as these will be later sliced in place
     spectra_sc = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
