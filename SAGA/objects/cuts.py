@@ -12,6 +12,11 @@ Examples
 from easyquery import Query
 import numpy as np
 
+COLUMNS_USED = ['ZQUALITY', 'REMOVE', 'PHOTPTYPE', 'FIBERMAG_R', 'SPEC_Z',
+                'RHOST_KPC', 'HOST_VHOST', 'SATS', 'OBJ_NSAID', 'HOST_NSAID',
+                'SPEC_REPEAT',
+                'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
+
 has_spec = Query('ZQUALITY >= 3')
 is_clean = Query('REMOVE == -1')
 is_galaxy = Query('PHOTPTYPE == 3')

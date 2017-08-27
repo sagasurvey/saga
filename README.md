@@ -30,12 +30,12 @@ hosts_no_sdss_flags = saga_hosts.load('no_sdss_flags')
 specs = saga_objects.load(has_spec=True, cuts=C.basic_cut)
 
 # load base catalogs for all paper1 hosts with the same basic cuts into a list:
-base_paper1 = list(saga_objects.load(hosts='paper1', cuts=C.basic_cut, iter_hosts=True))
+base_paper1 = saga_objects.load(hosts='paper1', cuts=C.basic_cut, return_as='list')
 
 # count number of satellites
 for base in base_paper1:
     print(base['HOST_NSAID'][0], '# of satellites', C.is_sat.count(base))
 
 # load all base catalogs with the same basic cuts into a list
-base_all = list(saga_objects.load(cuts=C.basic_cut, iter_hosts=True))
+base_all = saga_objects.load(cuts=C.basic_cut, return_as='list')
 ```

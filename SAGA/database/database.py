@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from astropy.table import Table
 from ..utils import gzip_compress
 
@@ -57,6 +58,18 @@ class FitsTable(DataObject):
                 gzip_compress(tmp_path, self._path)
 
 
+class NumpyBinary(DataObject):
+    def __init__(self, path):
+        self._path = path
+
+    def _read(self):
+        return np.load(self._path)
+
+    def _write(self, table, overwrite=False):
+        if overwrite or not os.path.isfile(self._path):
+            np.savez(self._path, **table)
+
+
 class Database(object):
     """
     This class provide the interface between the filesystem and other parts of
@@ -100,6 +113,7 @@ class Database(object):
         }
 
         if self._root_dir is not None:
+            self._tables['gmm_parameters'] = NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz'))
             self._tables['spectra_clean'] = FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))
 
     def __getitem__(self, key):

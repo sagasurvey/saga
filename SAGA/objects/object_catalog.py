@@ -50,7 +50,7 @@ class ObjectCatalog(object):
         return table
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, iter_hosts=False, columns=None):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None):
         """
         load object catalogs (aka "base catalogs")
 
@@ -66,15 +66,18 @@ class ObjectCatalog(object):
         cuts : easyquery.Query, str, tuple, optional
             To apply to the objects when loaded
 
-        iter_hosts : bool, optional
-            If set to True, return an iterator for looping over hosts
+        return_as : str, optional
+            If set to 'list' (default when `has_spec` is None), return a list that contains all tables
+            If set to 'stacked' (default when `has_spec` is True), return a stacked table
+            If set to 'iter', return an iterator for looping over hosts
 
         columns : list, optional
             If set, only load a subset of columns
 
         Returns
         -------
-        objects : astropy.table.Table
+        objects : astropy.table.Table, list, or iterator
+            (depending on `return_as`)
 
         Examples
         --------
@@ -91,12 +94,19 @@ class ObjectCatalog(object):
 
         Load base catalog for all paper1 hosts, with some basic cuts applied,
         and stored as a list:
-        >>> base_tables = list(saga_objects.load(hosts='paper1', cuts=C.basic_cut, iter_hosts=True))
+        >>> base_tables = saga_objects.load(hosts='paper1', cuts=C.basic_cut, return_as='list')
 
         Load base catalog for all paper1 hosts, with some basic cuts applied,
         and stored as one single big table:
-        >>> bases_table = saga_objects.load(hosts='paper1', cuts=C.basic_cut)
+        >>> bases_table = saga_objects.load(hosts='paper1', cuts=C.basic_cut, return_as='stacked')
         """
+
+        if return_as is None:
+            return_as = 'stacked' if has_spec else 'list'
+        return_as = return_as.lower()
+        if return_as[0] not in 'sli':
+            raise ValueError('`return_as` should be "list", "stacked", or "iter"')
+
         if has_spec:
             t = self._database['spectra_clean'].read()
 
@@ -109,12 +119,13 @@ class ObjectCatalog(object):
             if cuts is not None:
                 t = Query(cuts).filter(t)
 
-            if iter_hosts:
+            if return_as[0] == 's':
+                return _slice_columns(t, columns)
+            else:
                 if hosts is None:
                     host_ids = np.unique(t['HOST_NSAID'])
-                return (Query('HOST_NSAID == {}'.format(i)).filter(t) for i in host_ids)
-            else:
-                return _slice_columns(t, columns)
+                output_iterator = (Query('HOST_NSAID == {}'.format(i)).filter(t) for i in host_ids)
+                return output_iterator if return_as[0] == 'i' else list(output_iterator)
 
         else:
             q = Query(cuts)
@@ -125,7 +136,12 @@ class ObjectCatalog(object):
 
             output_iterator = (_slice_columns(q.filter(self._add_colors(self._database['base', host].read())), columns) for host in hosts)
 
-            return output_iterator if iter_hosts else vstack(list(output_iterator))
+            if return_as[0] == 'i':
+                return output_iterator
+            elif return_as[0] == 'l':
+                return list(output_iterator)
+            else:
+                return vstack(list(output_iterator))
 
 
     def build(self, hosts=None, rebuild=False):

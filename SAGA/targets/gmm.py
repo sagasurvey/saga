@@ -1,8 +1,7 @@
 import os
 import numpy as np
 from scipy.misc import logsumexp
-
-_colors = ('ug', 'gr', 'ri', 'iz')
+from ..utils import get_sdss_colors
 
 # compute distance from GMM model with diagonal or full covariances
 def _GMMlogposterior(y, yerr, xmap, xmean, xcovar):
@@ -48,8 +47,8 @@ def _change_table_format(table, cols):
 
 def calc_satellite_probability(base, model_parameters):
 
-    colors = _change_table_format(base, _colors)
-    colors_err = _change_table_format(base, ('{}_err'.format(c) for c in _colors))
+    colors = _change_table_format(base, get_sdss_colors())
+    colors_err = _change_table_format(base, ('{}_err'.format(c) for c in get_sdss_colors()))
 
     p_notsat = _GMMlogposterior(colors, colors_err,
                                 model_parameters['xamp_nosat'],

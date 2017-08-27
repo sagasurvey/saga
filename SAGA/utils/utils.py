@@ -11,9 +11,19 @@ from astropy.units import Quantity
 
 SPEED_OF_LIGHT = 299792.458 # in km/s
 
+_sdss_bands = 'ugriz'
+
+
+def get_sdss_bands():
+    return list(_sdss_bands)
+
+
+def get_sdss_colors():
+    return list(map(''.join, zip(_sdss_bands[:-1], _sdss_bands[1:])))
+
 
 def get_empty_str_array(array_length, string_length=48):
-    return np.chararray((array_length,), itemsize=string_length, unicode=False)
+    return np.chararray((array_length,), itemsize=string_length, unicode=True)
 
 
 def get_logger(level='WARNING'):

@@ -1,8 +1,9 @@
-from easyquery import Query
+from astropy.table import vstack
 from ..objects import ObjectCatalog
 from ..objects import cuts as C
-from ..utils import fill_values_by_query, get_empty_str_array
-from .gmm import calc_satellite_probability
+from ..utils import get_sdss_colors
+
+from .assign_targeting_score import assign_targeting_score
 
 _colors = ['ug', 'gr', 'ri', 'iz']
 
@@ -11,25 +12,28 @@ class TargetSelection(object):
         self._database = database
         self._objects = ObjectCatalog(self._database)
 
-    def select_preliminary_targets(self, host_id, return_columns=['OBJID', 'RA', 'DEC']):
-        columns = list(set(return_columns + _colors + ['{}_err'.format(c) for c in _colors] + ['OBJID']))
+    def compile_preliminary_targets(self, hosts=None, return_as='list', return_columns=('OBJID', 'RA', 'DEC')):
 
-        base = self._objects.load(hosts=host_id, has_spec=False, cuts=C.basic_cut, columns=columns)
+        return_as = return_as.lower()
+        if return_as[0] not in 'sli':
+            raise ValueError('`return_as` should be "list", "stacked", or "iter"')
 
-        base['TARGETING_LABEL'] = get_empty_str_array(len(base))
-        base['TARGETING_SCORE'] = 9999.0
+        columns_in = list(set(list(return_columns) + get_sdss_colors() \
+                + ['{}_err'.format(c) for c in get_sdss_colors()] \
+                + ['OBJID', 'RA', 'DEC'] + C.COLUMNS_USED))
 
-        n_bright = fill_values_by_query(base, C.sdss_limit, {'TARGETING_LABEL':'BRIGHT', 'TARGETING_SCORE': 0.0})
+        columns_out = list(return_columns) + ['TARGETING_LABEL', 'TARGETING_SCORE']
 
-        risa_objid = self._database._table['risa_objects'].read()['OBJID']
-        n_risa = fill_values_by_query(base,  Query((lambda x: np.in1d(x, risa_objid), 'OBJID')),
-                                      {'TARGETING_LABEL':'RISA', 'TARGETING_SCORE': 1.0})
+        manual_selected_objids = None #np.unique(self._database['manual_targets'].read()['OBJID'])
+        gmm_parameters = self._database['gmm_parameters'].read()
+        weight_func_parameters = None #TODO
 
-        p = calc_satellite_probability(base, self._database._table['gmm_model_para'].read())
-        p_mask = (p > 0.5)
-        base['TARGETING_LABEL'][p_mask] = 'HIGH_P_GMM'
-        base['TARGETING_SCORE'][p_mask] = 3.0 - p[p_mask]
+        output_iter = (assign_targeting_score(base, manual_selected_objids, gmm_parameters, weight_func_parameters)[columns_out]\
+                for base in self._objects.load(hosts=hosts, columns=columns_in, return_as='iter'))
 
-        #TODO: finish this
-
-        return base
+        if return_as[0] == 'i':
+            return output_iter
+        elif return_as[0] == 'l':
+            return list(output_iter)
+        elif return_as[0] == 's':
+            return vstack(list(output_iter))

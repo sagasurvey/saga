@@ -22,7 +22,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     base : astropy.table.Table
     """
 
-    if ('HOST_NSAID' in base and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
+    if ('HOST_NSAID' in base.columns and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
         raise ValueError('Existing host info and differs from input host info.')
 
     base['HOST_NSAID'] = host['NSAID']
@@ -41,7 +41,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
 
     cols = ('HOST_SAGA_NAME', 'HOST_NGC_NAME')
     for col in cols:
-        if col not in base:
+        if col not in base.columns:
             base[col] = get_empty_str_array(len(base))
 
     if saga_names:
@@ -101,7 +101,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     -------
     base : astropy.table.Table
     """
-    if 'REMOVE' not in base:
+    if 'REMOVE' not in base.columns:
         base['REMOVE'] = -1
 
     ids_to_remove = np.unique(objects_to_remove['SDSS ID'].data.compressed())
@@ -218,21 +218,21 @@ def add_spectra(base, spectra, ignore_imacs=False):
 
     cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'specobjid')
 
-    if 'REMOVE' not in base:
+    if 'REMOVE' not in base.columns:
         base['REMOVE'] = -1
-    if 'TELNAME' not in base:
+    if 'TELNAME' not in base.columns:
         base['TELNAME'] = get_empty_str_array(len(base), 6)
-    if 'MASKNAME' not in base:
+    if 'MASKNAME' not in base.columns:
         base['MASKNAME'] = get_empty_str_array(len(base))
-    if 'ZQUALITY' not in base:
+    if 'ZQUALITY' not in base.columns:
         base['ZQUALITY'] = -1
-    if 'SPEC_Z' not in base:
+    if 'SPEC_Z' not in base.columns:
         base['SPEC_Z'] = -1.0
-    if 'SPEC_Z_ERR' not in base:
+    if 'SPEC_Z_ERR' not in base.columns:
         base['SPEC_Z_ERR'] = -1.0
-    if 'SPEC_REPEAT' not in base:
+    if 'SPEC_REPEAT' not in base.columns:
         base['SPEC_REPEAT'] = get_empty_str_array(len(base))
-    if 'SPECOBJID' not in base:
+    if 'SPECOBJID' not in base.columns:
         base['SPECOBJID'] = get_empty_str_array(len(base), 48)
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
@@ -319,7 +319,7 @@ def find_satelites(base):
     base : astropy.table.Table
     """
 
-    if 'SATS' not in base:
+    if 'SATS' not in base.columns:
         base['SATS'] = -1
 
     fill_values_by_query(base, C.is_galaxy & C.is_high_z, {'SATS':0})
