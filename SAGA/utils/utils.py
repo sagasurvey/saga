@@ -85,7 +85,7 @@ def join_table_by_coordinates(table, table_to_join,
     dec2 = table_to_join_dec_name
 
     idx1, idx2 = search_around_sky(SkyCoord(t1[ra1], t1[dec1], unit=unit),
-                                   SkyCoord(t1[ra1], t1[dec1], unit=unit),
+                                   SkyCoord(t2[ra2], t2[dec2], unit=unit),
                                    Quantity(max_distance, unit=unit))[:2]
 
     n_matched = len(idx1)

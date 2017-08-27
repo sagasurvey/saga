@@ -11,7 +11,9 @@ def assign_targeting_score(base, manual_selected_objids=None,
         base['TARGETING_LABEL'] = ''
     else:
         base['TARGETING_LABEL'] = get_empty_str_array(len(base))
-    base['TARGETING_SCORE'] = 9999.0
+    base['TARGETING_SCORE'] = 200.0
+
+    fill_values_by_query(base, C.gri_cut, {'TARGETING_LABEL':'WITHIN_GRI_CUT', 'TARGETING_SCORE': 100.0})
 
     if weight_func_parameters:
         pass
@@ -31,10 +33,10 @@ def assign_targeting_score(base, manual_selected_objids=None,
             {'TARGETING_LABEL':'BRIGHT', 'TARGETING_SCORE': 0.0})
 
     fill_values_by_query(base, ~C.basic_cut, \
-            {'TARGETING_LABEL':'NOT_WITHIN_BASIC_CUT', 'TARGETING_SCORE': 8000.0})
+            {'TARGETING_LABEL':'NOT_WITHIN_BASIC_CUT', 'TARGETING_SCORE': 300.0})
 
     fill_values_by_query(base, C.has_spec, \
-            {'TARGETING_LABEL':'HAS_SPEC', 'TARGETING_SCORE': 9000.0})
+            {'TARGETING_LABEL':'HAS_SPEC', 'TARGETING_SCORE': 400.0})
 
     base.sort('TARGETING_SCORE')
     return base
