@@ -40,6 +40,9 @@ class DataObject(object):
     def clear(self):
         self._table = None
 
+    def isfile(self):
+        return os.path.isfile(self.path)
+
 
 class CSVTable(DataObject):
     _keep_table_default = True
@@ -117,6 +120,12 @@ class Database(object):
         path to the shared SAGA Dropbox root directory
         if you don't have access, set to None.
 
+    Notes
+    -----
+    Use database[key].read() to access the file.
+    Use database[key].path to overwrite the file path.
+    For base catalogs, key should be in the form of ('base', host_id).
+
     Examples
     --------
     >>> import SAGA
@@ -127,7 +136,7 @@ class Database(object):
     If you don't have access to SAGA Dropbox, you can do:
     >>> saga_database = SAGA.Database()
     >>> saga_database['base', 32].path = 'base_catalogs/base_sql_nsa32.fits.gz'
-    >>> saga_database['spectra_clean'].path = 'saga_spectra_clean.fits.gz'
+    >>> saga_database['spectra_clean'].path = 'data/saga_spectra_clean.fits.gz'
 
     If you don't have internet, you can do things like
     >>> saga_database['hosts_named'].path = 'hosts_named.csv'
@@ -135,7 +144,10 @@ class Database(object):
     """
 
     def __init__(self, root_dir=None):
-        if root_dir is not None and not os.path.isdir(root_dir):
+        if root_dir is None:
+            root_dir = os.curdir
+
+        if not os.path.isdir(root_dir):
             raise ValueError('cannot locate {}'.format(root_dir))
 
         self._root_dir = root_dir
@@ -147,11 +159,9 @@ class Database(object):
             'objects_to_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1),
             'objects_to_add': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1),
             'satellites_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 1),
+            'gmm_parameters': NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz')),
+            'spectra_clean': FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz')),
         }
-
-        if self._root_dir is not None:
-            self._tables['gmm_parameters'] = NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz'))
-            self._tables['spectra_clean'] = FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))
 
 
     def __getitem__(self, key):
@@ -160,8 +170,18 @@ class Database(object):
 
         if isinstance(key, tuple) and len(key) == 2 and key[0] == 'base':
             path = os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz'.format(key[1]))
-            if os.path.isfile(path):
-                self._tables[key] = FitsTable(path)
-                return self._tables[key]
+            self._tables[key] = FitsTable(path)
+            return self._tables[key]
 
         raise KeyError('cannot find {} in database'.format(key))
+
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+
+    def keys(self):
+        return self._tables.keys()
