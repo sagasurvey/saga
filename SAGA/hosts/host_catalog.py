@@ -4,6 +4,9 @@ SAGA.host.host_catalog
 This file defines the HostCatalog class
 """
 
+from astropy.coordinates import SkyCoord
+from easyquery import Query
+
 __all__ = ['HostCatalog']
 
 class HostCatalog(object):
@@ -149,4 +152,33 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_hosts.load('no_flags')
         >>> hosts_no_sdss_flag = saga_hosts.load('no_sdss_flags')
         """
+        res = self._database['hosts_{}'.format(host_type)].read(reload=reload)
+        self._annotate_catalog(res)
+        return res
+
+    def _annotate_catalog(self, cat_table):
+        cat_table['coord'] = SkyCoord(cat_table['RA'], cat_table['Dec'],
+                                      unit='deg')
+
+    def get_host_row(self, hostname):
+        """
+        Gets the catalog row corresponding to a specific named host.
+
+        Parameters
+        ----------
+        hostname : str
+            The name of the host, in any form that `resolve_id` understands.
+        Returns
+        -------
+        hostrow
+            An astropy table row for the requested host.
+
+        """
+        host_id = self.resolve_id(hostname)
+        assert len(host_id) == 1
+        host_id = host_id[0]
+
+        res = Query('NSAID == {}'.format(host_id)).filter(self.load())
+        assert len(res) == 1
+        return res[0]
         return self._database['hosts_{}'.format(host_type)].read(reload=reload)
