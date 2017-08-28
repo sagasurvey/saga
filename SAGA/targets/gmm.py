@@ -45,7 +45,7 @@ def _change_table_format(table, cols):
         return np.vstack((table[c].data for c in cols)).T
 
 
-def calc_satellite_probability(base, model_parameters):
+def calc_gmm_satellite_probability(base, model_parameters):
 
     colors = _change_table_format(base, get_sdss_colors())
     colors_err = _change_table_format(base, ('{}_err'.format(c) for c in get_sdss_colors()))
