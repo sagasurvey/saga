@@ -6,4 +6,4 @@ from .database import Database
 from .hosts import HostCatalog
 from .objects import ObjectCatalog, ObjectCuts
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
