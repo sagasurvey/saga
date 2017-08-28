@@ -153,32 +153,37 @@ class HostCatalog(object):
         >>> hosts_no_sdss_flag = saga_hosts.load('no_sdss_flags')
         """
         res = self._database['hosts_{}'.format(host_type)].read(reload=reload)
-        self._annotate_catalog(res)
-        return res
+        return self._annotate_catalog(res)
 
-    def _annotate_catalog(self, cat_table):
-        cat_table['coord'] = SkyCoord(cat_table['RA'], cat_table['Dec'],
-                                      unit='deg')
 
-    def get_host_row(self, hostname):
+    @staticmethod
+    def _annotate_catalog(table):
+        table['coord'] = SkyCoord(table['RA'], table['Dec'], unit='deg')
+        return table
+
+
+    def load_single(self, host, reload=False):
         """
         Gets the catalog row corresponding to a specific named host.
 
         Parameters
         ----------
-        hostname : str
-            The name of the host, in any form that `resolve_id` understands.
+        host : str, int
+            The name or ID of the host, in any form that `resolve_id` understands.
+
         Returns
         -------
-        hostrow
+        host_row : astropy.table.Row
             An astropy table row for the requested host.
 
+        Examples
+        --------
+        >>> anak = saga_hosts.load_single('AnaK')
         """
-        host_id = self.resolve_id(hostname)
+        host_id = self.resolve_id(host)
         assert len(host_id) == 1
         host_id = host_id[0]
 
-        res = Query('NSAID == {}'.format(host_id)).filter(self.load())
+        res = Query('NSAID == {}'.format(host_id)).filter(self.load('no_sdss_flags', reload=reload))
         assert len(res) == 1
         return res[0]
-        return self._database['hosts_{}'.format(host_type)].read(reload=reload)

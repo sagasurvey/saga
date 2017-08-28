@@ -68,7 +68,9 @@ def join_table_by_coordinates(table, table_to_join,
                               max_distance=1.0*u.arcsec, missing_value=np.nan,
                               table_ra_name='RA', table_dec_name='DEC',
                               table_to_join_ra_name='RA',
-                              table_to_join_dec_name='DEC', unit='deg'):
+                              table_to_join_dec_name='DEC', unit='deg',
+                              table_coord_name='coord',
+                              table_to_join_coord_name='coord'):
     """
     Join two table by matching the sky coordinates.
 
@@ -98,12 +100,12 @@ def join_table_by_coordinates(table, table_to_join,
 
     # note that if a unit-ful ra/dec are present, the *unit* argument here is
     # ignored
-    if 'coord' in t1.colnames:
-        sc1 = t1['coord']
+    if table_coord_name in t1.colnames:
+        sc1 = t1[table_coord_name]
     else:
         sc1 = SkyCoord(t1[ra1], t1[dec1], unit=unit)
-    if 'coord' in t2.colnames:
-        sc2 = t2['coord']
+    if table_to_join_coord_name in t2.colnames:
+        sc2 = t2[table_to_join_coord_name]
     else:
         sc2 = SkyCoord(t2[ra2], t2[dec2], unit=unit)
     idx1, idx2 = search_around_sky(sc1, sc2, max_distance)[:2]
