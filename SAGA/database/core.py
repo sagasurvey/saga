@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from astropy.table import Table
+from astropy.io import fits
 from ..utils import gzip_compress
 
 
@@ -72,12 +73,23 @@ class GoogleSheets(DataObject):
 
 
 class FitsTable(DataObject):
-    def __init__(self, path, compress_after_write=True):
+    def __init__(self, path, compress_after_write=True, masked_table=False):
         self.path = path
         self.compress_after_write = compress_after_write
+        self.masked_table = masked_table
 
     def _read(self):
-        return Table.read(self.path, format='fits')
+        # From Erik (eteq)
+        # the read method *could* work in all cases, but it's slower than the
+        # other because it  accounts for masked values... but the SDSS catalog
+        # files seem to just be *wrong* in their treatment of masked/null
+        # values...so we use this other approach because it doesn't
+        # have the masking-associated overhead (which is useless here).
+        if self.masked_table:
+            return Table.read(self.path, format='fits')
+        else:
+            with fits.open(self.path) as f:
+                return Table(f[1].data)
 
     def _write(self, table):
         tmp_path = self.path + ('_tmp.fits' if self.compress_after_write else '')
