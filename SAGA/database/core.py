@@ -127,7 +127,7 @@ class Database(object):
     If you don't have access to SAGA Dropbox, you can do:
     >>> saga_database = SAGA.Database()
     >>> saga_database['base', 32].path = 'base_catalogs/base_sql_nsa32.fits.gz'
-    >>> saga_database['spectra_clean'] = 'saga_spectra_clean.fits.gz'
+    >>> saga_database['spectra_clean'].path = 'saga_spectra_clean.fits.gz'
 
     If you don't have internet, you can do things like
     >>> saga_database['hosts_named'].path = 'hosts_named.csv'
