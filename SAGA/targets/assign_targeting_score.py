@@ -8,7 +8,7 @@ __all__ = ['assign_targeting_score', 'calc_simple_satellite_probability', 'calc_
 
 
 def calc_simple_satellite_probability(base,
-        model_parameters=(-0.84526801109313965, -0.53434252738952637, -1.0123661994934081, 0.19062581313890253, 9.3267454076000611, 0.055147320946337328)):
+        model_parameters=(-0.84526783, -0.53434289, -1.0123662441968917, 0.18628167890581865, 9.4021013202593942, 0.055890285233031099)):
     x = np.asarray(base['gr'])*model_parameters[0] + np.asarray(base['ri'])*model_parameters[1]
     return np.where(x > model_parameters[2], np.minimum(np.exp((x-model_parameters[3])*model_parameters[4]), model_parameters[5]), 0.0)
 
