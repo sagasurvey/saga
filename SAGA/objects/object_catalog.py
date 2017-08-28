@@ -1,5 +1,6 @@
 import numpy as np
 from astropy.table import vstack
+from astropy.coordinates import SkyCoord
 from easyquery import Query
 from . import cuts as C
 from ..hosts import HostCatalog
@@ -40,7 +41,7 @@ class ObjectCatalog(object):
 
 
     @staticmethod
-    def _add_colors(table):
+    def _annotate_catalog(table):
         sdss_bands = 'ugriz'
         for b in sdss_bands:
             table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
@@ -48,6 +49,8 @@ class ObjectCatalog(object):
         for color in map(''.join, zip(sdss_bands[:-1], sdss_bands[1:])):
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
             table['{}_err'.format(color)] = np.sqrt(table['{}_err'.format(color[0])]**2.0 + table['{}_err'.format(color[1])]**2.0)
+
+        table['coord'] = SkyCoord(table['RA'], table['DEC'], unit='deg')
 
         return table
 
@@ -116,7 +119,7 @@ class ObjectCatalog(object):
                 host_ids = self._hosts.resolve_id(hosts)
                 t = Query((lambda x: np.in1d(x, host_ids), 'HOST_NSAID')).filter(t)
 
-            t = self._add_colors(t)
+            t = self._annotate_catalog(t)
 
             if cuts is not None:
                 t = Query(cuts).filter(t)
@@ -136,7 +139,7 @@ class ObjectCatalog(object):
 
             hosts = self._hosts.resolve_id('all') if hosts is None else self._hosts.resolve_id(hosts)
 
-            output_iterator = (_slice_columns(q.filter(self._add_colors(self._database['base', host].read())), columns) for host in hosts)
+            output_iterator = (_slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read())), columns) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
