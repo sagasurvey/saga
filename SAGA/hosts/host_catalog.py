@@ -40,11 +40,19 @@ class HostCatalog(object):
 
     def __init__(self, database):
         self._database = database
-        self._all_host_ids = self.load()['NSAID'].tolist()
+        try:
+            self._all_host_ids = self.load()['NSAID'].tolist()
+        except FileNotFoundError:
+            self._all_host_ids = []
 
-        t = self._database['hosts_named'].read()
-        self._host_name_to_id = dict(zip((n.lower() for n in t['SAGA']), t['NSA']))
-        self._host_id_to_name = dict(zip(t['NSA'], t['SAGA']))
+        try:
+            t = self._database['hosts_named'].read()
+        except FileNotFoundError:
+            self._host_name_to_id = dict()
+            self._host_id_to_name = dict()
+        else:
+            self._host_name_to_id = dict(zip((n.lower() for n in t['SAGA']), t['NSA']))
+            self._host_id_to_name = dict(zip(t['NSA'], t['SAGA']))
 
 
     def resolve_id(self, hosts):
@@ -85,7 +93,7 @@ class HostCatalog(object):
         except AttributeError:
             pass
         else:
-            if hosts == 'all':
+            if hosts == 'all' and self._all_host_ids:
                 return self._all_host_ids
             elif hosts == 'paper1_complete':
                 return list(self._paper1_complete_hosts)
@@ -117,7 +125,7 @@ class HostCatalog(object):
         -------
         host_saga_name : str
         """
-        return self._host_id_to_name.get(host_id)
+        return self._host_id_to_name[int(host_id)]
 
 
     def load(self, host_type='no_flags', reload=False):
