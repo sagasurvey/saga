@@ -75,6 +75,9 @@ def join_table_by_coordinates(table, table_to_join,
     The `unit` input controls how the tables' coordinates are interpreted, and
     also the `max_distance`, but *only* if they are not quantity objects.
 
+    Also, note that if the tables have a `'coord'` column, that will be used as
+    the SkyCoord *instead* of accessing ``table_ra_name``/``table_dec_name``.
+
     Examples
     --------
     wise_cols = ('W1_MAG', 'W1_MAG_ERR', 'W2_MAG', 'W2_MAG_ERR')
@@ -95,9 +98,15 @@ def join_table_by_coordinates(table, table_to_join,
 
     # note that if a unit-ful ra/dec are present, the *unit* argument here is
     # ignored
-    idx1, idx2 = search_around_sky(SkyCoord(t1[ra1], t1[dec1], unit=unit),
-                                   SkyCoord(t2[ra2], t2[dec2], unit=unit),
-                                   max_distance)[:2]
+    if 'coord' in t1.colnames:
+        sc1 = t1['coord']
+    else:
+        sc1 = SkyCoord(t1[ra1], t1[dec1], unit=unit)
+    if 'coord' in t2.colnames:
+        sc2 = t2['coord']
+    else:
+        sc2 = SkyCoord(t2[ra2], t2[dec2], unit=unit)
+    idx1, idx2 = search_around_sky(sc1, sc2, max_distance)[:2]
 
     n_matched = len(idx1)
 
