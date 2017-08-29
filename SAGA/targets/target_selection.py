@@ -27,7 +27,7 @@ class TargetSelection(object):
         if columns is None:
             columns_out = None
         else:
-            columns_out = list(columns) + ['TARGETING_SCORE', 'P_SIMPLE']
+            columns_out = list(columns) + ['TARGETING_SCORE', 'P_SIMPLE', 'P_GMM']
 
         manual_selected_objids = None #np.unique(self._database['manual_targets'].read()['OBJID'])
         gmm_parameters = self._database['gmm_parameters'].read()

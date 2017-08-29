@@ -15,6 +15,31 @@ def calc_simple_satellite_probability(base,
 
 def assign_targeting_score(base, manual_selected_objids=None,
                            gmm_parameters=None):
+    """
+    100 Bright
+
+    200 Human selection
+
+    300 GMM high-p
+
+    400 Simple 1D model high-p
+
+    500 Outside host
+    510 but bright
+
+    600 Fainter but high-p
+
+    700 Outside gri but high-p
+
+    800
+
+    900 Other
+    950 outside host
+    960 fainter
+    970 Outside gri
+    990 Removed
+    999 Have spec
+    """
 
     base['TARGETING_SCORE'] = 900.0
 
