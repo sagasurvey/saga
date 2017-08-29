@@ -50,7 +50,9 @@ class FileObject(object):
                 shutil.copyfileobj(r.raw, f)
 
     def isfile(self):
-        return os.path.isfile(self.path)
+        if self.path:
+            return os.path.isfile(self.path)
+        return False
 
 
 class CsvTable(FileObject):
@@ -305,7 +307,11 @@ class Database(object):
         self._tables = {
             'gmm_parameters': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz'))),
             'spectra_clean': DataObject(FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))),
+            'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits')),
+            'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits')),
         }
+
+        self._tables['nsa'] = self._tables['nsa_v1.0.1']
 
         for k, v in _known_google_sheets.items():
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
