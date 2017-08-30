@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='SAGA',
-    version='0.2.7',
+    version='0.3.0',
     description='Code to access, create and edit SAGA Survey data catalogs.',
     url='https://github.com/sagasurvey/saga',
     author='The SAGA Survey',

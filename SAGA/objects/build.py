@@ -1,11 +1,18 @@
 import numpy as np
 import numexpr as ne
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, join
+from astropy.table import Table, join, vstack
+from astropy.constants import c
 from easyquery import Query
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
 from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array, get_sdss_bands
+
+
+__all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise', 'set_remove_flag',
+           'remove_shreds_with_nsa', 'remove_shreds_with_sdss', 'clean_repeat_spectra',
+           'add_spectra', 'find_satellites', 'apply_manual_fixes', 'add_stellar_mass',
+           'build_full_stack']
 
 
 def initialize_base_catalog(base):
@@ -50,7 +57,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     base : astropy.table.Table
     """
 
-    if ('HOST_NSAID' in base.columns and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
+    if ('HOST_NSAID' in base.colnames and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
         raise ValueError('Host info exists and differs from input host info.')
 
     base['HOST_NSAID'] = np.int32(host['NSAID'])
@@ -109,7 +116,7 @@ def add_wise(base, wise, missing_value=9999.0):
     del wise
 
     for k, v in cols_rename.items():
-        if v not in base.columns:
+        if v not in base.colnames:
             base[v] = np.float32(missing_value)
         t[k][np.isnan(t[k])] = missing_value
         base[v][t['index']] = t[k]
@@ -134,9 +141,10 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     base : astropy.table.Table
     """
 
-    ids_to_remove = np.unique(objects_to_remove['SDSS ID'].data.compressed())
-    fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
-    del ids_to_remove
+    if objects_to_remove is not None:
+        ids_to_remove = np.unique(objects_to_remove['SDSS ID'].data.compressed())
+        fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
+        del ids_to_remove
 
     fill_values_by_query(base, C.too_close_to_host, {'REMOVE': 1})
 
@@ -156,8 +164,9 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
     fill_values_by_query(base, q, {'REMOVE': 3})
 
-    ids_to_add = np.unique(objects_to_add['SDSS ID'].data.compressed())
-    fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
+    if objects_to_add is not None:
+        ids_to_add = np.unique(objects_to_add['SDSS ID'].data.compressed())
+        fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
 
     return base
 
@@ -273,6 +282,52 @@ def remove_shreds_with_sdss(base):
     return base
 
 
+def clean_repeat_spectra(spectra):
+    """
+    Clean all spectra to remove repeats.
+    `spectra` is modified in-place.
+
+    Parameters
+    ----------
+    spectra : astropy.table.Table
+
+    Returns
+    -------
+    spectra : astropy.table.Table
+    """
+
+    if 'coord' not in spectra.colnames:
+        spectra['coord'] = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
+
+    if 'SPEC_REPEAT' not in spectra.columns:
+        spectra['SPEC_REPEAT'] = get_empty_str_array(len(spectra))
+    else:
+        spectra['SPEC_REPEAT'] = ''
+
+    spectra['raw'] = True
+
+    for spec in spectra:
+        if not spec['raw']:
+            continue
+
+        # search nearby spectra in 3D
+        nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
+        nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < 30.0)
+        nearby_mask &= spectra['raw']
+        nearby_mask = np.where(nearby_mask)[0]
+        assert len(nearby_mask) >= 1
+
+        spectra['raw'][nearby_mask] = False
+
+        best_spec_idx = nearby_mask[spectra['ZQUALITY'][nearby_mask].argmax()]
+        spectra['SPEC_REPEAT'][best_spec_idx] = '+'.join(spectra['TELNAME'][nearby_mask])
+
+    del spectra['raw']
+    spectra = spectra[spectra['SPEC_REPEAT'] != '']
+
+    return spectra
+
+
 def add_spectra(base, spectra):
     """
     Add spectra to base catalog.
@@ -291,15 +346,18 @@ def add_spectra(base, spectra):
     cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID')
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
-    spectra = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
+    spectra = spectra[SkyCoord(spectra['RA'], spectra['DEC'], unit="deg").separation(host_sc).deg < 1.0]
 
     if len(spectra) == 0:
         return base
 
+    #spectra = vstack([spectra, base[['RA', 'DEC']+list(cols_to_copy)]], 'exact', 'error')
+    spectra = clean_repeat_spectra(spectra)
+
     for spec in spectra:
         sep = base['coord'].separation(spec['coord']).arcsec
 
-        nearby_obj_indices = np.where((sep < 5.0) & (base['REMOVE']==-1))[0]
+        nearby_obj_indices = np.where(sep < 5.0)[0]
         assert len(nearby_obj_indices) > 0
 
         nearby_nsa_indices = nearby_obj_indices[base['OBJ_NSAID'][nearby_obj_indices] > -1]
@@ -321,7 +379,7 @@ def add_spectra(base, spectra):
     return base
 
 
-def find_satelites(base):
+def find_satellites(base):
     """
     Add `SATS` column to the base catalog.
     `base` is modified in-place.
@@ -378,4 +436,24 @@ def add_stellar_mass(base):
     base : astropy.table.Table
     """
     #TODO: implement this
+    return base
+
+
+def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
+                     objects_to_remove=None, objects_to_add=None, spectra=None):
+
+    base = initialize_base_catalog(base)
+    base = add_host_info(base, host, saga_names)
+    if wise is not None:
+        base = add_wise(base, wise)
+    base = set_remove_flag(base, objects_to_remove, objects_to_add)
+    if nsa is not None:
+        base = remove_shreds_with_nsa(base, nsa)
+    base = remove_shreds_with_sdss(base)
+    if spectra:
+        base = add_spectra(base, spectra)
+    base = find_satellites(base)
+    base = apply_manual_fixes(base)
+    base = add_stellar_mass(base)
+
     return base

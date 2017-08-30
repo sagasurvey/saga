@@ -21,9 +21,10 @@ def get_sdss_colors():
     return list(map(''.join, zip(_sdss_bands[:-1], _sdss_bands[1:])))
 
 
-def get_empty_str_array(array_length, string_length=48):
-    return np.chararray((array_length,), itemsize=string_length, unicode=True)
-
+def get_empty_str_array(array_length, string_length=48, initialize_with=''):
+    a = np.empty(array_length, np.dtype('<U{}'.format(string_length)))
+    a[:] = initialize_with
+    return a
 
 def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None):
     url = 'http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}'.format(**locals())
