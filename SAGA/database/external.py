@@ -10,10 +10,6 @@ from .core import FitsTable
 __all__ = ['SdssQuery', 'WiseQuery']
 
 
-def clean_variable_name(varStr):
-    return re.sub(r'\W|^(?=\d)','', varStr)
-
-
 def ensure_deg(value):
     if isinstance(value, u.Quantity):
         return value.to(u.deg).value
@@ -32,11 +28,9 @@ class WiseQuery(FitsTable):
 class SdssQuery(object):
     def __init__(self, ra, dec, radius=1.0, host_name=None):
         self.query = self.construct_query(host_name, ra, dec, radius)
-
-        host_name = re.sub('[^A-Za-z]', '', host_name)
         if not host_name:
             host_name = 'saga'
-        self.host_name = host_name
+        self.host_name = re.sub('[^A-Za-z]', '', host_name)
 
 
     def download_as_file(self, file_path):
