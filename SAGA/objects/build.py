@@ -8,6 +8,33 @@ from .manual_fixes import fixes_by_sdss_objid
 from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array, get_sdss_bands
 
 
+def initialize_base_catalog(base):
+
+    base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
+
+    base['REMOVE'] = np.int16(-1)
+    base['ZQUALITY'] = np.int16(-1)
+    base['SATS'] = np.int16(-1)
+
+    base['SPEC_HA_EW'] = np.float32(-9999.0)
+    base['SPEC_HA_EWERR'] = np.float32(-9999.0)
+    base['OBJ_NSAID'] = np.int32(-1)
+
+    empty_str_arr = get_empty_str_array(len(base), 48)
+    base['HOST_SAGA_NAME'] = empty_str_arr
+    base['HOST_NGC_NAME'] = empty_str_arr
+    base['MASKNAME'] = empty_str_arr
+    base['SPEC_REPEAT'] = empty_str_arr
+    base['SPECOBJID'] = empty_str_arr
+
+    base['TELNAME'] = get_empty_str_array(len(base), 6)
+
+    fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
+    fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
+
+    return base
+
+
 def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
     """
     Add host information to the base catalog (for a single host).
@@ -26,24 +53,20 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     if ('HOST_NSAID' in base.columns and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
         raise ValueError('Host info exists and differs from input host info.')
 
-    base['HOST_NSAID'] = host['NSAID']
-    base['HOST_RA'] = host['RA']
-    base['HOST_DEC'] = host['Dec']
-    base['HOST_DIST'] = host['distance']
-    base['HOST_VHOST'] = host['vhelio']
-    base['HOST_MK'] = host['M_K']
-    base['HOST_MR'] = host['M_r']
-    base['HOST_MG'] = host['M_g']
+    base['HOST_NSAID'] = np.int32(host['NSAID'])
+    base['HOST_RA'] = np.float32(host['RA'])
+    base['HOST_DEC'] = np.float32(host['Dec'])
+    base['HOST_DIST'] = np.float32(host['distance'])
+    base['HOST_VHOST'] = np.float32(host['vhelio'])
+    base['HOST_MK'] = np.float32(host['M_K'])
+    base['HOST_MR'] = np.float32(host['M_r'])
+    base['HOST_MG'] = np.float32(host['M_g'])
 
     host_sc = SkyCoord(host['RA'], host['Dec'], unit='deg')
-    sep = SkyCoord(base['RA'], base['DEC'], unit="deg").separation(host_sc)
-    base['RHOST_ARCM'] = sep.arcmin
-    base['RHOST_KPC'] = np.sin(sep.radian) * (1000.0 * host['distance'])
-
-    cols = ('HOST_SAGA_NAME', 'HOST_NGC_NAME')
-    for col in cols:
-        if col not in base.columns:
-            base[col] = get_empty_str_array(len(base))
+    sep = base['coord'].separation(host_sc)
+    base['RHOST_ARCM'] = sep.arcmin.astype(np.float32)
+    base['RHOST_KPC'] = (np.sin(sep.radian) * (1000.0 * host['distance'])).astype(np.float32)
+    del sep
 
     if saga_names:
         idx = np.where(saga_names['NSA'] == host['NSAID'])[0]
@@ -54,7 +77,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     return base
 
 
-def add_wise(base, wise, missing_value=-9999.0):
+def add_wise(base, wise, missing_value=9999.0):
     """
     Add more photometric data to the base catalog (for a single host).
     `base` is modified in-place.
@@ -83,10 +106,11 @@ def add_wise(base, wise, missing_value=-9999.0):
 
     t = Table({'OBJID':base['OBJID'], 'index':np.arange(len(base))})
     t = join(t, wise, keys='OBJID')
+    del wise
 
     for k, v in cols_rename.items():
         if v not in base.columns:
-            base[v] = missing_value
+            base[v] = np.float32(missing_value)
         t[k][np.isnan(t[k])] = missing_value
         base[v][t['index']] = t[k]
 
@@ -109,8 +133,6 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     -------
     base : astropy.table.Table
     """
-    if 'REMOVE' not in base.columns:
-        base['REMOVE'] = -1
 
     ids_to_remove = np.unique(objects_to_remove['SDSS ID'].data.compressed())
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
@@ -141,7 +163,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
 
 
 
-def fix_photometry_with_nsa(base, nsa):
+def remove_shreds_with_nsa(base, nsa):
     """
     Use NSA catalog to remove shereded object.
 
@@ -154,23 +176,6 @@ def fix_photometry_with_nsa(base, nsa):
     -------
     sdss : astropy.table.Table
     """
-
-    if 'TELNAME' not in base.columns:
-        base['TELNAME'] = get_empty_str_array(len(base), 6)
-    if 'MASKNAME' not in base.columns:
-        base['MASKNAME'] = get_empty_str_array(len(base))
-    if 'ZQUALITY' not in base.columns:
-        base['ZQUALITY'] = -1
-    if 'SPEC_REPEAT' not in base.columns:
-        base['SPEC_REPEAT'] = get_empty_str_array(len(base))
-    if 'SPECOBJID' not in base.columns:
-        base['SPECOBJID'] = get_empty_str_array(len(base), 48)
-    if 'SPEC_HA_EW' not in base.columns:
-        base['SPEC_HA_EW'] = -9999.0
-    if 'SPEC_HA_EWERR' not in base.columns:
-        base['SPEC_HA_EWERR'] = -9999.0
-    if 'OBJ_NSAID' not in base.columns:
-        base['OBJ_NSAID'] = -1
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     nsa = nsa[SkyCoord(nsa['RA'], nsa['DEC'], unit="deg").separation(host_sc).deg < 1.0]
@@ -192,7 +197,7 @@ def fix_photometry_with_nsa(base, nsa):
         }
 
         r2_ellipse = ne.evaluate('(((RA-nra)*c - (DEC-ndec)*s)/a)**2.0 + (((RA-nra)*s + (DEC-ndec)*c)/b)**2.0',
-                    local_dict=values_for_ellipse_calculation, global_dict={})
+                                 local_dict=values_for_ellipse_calculation, global_dict={})
 
         closest_base_obj_index = r2_ellipse.argmin()
         assert r2_ellipse[closest_base_obj_index] < 1.0
@@ -236,6 +241,37 @@ def fix_photometry_with_nsa(base, nsa):
     return base
 
 
+def remove_shreds_with_sdss(base):
+    """
+    Use NSA catalog to remove shereded object.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+    nsa : astropy.table.Table
+
+    Returns
+    -------
+    sdss : astropy.table.Table
+    """
+
+    sdss_specs = Query('SPEC_Z > 0.05', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE==-1').filter(base)
+
+    for i, spec in enumerate(sdss_specs):
+
+        nearby_obj_indices = np.where(base['coord'].separation(spec['coord']).arcsec < 1.25 * spec['PETRORAD_R'])[0]
+        nearby_obj_indices = nearby_obj_indices[nearby_obj_indices != i]
+
+        if len(nearby_obj_indices) == 0:
+            continue
+
+        base['REMOVE'][nearby_obj_indices] = 4
+
+        if len(nearby_obj_indices) > 25:
+            print('Too many shreds around ({}, {})'.format(spec['RA'], spec['DEC']))
+
+    return base
+
 
 def add_spectra(base, spectra):
     """
@@ -253,18 +289,6 @@ def add_spectra(base, spectra):
     """
 
     cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID')
-
-    if 'TELNAME' not in base.columns:
-        base['TELNAME'] = get_empty_str_array(len(base), 6)
-    if 'MASKNAME' not in base.columns:
-        base['MASKNAME'] = get_empty_str_array(len(base))
-    if 'ZQUALITY' not in base.columns:
-        base['ZQUALITY'] = -1
-    if 'SPEC_REPEAT' not in base.columns:
-        base['SPEC_REPEAT'] = get_empty_str_array(len(base))
-    if 'SPECOBJID' not in base.columns:
-        base['SPECOBJID'] = get_empty_str_array(len(base), 48)
-
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     spectra = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
@@ -310,9 +334,6 @@ def find_satelites(base):
     -------
     base : astropy.table.Table
     """
-
-    if 'SATS' not in base.columns:
-        base['SATS'] = -1
 
     fill_values_by_query(base, C.is_galaxy & C.is_high_z, {'SATS':0})
     fill_values_by_query(base, C.is_galaxy & ~C.is_high_z, {'SATS':2})

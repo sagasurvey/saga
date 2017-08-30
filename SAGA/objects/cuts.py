@@ -27,7 +27,7 @@ sdss_limit = Query('r_mag < 17.77')
 
 too_close_to_host = Query('RHOST_KPC < 10.0')
 
-sat_vcut = Query('abs(SPEC_Z * 2.997e5 - HOST_VHOST) < 250.0')
+sat_vcut = Query('abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0')
 sat_rcut = Query('RHOST_KPC < 300.0')
 
 gr_cut = Query('gr-gr_err*2.0 < 0.85')

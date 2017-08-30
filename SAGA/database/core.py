@@ -110,8 +110,8 @@ class DataObject(object):
         local FileObject
     cache_in_memory : bool, optional
         whether or not to store the table in memory
-    always_use_local : bool, optional
-        whether or not to only use local
+    use_local_first : bool, optional
+        whether or not to try using local file first
 
     Examples
     --------
@@ -124,11 +124,11 @@ class DataObject(object):
     >>> dobj.download('data/file.fits')
     """
     def __init__(self, remote, local=None, cache_in_memory=False,
-                 always_use_local=False):
+                 use_local_first=False):
         self.remote = remote
         self.local = local
         self.local_type = type(remote) if local is None else type(local)
-        self.always_use_local = always_use_local
+        self.use_local_first = use_local_first
         self.cache_in_memory = cache_in_memory
         self._cached_table = None
 
@@ -157,9 +157,12 @@ class DataObject(object):
             if table is not None:
                 return table
 
-        if self.always_use_local:
-            table = self._get_local().read()
-
+        if self.use_local_first:
+            try:
+                table = self._get_local().read()
+            except (IOError, OSError):
+                warnings.warn("Failed to read local file, try reading the remote file")
+                table = self.remote().read()
         else:
             try:
                 table = self.remote.read()
@@ -311,8 +314,9 @@ class Database(object):
         self._tables = {
             'gmm_parameters': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz'))),
             'spectra_clean': DataObject(FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))),
-            'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits')),
-            'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits')),
+            'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'), use_local_first=True),
+            'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits'), use_local_first=True),
+            ('spec', 'gama'): DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'), use_local_first=True),
         }
 
         self._tables['nsa'] = self._tables['nsa_v1.0.1']
@@ -321,16 +325,15 @@ class Database(object):
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
         self.base_file_path_pattern = os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz')
-
+        self.sdss_file_path_pattern = 'sdss_nsa{}.fits.gz'
+        self.wise_file_path_pattern = 'wise_nsa{}.fits'
 
     def __getitem__(self, key):
         if key in self._tables:
             return self._tables[key]
 
-        if isinstance(key, tuple) and len(key) == 2 and key[0] == 'base':
-            path = self.base_file_path_pattern.format(key[1])
-            if not os.path.isfile(path):
-                path = None
+        if isinstance(key, tuple) and len(key) == 2 and key[0] in ('base', 'sdss', 'wise'):
+            path = getattr(self, '{}_file_path_pattern'.format(key[0])).format(key[1])
             self._tables[key] = DataObject(FitsTable(path))
             return self._tables[key]
 
