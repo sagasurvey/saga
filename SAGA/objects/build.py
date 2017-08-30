@@ -1,10 +1,11 @@
 import numpy as np
 import numexpr as ne
 from astropy.coordinates import SkyCoord
+from astropy.table import Table, join
 from easyquery import Query
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
-from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array
+from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array, get_sdss_bands
 
 
 def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
@@ -23,7 +24,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     """
 
     if ('HOST_NSAID' in base.columns and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
-        raise ValueError('Existing host info and differs from input host info.')
+        raise ValueError('Host info exists and differs from input host info.')
 
     base['HOST_NSAID'] = host['NSAID']
     base['HOST_RA'] = host['RA']
@@ -53,7 +54,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     return base
 
 
-def add_more_photometric_data(base, wise, **kwargs):
+def add_wise(base, wise, missing_value=-9999.0):
     """
     Add more photometric data to the base catalog (for a single host).
     `base` is modified in-place.
@@ -72,15 +73,22 @@ def add_more_photometric_data(base, wise, **kwargs):
     Currently this function only adds wise data, but in the future this function
     may add more photometric data
     """
-    if kwargs:
-        raise NotImplementedError('Photometric data other than wise has not been implemented.')
+    cols_rename = {'w1_mag':'W1', 'w1_mag_err':'W1ERR', 'w2_mag':'W2', 'w2_mag_err':'W2ERR'}
 
-    cols_rename = {'W1_MAG':'W1', 'W1_MAG_ERR':'W1ERR', 'W2_MAG':'W2', 'W2_MAG_ERR':'W2ERR'}
-    join_table_by_coordinates(base, wise, list(cols_rename.keys()), cols_rename)
+    wise = wise[['has_wise_phot', 'objid'] + list(cols_rename.keys())]
+    wise = wise[wise['has_wise_phot']]
+    wise['OBJID'] = wise['objid'].astype(np.int64)
+    del wise['objid']
+    del wise['has_wise_phot']
 
-    # use -1.0 instead np.nan for missing values
-    for col in cols_rename.values():
-        fill_values_by_query(base, Query((np.isnan, col)), {col:-1.0})
+    t = Table({'OBJID':base['OBJID'], 'index':np.arange(len(base))})
+    t = join(t, wise, keys='OBJID')
+
+    for k, v in cols_rename.items():
+        if v not in base.columns:
+            base[v] = missing_value
+        t[k][np.isnan(t[k])] = missing_value
+        base[v][t['index']] = t[k]
 
     return base
 
@@ -147,13 +155,28 @@ def fix_photometry_with_nsa(base, nsa):
     sdss : astropy.table.Table
     """
 
+    if 'TELNAME' not in base.columns:
+        base['TELNAME'] = get_empty_str_array(len(base), 6)
+    if 'MASKNAME' not in base.columns:
+        base['MASKNAME'] = get_empty_str_array(len(base))
+    if 'ZQUALITY' not in base.columns:
+        base['ZQUALITY'] = -1
+    if 'SPEC_REPEAT' not in base.columns:
+        base['SPEC_REPEAT'] = get_empty_str_array(len(base))
+    if 'SPECOBJID' not in base.columns:
+        base['SPECOBJID'] = get_empty_str_array(len(base), 48)
+    if 'SPEC_HA_EW' not in base.columns:
+        base['SPEC_HA_EW'] = -9999.0
+    if 'SPEC_HA_EWERR' not in base.columns:
+        base['SPEC_HA_EWERR'] = -9999.0
+    if 'OBJ_NSAID' not in base.columns:
+        base['OBJ_NSAID'] = -1
+
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     nsa = nsa[SkyCoord(nsa['RA'], nsa['DEC'], unit="deg").separation(host_sc).deg < 1.0]
 
     if len(nsa) == 0:
         return base
-
-    base_sc = SkyCoord(base['RA'], base['DEC'], unit='deg')
 
     for nsa_obj in nsa:
 
@@ -172,11 +195,10 @@ def fix_photometry_with_nsa(base, nsa):
                     local_dict=values_for_ellipse_calculation, global_dict={})
 
         closest_base_obj_index = r2_ellipse.argmin()
-        nearby_obj_to_remove = (r2_ellipse < 1.0)
+        assert r2_ellipse[closest_base_obj_index] < 1.0
+        base['REMOVE'][r2_ellipse < 1.0] = 2
 
-        base['REMOVE'][nearby_obj_to_remove] = 2
-
-        del nearby_obj_to_remove, r2_ellipse, values_for_ellipse_calculation
+        del r2_ellipse, values_for_ellipse_calculation
 
         values_to_rewrite = {
             'REMOVE': -1,
@@ -192,15 +214,30 @@ def fix_photometry_with_nsa(base, nsa):
             'SPEC_REPEAT': 'SDSS+NSA',
             'MASKNAME': nsa_obj['ZSRC'],
             'OBJ_NSAID': nsa_obj['NSAID'],
-            #TODO: finish this
+            'PETROR90_R': nsa_obj['PETROTH90'],
+            'PETROR50_R': nsa_obj['PETROTH50'],
         }
 
+        mag = 22.5 - 2.5*np.log10(nsa_obj['SERSICFLUX'])
+        var = 1.0 / nsa_obj['SERSICFLUX_IVAR']
+        tmp1 = 2.5 / (nsa_obj['SERSICFLUX'] * np.log(10.0))
+        mag_err = np.sqrt(var * tmp1**2)     # IS THIS RIGHT??
+        mag[np.isnan(mag)] = -9999.0
+        mag_err[np.isnan(mag_err)] = -9999.0
+
+        for i, b in enumerate(get_sdss_bands()):
+            values_to_rewrite[b] = mag[i+2]
+            values_to_rewrite['{}_err'.format(b)] = mag_err[i+2]
+        values_to_rewrite['SB_EXP_R'] = mag[4] + 2.5 * np.log10(2.0*np.pi*nsa_obj['PETROTH50']**2.0 + 1.0e-20)
+
+        for k, v in values_to_rewrite.items():
+            base[k][closest_base_obj_index] = v
 
     return base
 
 
 
-def add_spectra(base, spectra, ignore_imacs=False):
+def add_spectra(base, spectra):
     """
     Add spectra to base catalog.
     `base` is modified in-place.
@@ -209,98 +246,53 @@ def add_spectra(base, spectra, ignore_imacs=False):
     ----------
     base : astropy.table.Table
     spectra : astropy.table.Table
-    ignore_imacs : bool, optional
 
     Returns
     -------
     base : astropy.table.Table
     """
 
-    cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'specobjid')
+    cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID')
 
-    if 'REMOVE' not in base.columns:
-        base['REMOVE'] = -1
     if 'TELNAME' not in base.columns:
         base['TELNAME'] = get_empty_str_array(len(base), 6)
     if 'MASKNAME' not in base.columns:
         base['MASKNAME'] = get_empty_str_array(len(base))
     if 'ZQUALITY' not in base.columns:
         base['ZQUALITY'] = -1
-    if 'SPEC_Z' not in base.columns:
-        base['SPEC_Z'] = -1.0
-    if 'SPEC_Z_ERR' not in base.columns:
-        base['SPEC_Z_ERR'] = -1.0
     if 'SPEC_REPEAT' not in base.columns:
         base['SPEC_REPEAT'] = get_empty_str_array(len(base))
     if 'SPECOBJID' not in base.columns:
         base['SPECOBJID'] = get_empty_str_array(len(base), 48)
 
-    host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
-    spectra_sc = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
-    near_host_mask = spectra_sc.separation(host_sc).deg < 1.0
 
-    if not near_host_mask.any():
+    host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
+    spectra = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
+
+    if len(spectra) == 0:
         return base
 
-    spectra = spectra[near_host_mask]
-    spectra_sc = spectra_sc[near_host_mask]
-    del near_host_mask
+    for spec in spectra:
+        sep = base['coord'].separation(spec['coord']).arcsec
 
-    base_sc = SkyCoord(base['RA'], base['DEC'], unit='deg')
+        nearby_obj_indices = np.where((sep < 5.0) & (base['REMOVE']==-1))[0]
+        assert len(nearby_obj_indices) > 0
 
-    done_spectra_indices = []
-
-    for i, spec in enumerate(spectra):
-        if i in done_spectra_indices:
-            continue
-
-        spec_sc = SkyCoord(spec['RA'], spec['DEC'], unit='deg')
-
-        # do an initial search of objects within 5 arcsec
-        objects_nearby = base[base_sc.separation(spec_sc).arcsec < 5.0]
-        if len(objects_nearby) == 0:
-            raise ValueError('Marla said there must be an object!!')
-
-        #TODO: change this to 3D match
-        mask = (objects_nearby['PETRORAD_R'] < 30.0)
-        if mask.any():
-            radius = objects_nearby['PETRORAD_R'][mask].max()
+        nearby_nsa_indices = nearby_obj_indices[base['OBJ_NSAID'][nearby_obj_indices] > -1]
+        if len(nearby_nsa_indices) == 0:
+            closest_obj_index = sep.argmin()
         else:
-            radius = objects_nearby['PETRORAD_R'][(objects_nearby['r'] - objects_nearby['EXTINCTION_R']).argmin()]
+            assert len(nearby_nsa_indices) == 1
+            closest_obj_index = nearby_nsa_indices[0]
 
-        # now we search within the object radius
-        # note that we need the indices here to keep track of specs and to write to base
+        if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index]:
+            for col in cols_to_copy:
+                base[col][closest_obj_index] = spec[col]
+        else:
+            base['SPEC_REPEAT'][closest_obj_index] = '+'.join(set(spec['SPEC_REPEAT'].split('+') + base['SPEC_REPEAT'][closest_obj_index].split('+')))
 
-        objects_nearby_indices = np.where(base_sc.separation(spec_sc).arcsec < radius)[0]
-        objects_nearby = base[objects_nearby_indices]
-
-        specs_nearby_indices = np.where(spectra_sc.separation(spec_sc).arcsec < radius)[0]
-        specs_nearby = spectra[specs_nearby_indices]
-
-        done_spectra_indices.extend(specs_nearby_indices)
-
-        if ignore_imacs:
-            specs_nearby = specs_nearby[specs_nearby['TELNAME'] != 'IMACS']
-
-        # gather SPEC_REPEAT before we identify the best spec
-        spec_repeat = set()
-        for r in specs_nearby['SPEC_REPEAT']:
-            spec_repeat.update(r.split('+'))
-        spec_repeat = '+'.join(spec_repeat)
-
-        # should prefer NSA
-        best_spec = specs_nearby[specs_nearby['ZQUALITY'].data.argmax()]
-        best_spec_sc = SkyCoord(best_spec['RA'], best_spec['DEC'], unit='deg')
-        closest_object_index = SkyCoord(objects_nearby['RA'], objects_nearby['DEC'], unit='deg').separation(best_spec_sc).arcsec.argmin()
-
-        original_base_index = objects_nearby_indices[closest_object_index]
-        base['SPEC_REPEAT'][original_base_index] = spec_repeat
-        for col in cols_to_copy:
-            base[col.upper()][original_base_index] = best_spec[col]
-
-        other_objects = objects_nearby_indices[objects_nearby_indices != original_base_index]
-        base['REMOVE'][other_objects] = 0
-
+        base['REMOVE'][nearby_obj_indices] = 0
+        base['REMOVE'][closest_obj_index] = -1
 
     return base
 
@@ -350,7 +342,7 @@ def apply_manual_fixes(base):
 
 
 
-def calc_stellar_mass(base):
+def add_stellar_mass(base):
     """
     Calculate stellar mass based only on gi colors and redshift
     Based on GAMA data using Taylor et al (2011)

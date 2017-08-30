@@ -26,16 +26,16 @@ class HostCatalog(object):
     --------
     >>> import SAGA
     >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
-    >>> saga_hosts = SAGA.HostCatalog(saga_database)
-    >>> hosts_no_flag = saga_hosts.load('no_flags')
-    >>> hosts_no_sdss_flag = saga_hosts.load('no_sdss_flags')
+    >>> saga_host_catalog = SAGA.HostCatalog(saga_database)
+    >>> hosts_no_flag = saga_host_catalog.load('no_flags')
+    >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
 
     Here hosts_no_flag and hosts_no_sdss_flag are astropy tables.
 
-    >>> saga_hosts.resolve_id('AnaK')
+    >>> saga_host_catalog.resolve_id('AnaK')
     [61945]
 
-    >>> saga_hosts.id_to_name(61945)
+    >>> saga_host_catalog.id_to_name(61945)
     'AnaK'
     """
     _paper1_complete_hosts = (166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887)
@@ -77,10 +77,10 @@ class HostCatalog(object):
 
         Examples
         --------
-        >>> saga_hosts.resolve_id('paper1_complete')
+        >>> saga_host_catalog.resolve_id('paper1_complete')
         [166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887]
 
-        >>> saga_hosts.resolve_id('AnaK')
+        >>> saga_host_catalog.resolve_id('AnaK')
         [61945]
 
         """
@@ -149,8 +149,8 @@ class HostCatalog(object):
 
         Examples
         --------
-        >>> hosts_no_flag = saga_hosts.load('no_flags')
-        >>> hosts_no_sdss_flag = saga_hosts.load('no_sdss_flags')
+        >>> hosts_no_flag = saga_host_catalog.load('no_flags')
+        >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
         res = self._database['hosts_{}'.format(host_type)].read(reload=reload)
         return self._annotate_catalog(res)
@@ -178,7 +178,7 @@ class HostCatalog(object):
 
         Examples
         --------
-        >>> anak = saga_hosts.load_single('AnaK')
+        >>> anak = saga_host_catalog.load_single('AnaK')
         """
         host_id = self.resolve_id(host)
         assert len(host_id) == 1
@@ -187,3 +187,5 @@ class HostCatalog(object):
         res = Query('NSAID == {}'.format(host_id)).filter(self.load('no_sdss_flags', reload=reload))
         assert len(res) == 1
         return res[0]
+
+

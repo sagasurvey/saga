@@ -7,9 +7,6 @@ from ..hosts import HostCatalog
 
 __all__ = ['ObjectCatalog']
 
-def _slice_columns(table, columns):
-    return table[columns] if columns is not None else table
-
 
 class ObjectCatalog(object):
     """
@@ -28,9 +25,9 @@ class ObjectCatalog(object):
     --------
     >>> import SAGA
     >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
-    >>> saga_objects = SAGA.ObjectCatalog(saga_database)
-    >>> specs = saga_objects.load(has_spec=True)
-    >>> base_anak = saga_objects.load(hosts='AnaK')
+    >>> saga_object_catalog = SAGA.ObjectCatalog(saga_database)
+    >>> specs = saga_object_catalog.load(has_spec=True)
+    >>> base_anak = saga_object_catalog.load(hosts='AnaK')
 
     Here specs and base_anak are both astropy tables.
     """
@@ -53,6 +50,11 @@ class ObjectCatalog(object):
         table['coord'] = SkyCoord(table['RA'], table['DEC'], unit='deg')
 
         return table
+
+
+    @staticmethod
+    def _slice_columns(table, columns):
+       return table[columns] if columns is not None else table
 
 
     def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None):
@@ -89,21 +91,21 @@ class ObjectCatalog(object):
         >>> import SAGA
         >>> from SAGA import ObjectCuts as C
         >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
-        >>> saga_objects = SAGA.ObjectCatalog(saga_database)
+        >>> saga_object_catalog = SAGA.ObjectCatalog(saga_database)
 
         To load all spectra, with some basic cuts applied:
-        >>> specs = saga_objects.load(has_spec=True, cuts=C.basic_cut)
+        >>> specs = saga_object_catalog.load(has_spec=True, cuts=C.basic_cut)
 
         Load the base catalog for a certain host, with some basic cuts applied:
-        >>> specs = saga_objects.load(hosts='AnaK', cuts=C.basic_cut)
+        >>> specs = saga_object_catalog.load(hosts='AnaK', cuts=C.basic_cut)
 
         Load base catalog for all paper1 hosts, with some basic cuts applied,
         and stored as a list:
-        >>> base_tables = saga_objects.load(hosts='paper1', cuts=C.basic_cut, return_as='list')
+        >>> base_tables = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='list')
 
         Load base catalog for all paper1 hosts, with some basic cuts applied,
         and stored as one single big table:
-        >>> bases_table = saga_objects.load(hosts='paper1', cuts=C.basic_cut, return_as='stacked')
+        >>> bases_table = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='stacked')
         """
 
         if return_as is None:
@@ -124,13 +126,13 @@ class ObjectCatalog(object):
             if cuts is not None:
                 t = Query(cuts).filter(t)
 
-            if return_as[0] == 's':
-                return _slice_columns(t, columns)
-            else:
+            if return_as[0] != 's':
                 if hosts is None:
                     host_ids = np.unique(t['HOST_NSAID'])
-                output_iterator = (Query('HOST_NSAID == {}'.format(i)).filter(t) for i in host_ids)
+                output_iterator = (self._slice_columns(Query('HOST_NSAID == {}'.format(i)).filter(t), columns) for i in host_ids)
                 return output_iterator if return_as[0] == 'i' else list(output_iterator)
+
+            return self._slice_columns(t, columns)
 
         else:
             q = Query(cuts)
@@ -139,14 +141,14 @@ class ObjectCatalog(object):
 
             hosts = self._hosts.resolve_id('all') if hosts is None else self._hosts.resolve_id(hosts)
 
-            output_iterator = (_slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read())), columns) for host in hosts)
+            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read())), columns) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
-            elif return_as[0] == 'l':
-                return list(output_iterator)
-            else:
+            elif return_as[0] == 's':
                 return vstack(list(output_iterator))
+            else:
+                return list(output_iterator)
 
 
     def build(self, hosts=None, rebuild=False):

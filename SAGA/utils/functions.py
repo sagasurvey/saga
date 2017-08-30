@@ -1,8 +1,3 @@
-import os
-import sys
-import logging
-import gzip
-import shutil
 import requests
 import numpy as np
 from easyquery import Query
@@ -11,8 +6,9 @@ from astropy import units as u
 
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors',
-           'get_empty_str_array', 'get_logger', 'get_decals_viewer_image',
-           'gzip_compress', 'join_table_by_coordinates', 'fill_values_by_query']
+           'get_empty_str_array', 'get_decals_viewer_image',
+           'join_table_by_coordinates', 'fill_values_by_query']
+
 
 _sdss_bands = 'ugriz'
 
@@ -29,16 +25,6 @@ def get_empty_str_array(array_length, string_length=48):
     return np.chararray((array_length,), itemsize=string_length, unicode=True)
 
 
-def get_logger(level='WARNING'):
-    log = logging.getLogger()
-    log.setLevel(level if isinstance(level, int) else getattr(logging, level))
-    logFormatter = logging.Formatter('[%(levelname)-5.5s][%(asctime)s] %(message)s')
-    consoleHandler = logging.StreamHandler(sys.stdout)
-    consoleHandler.setFormatter(logFormatter)
-    log.addHandler(consoleHandler)
-    return log
-
-
 def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None):
     url = 'http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}'.format(**locals())
     content = requests.get(url).content
@@ -48,19 +34,6 @@ def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out
         with open(out, 'wb') as f:
             f.write(content)
     return content
-
-
-def gzip_compress(path, out_path=None, delete_original=True):
-    if out_path is None:
-        out_path = path + '.gz'
-
-    with open(path, 'rb') as f_in, gzip.open(out_path, 'wb') as f_out:
-        shutil.copyfileobj(f_in, f_out)
-
-    if delete_original:
-        os.unlink(path)
-
-    return out_path
 
 
 def join_table_by_coordinates(table, table_to_join,

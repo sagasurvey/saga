@@ -1,11 +1,11 @@
 import os
 import shutil
 import warnings
+import gzip
 import numpy as np
 import requests
 from astropy.table import Table
 from astropy.io import fits
-from ..utils import gzip_compress
 
 try:
     FileExistsError
@@ -74,15 +74,19 @@ class GoogleSheets(CsvTable):
 
 
 class FitsTable(FileObject):
+    compress_after_write = True
+
     def read(self):
         with fits.open(self.path, cache=False, lazy_load_hdus=True, **self.kwargs) as f:
             return Table(f[1].data)
 
     def write(self, table):
-        tmp_path = self.path + ('_tmp.fits' if self.kwargs['compress_after_write'] else '')
-        table.write(tmp_path, format='fits', overwrite=True)
-        if self.kwargs['compress_after_write']:
-            gzip_compress(tmp_path, self.path)
+        if 'coord' in table.columns and table['coord'].info.dtype.name == 'object':
+            table = table.copy()
+            del table['coord']
+        file_open = gzip.open if self.compress_after_write else open
+        with file_open(self.path, 'wb') as f_out:
+            table.write(f_out, format='fits')
 
 
 class NumpyBinary(FileObject):
@@ -331,6 +335,14 @@ class Database(object):
             return self._tables[key]
 
         raise KeyError('cannot find {} in database'.format(key))
+
+
+    def __setitem__(self, key, value):
+        self._tables[key] = value
+
+
+    def __delitem__(self, key):
+        del self._tables[key]
 
 
     def get(self, key, default=None):
