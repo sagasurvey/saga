@@ -175,4 +175,9 @@ class ObjectCatalog(object):
 
 
     def build(self, hosts=None, rebuild=False):
+        """
+        This function is not yet implemented.
+        You can do `from SAGA.objects.build import *` to get
+        the functions for building object catalogs.
+        """
         raise NotImplementedError #TODO: implement this

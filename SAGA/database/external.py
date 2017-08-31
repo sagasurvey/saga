@@ -24,6 +24,12 @@ def ensure_deg(value):
 
 
 class WiseQuery(FitsTable):
+    """
+    Examples
+    --------
+    WiseQuery(ra, dec).download_as_file('/path/to/file', overwrite=False)
+
+    """
     def __init__(self, ra, dec, radius=1.0, **kwargs):
         path = 'http://unwise.me/phot_near/?ra={:f}&dec={:f}&radius={:f}&datatype=flat&version=sdss-dr10d'.format(ensure_deg(ra), ensure_deg(dec), ensure_deg(radius))
         super(WiseQuery, self).__init__(path, **kwargs)
@@ -36,18 +42,15 @@ class SdssQuery(object):
     """
     Examples
     --------
-    >>> SdssQuery(ra, dec).download_as_file('/path/to/file')
+    >>> SdssQuery(ra, dec, context='DR14').download_as_file('/path/to/file', overwrite=False)
 
     Notes
     -----
-    Follow these instructions:
+    For SdssQuery to work , please follow these instructions:
 
-    1. Install by Dan FM's casjobs (https://github.com/dfm/casjobs):
-        pip install git+git://github.com/dfm/casjobs.git
+    1. Get an account from  http://skyserver.sdss3.org/CasJobs/CreateAccount.aspx
 
-    2. Get an account from  http://skyserver.sdss3.org/CasJobs/CreateAccount.aspx
-
-    3. Edit your `.bashrc`:
+    2. Edit your `.bashrc`:
         export CASJOBS_WSID='2090870927'   # get your WSID from site above
         export CASJOBS_PW='my password'
     """
@@ -189,7 +192,7 @@ class SdssQuery(object):
         Follow these instructions to use `run_casjob`
 
         1. Install by Dan FM's casjobs (https://github.com/dfm/casjobs):
-            pip install git+git://github.com/dfm/casjobs.git
+            pip install casjobs
 
         2. Get an account from  http://skyserver.sdss3.org/CasJobs/CreateAccount.aspx
 

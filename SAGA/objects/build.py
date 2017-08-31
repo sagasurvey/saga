@@ -1,4 +1,4 @@
-import warnings
+import logging
 import numpy as np
 import numexpr as ne
 from astropy.coordinates import SkyCoord
@@ -162,7 +162,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     """
 
     if objects_to_remove is not None:
-        ids_to_remove = np.unique(objects_to_remove['SDSS ID'].data.compressed())
+        ids_to_remove = np.unique(np.asarray(objects_to_remove['SDSS ID'].data.compressed(), dtype=np.int64))
         fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
         del ids_to_remove
 
@@ -177,15 +177,16 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40') | Query('abs(PETRORAD_R - PETRORAD_G) > 40'))
     fill_values_by_query(base, q, {'REMOVE': 4})
 
-    q  = Query('SB_EXP_R > 24', 'PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
-    q |= Query('SB_EXP_R > 24', 'r < 18', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
+    q  = Query('PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
+    q |= Query('r < 18', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
+    q &= Query('SB_EXP_R > 24')
     fill_values_by_query(base, q, {'REMOVE': 5})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
     fill_values_by_query(base, q, {'REMOVE': 3})
 
     if objects_to_add is not None:
-        ids_to_add = np.unique(objects_to_add['SDSS ID'].data.compressed())
+        ids_to_add = np.unique(np.asarray(objects_to_add['SDSS ID'].data.compressed(), dtype=np.int64))
         fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
 
     return base
@@ -226,27 +227,25 @@ def remove_shreds_with_nsa(base, nsa):
 
     for nsa_obj in nsa:
 
-        values_for_ellipse_calculation = {
-            'a': nsa_obj['PETROTH90'] * 2.0 / 3600.0,
-            'b': nsa_obj['SERSIC_BA'] * nsa_obj['PETROTH90'] * 2.0 / 3600.0,
-            's': np.sin(np.deg2rad(nsa_obj['SERSIC_PHI'] + 270.0)),
-            'c': np.cos(np.deg2rad(nsa_obj['SERSIC_PHI'] + 270.0)),
-            'nra': nsa_obj['RA'],
-            'ndec': nsa_obj['DEC'],
-            'RA': base['RA'],
-            'DEC': base['DEC'],
-        }
+        ellipse_calculation = dict()
+        ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
+        ellipse_calculation['b'] = ellipse_calculation['a'] * nsa_obj['SERSIC_BA']
+        ellipse_calculation['th'] = np.deg2rad(nsa_obj['SERSIC_PHI'] + 270.0)
+        ellipse_calculation['s'] = np.sin(ellipse_calculation['th'])
+        ellipse_calculation['c'] = np.cos(ellipse_calculation['th'])
+        ellipse_calculation['x'] = base['RA'] - nsa_obj['RA']
+        ellipse_calculation['y'] = base['DEC'] - nsa_obj['DEC']
 
-        r2_ellipse = ne.evaluate('(((RA-nra)*c - (DEC-ndec)*s)/a)**2.0 + (((RA-nra)*s + (DEC-ndec)*c)/b)**2.0',
-                                 local_dict=values_for_ellipse_calculation, global_dict={})
+        r2_ellipse = ne.evaluate('((x*c - y*s)/a)**2.0 + ((x*s + y*c)/b)**2.0',
+                                 local_dict=ellipse_calculation, global_dict={})
 
         closest_base_obj_index = r2_ellipse.argmin()
         if r2_ellipse[closest_base_obj_index] > 1.0:
-            warnings.warn('No object around NSA {} ({}, {})'.format(nsa_obj['NSAID'], nsa_obj['RA'], nsa_obj['DEC']))
+            logging.warning('in SAGA.objects.build.remove_shreds_with_nsa()\n No object within the radius of NSA {} ({}, {})'.format(nsa_obj['NSAID'], nsa_obj['RA'], nsa_obj['DEC']))
             continue
         base['REMOVE'][r2_ellipse < 1.0] = 2
 
-        del r2_ellipse, values_for_ellipse_calculation
+        del r2_ellipse, ellipse_calculation
 
         values_to_rewrite = {
             'REMOVE': -1,
@@ -288,16 +287,15 @@ def remove_shreds_with_nsa(base, nsa):
 
 def remove_shreds_with_sdss(base):
     """
-    Use NSA catalog to remove shereded object.
+    Use SDSS catalog (i.e., base catalog itself) to remove shereded object.
 
     Parameters
     ----------
     base : astropy.table.Table
-    nsa : astropy.table.Table
 
     Returns
     -------
-    sdss : astropy.table.Table
+    base : astropy.table.Table
     """
 
     sdss_specs = Query('SPEC_Z > 0.05', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1').filter(base)
@@ -313,7 +311,7 @@ def remove_shreds_with_sdss(base):
         base['REMOVE'][nearby_obj_indices] = 4
 
         if len(nearby_obj_indices) > 25:
-            warnings.warn('Too many shreds around SDSS ({}, {})'.format(spec['RA'], spec['DEC']))
+            logging.warning('in SAGA.objects.build.remove_shreds_with_sdss()\n Too many (> 25) shreds around SDSS spec ({}, {})'.format(spec['RA'], spec['DEC']))
 
     return base
 
@@ -387,7 +385,8 @@ def add_cleaned_spectra(base, spectra_clean):
 
         nearby_obj_indices = np.where(sep < 20.0)[0]
         if len(nearby_obj_indices) == 0:
-            warnings.warn('No object within 20 arcsec of {} spec ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
+            if spec['TELNAME'] != 'GAMA':
+                logging.warning('in SAGA.objects.build.add_cleaned_spectra()\n No object within 20 arcsec of {} spec ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
             continue
 
         nearby_obj = base[['REMOVE', 'ZQUALITY', 'SPEC_Z', 'OBJ_NSAID']][nearby_obj_indices]
