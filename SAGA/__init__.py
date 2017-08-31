@@ -7,4 +7,4 @@ from .hosts import HostCatalog
 from .objects import ObjectCatalog, ObjectCuts
 from .targets import TargetSelection
 
-__version__ = '0.3.3'
+__version__ = '0.3.4'

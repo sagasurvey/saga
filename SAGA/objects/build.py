@@ -30,6 +30,14 @@ def _join_spec_repeat(*repeats):
     return '+'.join(out)
 
 
+def _get_unique_objids(objid_col):
+    try:
+        objid_col = objid_col.compressed()
+    except AttributeError:
+        pass
+    return np.unique(np.asarray(objid_col, dtype=np.int64))
+
+
 def initialize_base_catalog(base):
 
     base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
@@ -162,7 +170,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     """
 
     if objects_to_remove is not None:
-        ids_to_remove = np.unique(np.asarray(objects_to_remove['SDSS ID'].data.compressed(), dtype=np.int64))
+        ids_to_remove = _get_unique_objids(objects_to_remove['SDSS ID'])
         fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
         del ids_to_remove
 
@@ -186,7 +194,7 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     fill_values_by_query(base, q, {'REMOVE': 3})
 
     if objects_to_add is not None:
-        ids_to_add = np.unique(np.asarray(objects_to_add['SDSS ID'].data.compressed(), dtype=np.int64))
+        ids_to_add = _get_unique_objids(objects_to_add['SDSS ID'])
         fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
 
     return base
