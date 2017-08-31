@@ -39,15 +39,22 @@ class FileObject(object):
     def write(self, table):
         return table.write(self.path)
 
-    def download_as_file(self, file_path):
-        try:
-            r = requests.get(self.path, stream=True)
-        except requests.exceptions.MissingSchema:
-            shutil.copy(self.path, file_path)
-        else:
-            r.raw.decode_content = True
-            with open(file_path, 'wb') as f:
-                shutil.copyfileobj(r.raw, f)
+    def download_as_file(self, file_path, overwrite=False, compress=False):
+        if overwrite or not os.path.isfile(file_path):
+            try:
+                r = requests.get(self.path, stream=True)
+            except requests.exceptions.MissingSchema:
+                shutil.copy(self.path, file_path)
+            else:
+                r.raw.decode_content = True
+                file_open = gzip.open if compress else open
+                try:
+                    with file_open(file_path, 'wb') as f:
+                        shutil.copyfileobj(r.raw, f)
+                except Exception as e:
+                    if os.path.isfile(f):
+                        os.unlink(f)
+                    raise e
 
     def isfile(self):
         if self.path:
@@ -205,7 +212,7 @@ class DataObject(object):
         f.write(table)
 
 
-    def download(self, local_file_path=None, overwrite=False, set_as_local=True):
+    def download(self, local_file_path=None, overwrite=False, compress=False, set_as_local=True):
         """
         Download in the data as a file
 
@@ -223,20 +230,21 @@ class DataObject(object):
             try:
                 local_file_path = self._get_local().path
             except AttributeError:
-                raise ValueError('Please provide a path for the downloaded file')
+                pass
             else:
                 set_as_local = False # no need to do this again
 
-        if os.path.isfile(local_file_path) and not overwrite:
-            warnings.warn('File already exists! Existing file is set as local')
-        else:
-            self.remote.download_as_file(local_file_path)
+        self.remote.download_as_file(local_file_path, overwrite=overwrite, compress=compress)
 
         if set_as_local:
+            kwargs = dict()
             try:
-                kwargs = self.remote.kwargs
+                kwargs = self._get_local().kwargs
             except AttributeError:
-                kwargs = dict()
+                try:
+                    kwargs = self.remote.kwargs
+                except AttributeError:
+                    pass
             self.local = self.local_type(local_file_path, **kwargs)
 
 

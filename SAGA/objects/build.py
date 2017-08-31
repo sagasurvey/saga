@@ -1,5 +1,6 @@
 import numpy as np
 import numexpr as ne
+import warnings
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, join, vstack
 from astropy.constants import c
@@ -12,7 +13,12 @@ from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_s
 __all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise', 'set_remove_flag',
            'remove_shreds_with_nsa', 'remove_shreds_with_sdss', 'clean_repeat_spectra',
            'add_spectra', 'find_satellites', 'apply_manual_fixes', 'add_stellar_mass',
-           'build_full_stack']
+           'build_full_stack', 'wise_cols_used', 'nsa_cols_used']
+
+wise_cols_used = ['has_wise_phot', 'objid', 'w1_mag', 'w1_mag_err', 'w2_mag', 'w2_mag_err']
+
+nsa_cols_used = ['RA', 'DEC', 'PETROTH90', 'PETROTH50', 'SERSIC_BA', 'SERSIC_PHI',
+                 'Z', 'HAEW', 'HAEWERR', 'ZSRC', 'NSAID', 'SERSICFLUX', 'SERSICFLUX_IVAR']
 
 
 def initialize_base_catalog(base):
@@ -31,9 +37,9 @@ def initialize_base_catalog(base):
     base['HOST_SAGA_NAME'] = empty_str_arr
     base['HOST_NGC_NAME'] = empty_str_arr
     base['MASKNAME'] = empty_str_arr
-    base['SPEC_REPEAT'] = empty_str_arr
     base['SPECOBJID'] = empty_str_arr
 
+    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 96)
     base['TELNAME'] = get_empty_str_array(len(base), 6)
 
     fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
@@ -105,7 +111,12 @@ def add_wise(base, wise, missing_value=9999.0):
     """
     cols_rename = {'w1_mag':'W1', 'w1_mag_err':'W1ERR', 'w2_mag':'W2', 'w2_mag_err':'W2ERR'}
 
-    wise = wise[['has_wise_phot', 'objid'] + list(cols_rename.keys())]
+    if set(wise.colnames).issuperset(set(wise_cols_used)):
+        if len(wise.colnames) > len(wise_cols_used):
+            wise = wise[wise_cols_used]
+    else:
+        raise KeyError('`wise` does not have all needed columns')
+
     wise = wise[wise['has_wise_phot']]
     wise['OBJID'] = wise['objid'].astype(np.int64)
     del wise['objid']
@@ -186,6 +197,12 @@ def remove_shreds_with_nsa(base, nsa):
     sdss : astropy.table.Table
     """
 
+    if set(nsa.colnames).issuperset(set(nsa_cols_used)):
+        if len(nsa.colnames) > len(nsa_cols_used):
+            nsa = nsa[nsa_cols_used]
+    else:
+        raise KeyError('`nsa` does not have all needed columns')
+
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     nsa = nsa[SkyCoord(nsa['RA'], nsa['DEC'], unit="deg").separation(host_sc).deg < 1.0]
 
@@ -209,7 +226,9 @@ def remove_shreds_with_nsa(base, nsa):
                                  local_dict=values_for_ellipse_calculation, global_dict={})
 
         closest_base_obj_index = r2_ellipse.argmin()
-        assert r2_ellipse[closest_base_obj_index] < 1.0
+        if r2_ellipse[closest_base_obj_index] > 1.0:
+            warnings.warn('No object around NSA {} ({}, {})'.format(nsa_obj['NSAID'], nsa_obj['RA'], nsa_obj['DEC']))
+            continue
         base['REMOVE'][r2_ellipse < 1.0] = 2
 
         del r2_ellipse, values_for_ellipse_calculation
@@ -277,7 +296,7 @@ def remove_shreds_with_sdss(base):
         base['REMOVE'][nearby_obj_indices] = 4
 
         if len(nearby_obj_indices) > 25:
-            print('Too many shreds around ({}, {})'.format(spec['RA'], spec['DEC']))
+            warnings.warn('Too many shreds around SDSS ({}, {})'.format(spec['RA'], spec['DEC']))
 
     return base
 
@@ -300,7 +319,7 @@ def clean_repeat_spectra(spectra):
         spectra['coord'] = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
 
     if 'SPEC_REPEAT' not in spectra.columns:
-        spectra['SPEC_REPEAT'] = get_empty_str_array(len(spectra))
+        spectra['SPEC_REPEAT'] = get_empty_str_array(len(spectra), 96)
     else:
         spectra['SPEC_REPEAT'] = ''
 
@@ -312,7 +331,7 @@ def clean_repeat_spectra(spectra):
 
         # search nearby spectra in 3D
         nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
-        nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < 30.0)
+        nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < 20.0)
         nearby_mask &= spectra['raw']
         nearby_mask = np.where(nearby_mask)[0]
         assert len(nearby_mask) >= 1
@@ -351,29 +370,45 @@ def add_spectra(base, spectra):
     if len(spectra) == 0:
         return base
 
-    #spectra = vstack([spectra, base[['RA', 'DEC']+list(cols_to_copy)]], 'exact', 'error')
     spectra = clean_repeat_spectra(spectra)
 
     for spec in spectra:
         sep = base['coord'].separation(spec['coord']).arcsec
 
-        nearby_obj_indices = np.where(sep < 5.0)[0]
-        assert len(nearby_obj_indices) > 0
+        nearby_obj_indices = np.where(sep < 20.0)[0]
+        if len(nearby_obj_indices) == 0:
+            warnings.warn('No object within 20 arcsec of {} spec ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
+            continue
 
-        nearby_nsa_indices = nearby_obj_indices[base['OBJ_NSAID'][nearby_obj_indices] > -1]
-        if len(nearby_nsa_indices) == 0:
-            closest_obj_index = sep.argmin()
+        nearby_obj = base[nearby_obj_indices]
+        nearby_has_spec  = nearby_obj['ZQUALITY'] == 4
+        nearby_has_spec &= nearby_obj['REMOVE'] < 1
+        nearby_has_spec &= (np.abs(nearby_obj['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
+        nearby_has_spec_indices = nearby_obj_indices[nearby_has_spec]
+
+        nearby_has_spec &= nearby_obj['OBJ_NSAID'] > -1
+        nearby_nsa_indices = nearby_obj_indices[nearby_has_spec]
+
+        del nearby_obj, nearby_has_spec, nearby_obj_indices
+
+        if len(nearby_nsa_indices) > 0:
+            closest_obj_index = nearby_nsa_indices[sep[nearby_nsa_indices].argmin()]
+        elif len(nearby_has_spec_indices) > 0:
+            closest_obj_index = nearby_has_spec_indices[sep[nearby_has_spec_indices].argmin()]
         else:
-            assert len(nearby_nsa_indices) == 1
-            closest_obj_index = nearby_nsa_indices[0]
+            closest_obj_index = sep.argmin()
 
-        if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index]:
+        if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index] or \
+                (spec['ZQUALITY'] == base['ZQUALITY'][closest_obj_index] and spec['TELNAME']=='MMT'):
             for col in cols_to_copy:
                 base[col][closest_obj_index] = spec[col]
-        else:
-            base['SPEC_REPEAT'][closest_obj_index] = '+'.join(set(spec['SPEC_REPEAT'].split('+') + base['SPEC_REPEAT'][closest_obj_index].split('+')))
 
-        base['REMOVE'][nearby_obj_indices] = 0
+        spec_repeat = set(spec['SPEC_REPEAT'].split('+'))
+        for i in nearby_has_spec_indices:
+            spec_repeat.update(base['SPEC_REPEAT'][i].split('+'))
+        base['SPEC_REPEAT'][closest_obj_index] = '+'.join(spec_repeat)
+
+        base['REMOVE'][nearby_has_spec_indices] = 0
         base['REMOVE'][closest_obj_index] = -1
 
     return base
@@ -392,11 +427,11 @@ def find_satellites(base):
     -------
     base : astropy.table.Table
     """
-
-    fill_values_by_query(base, C.is_galaxy & C.is_high_z, {'SATS':0})
-    fill_values_by_query(base, C.is_galaxy & ~C.is_high_z, {'SATS':2})
-    fill_values_by_query(base, C.is_galaxy & C.sat_rcut & C.sat_vcut, {'SATS':1})
-    fill_values_by_query(base, C.obj_is_host, {'SATS':3})
+    basic_cuts = C.is_galaxy & C.has_spec & C.is_clean
+    fill_values_by_query(base, basic_cuts & C.is_high_z, {'SATS':0})
+    fill_values_by_query(base, basic_cuts & ~C.is_high_z, {'SATS':2})
+    fill_values_by_query(base, basic_cuts & C.sat_rcut & C.sat_vcut, {'SATS':1})
+    fill_values_by_query(base, basic_cuts & C.obj_is_host, {'SATS':3})
 
     return base
 
@@ -452,8 +487,8 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     base = remove_shreds_with_sdss(base)
     if spectra:
         base = add_spectra(base, spectra)
-    base = find_satellites(base)
     base = apply_manual_fixes(base)
+    base = find_satellites(base)
     base = add_stellar_mass(base)
 
     return base

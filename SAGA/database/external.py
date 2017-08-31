@@ -2,12 +2,18 @@ import os
 import time
 import re
 import gzip
+import random
+import string
 from astropy import units as u
 from casjobs import CasJobs
 from .core import FitsTable
 
 
 __all__ = ['SdssQuery', 'WiseQuery']
+
+
+def get_random_string(length=6):
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(length))
 
 
 def ensure_deg(value):
@@ -26,40 +32,26 @@ class WiseQuery(FitsTable):
 
 
 class SdssQuery(object):
-    def __init__(self, ra, dec, radius=1.0, host_name=None):
-        self.query = self.construct_query(host_name, ra, dec, radius)
-        if not host_name:
-            host_name = 'saga'
-        self.host_name = re.sub('[^A-Za-z]', '', host_name)
+    """
+    Examples
+    --------
+    >>> SdssQuery(ra, dec).download_as_file('/path/to/file')
 
+    Notes
+    -----
+    Follow these instructions:
 
-    def download_as_file(self, file_path):
-        self.run_casjob(self.query, self.host_name, file_path, overwrite=True)
+    1. Install by Dan FM's casjobs (https://github.com/dfm/casjobs):
+        pip install git+git://github.com/dfm/casjobs.git
 
+    2. Get an account from  http://skyserver.sdss3.org/CasJobs/CreateAccount.aspx
 
-    @staticmethod
-    def construct_query(db_table_name, ra, dec, radius=1.0):
-        """
-        Generates the query to send to the SDSS to get the full SDSS catalog around
-        a target.
+    3. Edit your `.bashrc`:
+        export CASJOBS_WSID='2090870927'   # get your WSID from site above
+        export CASJOBS_PW='my password'
+    """
 
-        Parameters
-        ----------
-        db_table_name : string
-        ra : `Quantity` or float
-            The center/host RA (in degrees if float)
-        dec : `Quantity` or float
-            The center/host Dec (in degrees if float)
-        radius : `Quantity` or float
-            The radius to search out to (in degrees if float)
-
-        Returns
-        -------
-        query : str
-            The SQL query to send to the SDSS skyserver
-        """
-
-        query_template = """
+    _query_template = """
         SELECT  p.objId  as OBJID,
         p.ra as RA, p.dec as DEC,
         p.type as PHOTPTYPE,  dbo.fPhotoTypeN(p.type) as PHOT_SG,
@@ -120,37 +112,76 @@ class SdssQuery(object):
         ISNULL(s.z, -1) as SPEC_Z, ISNULL(s.zErr, -1) as SPEC_Z_ERR, ISNULL(s.zWarning, -1) as SPEC_Z_WARN,
         ISNULL(pz.z,-1) as PHOTOZ, ISNULL(pz.zerr,-1) as PHOTOZ_ERR
 
-        FROM dbo.fGetNearbyObjEq({ra}, {dec}, {r_arcmin}) n, PhotoPrimary p
+        FROM dbo.fGetNearbyObjEq({ra:.10g}, {dec:.10g}, {r_arcmin:.10g}) n, PhotoPrimary p
         INTO mydb.{db_table_name}
         LEFT JOIN SpecObj s ON p.specObjID = s.specObjID
         LEFT JOIN PHOTOZ  pz ON p.ObjID = pz.ObjID
         LEFT join WISE_XMATCH as wx on p.objid = wx.sdss_objid
         LEFT join wise_ALLSKY as w on  wx.wise_cntr = w.cntr
         WHERE n.objID = p.objID
+    """
+
+    def __init__(self, ra, dec, radius=1.0, host_name=None, context='DR14'):
+        if not host_name:
+            host_name = 'SAGA' + get_random_string(4)
+        self.host_name = re.sub('[^A-Za-z]', '', host_name)
+        self.query = self.construct_query(self.host_name, ra, dec, radius)
+        self.context = context
+
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        self.run_casjob(self.query, self.host_name, file_path, compress=compress, overwrite=True, context=self.context)
+
+
+    @classmethod
+    def construct_query(cls, db_table_name, ra, dec, radius=1.0):
         """
+        Generates the query to send to the SDSS to get the full SDSS catalog around
+        a target.
+
+        Parameters
+        ----------
+        db_table_name : string
+        ra : `Quantity` or float
+            The center/host RA (in degrees if float)
+        dec : `Quantity` or float
+            The center/host Dec (in degrees if float)
+        radius : `Quantity` or float
+            The radius to search out to (in degrees if float)
+
+        Returns
+        -------
+        query : str
+            The SQL query to send to the SDSS skyserver
+        """
+
+        if '{}'.format(db_table_name).lower() == 'none':
+            raise ValueError('`db_table_name` cannot be None')
 
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
         r_arcmin = ensure_deg(radius) * 60.0
 
         # ``**locals()`` means "use the local variable names to fill the template"
-        q = query_template.format(**locals())
+        q = cls._query_template.format(**locals())
         q = re.sub(r'\s+', ' ', q).strip()
+        q = re.sub(', ', ',', q)
         return q
 
 
     @staticmethod
-    def run_casjob(query, db_table_name, output_path, compress=True, overwrite=False):
+    def run_casjob(query, db_table_name, output_path, overwrite=False, compress=True, context='DR14'):
         """
         Run single casjob and download casjob output
 
         Parameters
         ----------
         query : str, output from construct_query
+        db_table_name : str
         output_path : str
-        compress : bool, optional
         overwrite : bool, optional
-        verbose : bool, optional
+        compress : bool, optional
+        context : str, optional
 
         Notes
         -----
@@ -165,22 +196,20 @@ class SdssQuery(object):
             export CASJOBS_WSID='2090870927'   # get your WSID from site above
             export CASJOBS_PW='my password'
         """
-
-        if not all(k in os.environ for k in ('CASJOBS_WSID', 'CASJOBS_PW')):
-            raise ValueError('You are not setup to run casjobs')
-
-        cjob = CasJobs(base_url='http://skyserver.sdss.org/casjobs/services/jobs.asmx', request_type='POST', context='DR14')
-
         if overwrite or not os.path.isfile(output_path):
-            job_id = cjob.submit(query)
-            while True:
-                code, status = cjob.status(job_id)
-                if code == 3 or code == 4:
-                    raise RuntimeError('{} casjob ({}) {}!'.format(time.strftime('[%m/%d %H:%M:%S]'), db_table_name, 'cancelled' if code==3 else 'failed'))
-                elif code == 5:
-                    break
-                print(time.strftime('[%m/%d %H:%M:%S]'), 'waiting for casjob ({}), current status: {} - {}'.format(db_table_name, code, status))
-                time.sleep(30)
+
+            if not all(k in os.environ for k in ('CASJOBS_WSID', 'CASJOBS_PW')):
+                raise ValueError('You are not setup to run casjobs')
+
+            cjob = CasJobs(base_url='http://skyserver.sdss.org/casjobs/services/jobs.asmx', request_type='POST', context=context)
+
+            job_id = cjob.submit(query, estimate=1)
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) submitted...'.format(db_table_name))
+
+            code, status = cjob.monitor(job_id)
+            if code == 3 or code == 4:
+                raise RuntimeError('{} casjob ({}) {}!'.format(time.strftime('[%m/%d %H:%M:%S]'), db_table_name, 'cancelled' if code == 3 else 'failed'))
+            assert code == 5
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) finished, downloading data...'.format(db_table_name))
             file_open = gzip.open if compress else open

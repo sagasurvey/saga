@@ -26,6 +26,7 @@ def get_empty_str_array(array_length, string_length=48, initialize_with=''):
     a[:] = initialize_with
     return a
 
+
 def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None):
     url = 'http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}'.format(**locals())
     content = requests.get(url).content
