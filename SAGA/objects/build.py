@@ -318,30 +318,27 @@ def clean_repeat_spectra(spectra):
     if 'coord' not in spectra.colnames:
         spectra['coord'] = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
 
-    if 'SPEC_REPEAT' not in spectra.columns:
-        spectra['SPEC_REPEAT'] = get_empty_str_array(len(spectra), 96)
-    else:
-        spectra['SPEC_REPEAT'] = ''
+    spec_repeat = get_empty_str_array(len(spectra), 96)
+    not_done = np.ones(len(spectra), np.bool)
 
-    spectra['raw'] = True
-
-    for spec in spectra:
-        if not spec['raw']:
+    for i, spec in enumerate(spectra):
+        if not not_done[i]:
             continue
 
         # search nearby spectra in 3D
         nearby_mask = (np.abs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
         nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < 20.0)
-        nearby_mask &= spectra['raw']
+        nearby_mask &= not_done
         nearby_mask = np.where(nearby_mask)[0]
         assert len(nearby_mask) >= 1
 
-        spectra['raw'][nearby_mask] = False
+        not_done[nearby_mask] = False
 
         best_spec_idx = nearby_mask[spectra['ZQUALITY'][nearby_mask].argmax()]
-        spectra['SPEC_REPEAT'][best_spec_idx] = '+'.join(spectra['TELNAME'][nearby_mask])
+        spec_repeat[best_spec_idx] = '+'.join(set(spectra['TELNAME'][nearby_mask]))
 
-    del spectra['raw']
+    del not_done
+    spectra['SPEC_REPEAT'] = spec_repeat
     spectra = spectra[spectra['SPEC_REPEAT'] != '']
 
     return spectra
@@ -381,20 +378,25 @@ def add_spectra(base, spectra):
             continue
 
         nearby_obj = base[nearby_obj_indices]
-        nearby_has_spec  = nearby_obj['ZQUALITY'] == 4
-        nearby_has_spec &= nearby_obj['REMOVE'] < 1
-        nearby_has_spec &= (np.abs(nearby_obj['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
-        nearby_has_spec_indices = nearby_obj_indices[nearby_has_spec]
 
-        nearby_has_spec &= nearby_obj['OBJ_NSAID'] > -1
-        nearby_nsa_indices = nearby_obj_indices[nearby_has_spec]
+        nearby_mask = (nearby_obj['REMOVE'] == -1)
+        nearby_clean_indices = nearby_obj_indices[nearby_mask]
 
-        del nearby_obj, nearby_has_spec, nearby_obj_indices
+        nearby_mask &= (nearby_obj['ZQUALITY'] == 4)
+        nearby_mask &= (np.abs(nearby_obj['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
+        nearby_has_spec_indices = nearby_obj_indices[nearby_mask]
+
+        nearby_mask &= (nearby_obj['OBJ_NSAID'] > -1)
+        nearby_nsa_indices = nearby_obj_indices[nearby_mask]
+
+        del nearby_obj, nearby_mask, nearby_obj_indices
 
         if len(nearby_nsa_indices) > 0:
             closest_obj_index = nearby_nsa_indices[sep[nearby_nsa_indices].argmin()]
         elif len(nearby_has_spec_indices) > 0:
             closest_obj_index = nearby_has_spec_indices[sep[nearby_has_spec_indices].argmin()]
+        elif len(nearby_clean_indices) > 0:
+            closest_obj_index = nearby_clean_indices[sep[nearby_clean_indices].argmin()]
         else:
             closest_obj_index = sep.argmin()
 
@@ -405,11 +407,13 @@ def add_spectra(base, spectra):
 
         spec_repeat = set(spec['SPEC_REPEAT'].split('+'))
         for i in nearby_has_spec_indices:
-            spec_repeat.update(base['SPEC_REPEAT'][i].split('+'))
+            if base['SPEC_REPEAT'][i]:
+                spec_repeat.update(base['SPEC_REPEAT'][i].split('+'))
         base['SPEC_REPEAT'][closest_obj_index] = '+'.join(spec_repeat)
 
-        base['REMOVE'][nearby_has_spec_indices] = 0
-        base['REMOVE'][closest_obj_index] = -1
+        if len(nearby_clean_indices) > 0:
+            base['REMOVE'][nearby_clean_indices] = 0
+            base['REMOVE'][closest_obj_index] = -1
 
     return base
 
