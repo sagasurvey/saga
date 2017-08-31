@@ -7,8 +7,6 @@ from .assign_targeting_score import assign_targeting_score
 
 __all__ = ['TargetSelection']
 
-_colors = ['ug', 'gr', 'ri', 'iz']
-
 class TargetSelection(object):
     def __init__(self, database):
         self._database = database

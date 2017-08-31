@@ -6,8 +6,8 @@ from astropy import units as u
 
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors', 'add_skycoord',
-           'get_empty_str_array', 'get_decals_viewer_image',
-           'join_table_by_coordinates', 'fill_values_by_query']
+           'get_empty_str_array', 'get_decals_viewer_image', 'fill_values_by_query',
+           'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec']
 
 
 _sdss_bands = 'ugriz'
@@ -44,77 +44,6 @@ def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out
     return content
 
 
-def join_table_by_coordinates(table, table_to_join,
-                              columns_to_join=None, columns_to_rename=None,
-                              max_distance=1.0*u.arcsec, missing_value=np.nan,
-                              table_ra_name='RA', table_dec_name='DEC',
-                              table_to_join_ra_name='RA',
-                              table_to_join_dec_name='DEC', unit='deg',
-                              table_coord_name='coord',
-                              table_to_join_coord_name='coord'):
-    """
-    Join two table by matching the sky coordinates.
-
-    The `unit` input controls how the tables' coordinates are interpreted, and
-    also the `max_distance`, but *only* if they are not quantity objects.
-
-    Also, note that if the tables have a `'coord'` column, that will be used as
-    the SkyCoord *instead* of accessing ``table_ra_name``/``table_dec_name``.
-
-    Examples
-    --------
-    wise_cols = ('W1_MAG', 'W1_MAG_ERR', 'W2_MAG', 'W2_MAG_ERR')
-    cols_rename = {'W1_MAG':'W1', 'W1_MAG_ERR':'W1ERR', 'W2_MAG':'W2', 'W2_MAG_ERR':'W2ERR'}
-    join_table_by_coordinates(base, wise, wise_cols, cols_rename)
-    """
-
-    t1 = table
-    t2 = table_to_join
-
-    ra1 = table_ra_name
-    dec1 = table_dec_name
-    ra2 = table_to_join_ra_name
-    dec2 = table_to_join_dec_name
-
-    if not hasattr(max_distance, 'unit'):
-        max_distance = u.Quantity(max_distance, unit=unit)
-
-    # note that if a unit-ful ra/dec are present, the *unit* argument here is
-    # ignored
-    if table_coord_name in t1.colnames:
-        sc1 = t1[table_coord_name]
-    else:
-        sc1 = SkyCoord(t1[ra1], t1[dec1], unit=unit)
-    if table_to_join_coord_name in t2.colnames:
-        sc2 = t2[table_to_join_coord_name]
-    else:
-        sc2 = SkyCoord(t2[ra2], t2[dec2], unit=unit)
-    idx1, idx2 = search_around_sky(sc1, sc2, max_distance)[:2]
-
-    n_matched = len(idx1)
-
-    if n_matched:
-        if columns_to_join is None:
-            columns_to_join = t2.colnames
-
-        if columns_to_rename is None:
-            columns_to_rename = dict()
-
-        if isinstance(missing_value, dict):
-            missing_value_dict = missing_value
-            missing_value = np.nan
-        else:
-            missing_value_dict = dict()
-
-        for c2 in columns_to_join:
-            c1 = columns_to_rename.get(c2, c2)
-            if c1 not in t1:
-                t1[c1] = missing_value_dict.get(c1, missing_value)
-            t1[c1][idx1] = t2[c2][idx2]
-
-    return n_matched
-
-
 def fill_values_by_query(table, query, values_to_fill):
     """
 
@@ -131,3 +60,69 @@ def fill_values_by_query(table, query, values_to_fill):
             table[c][mask] = v
 
     return n_matched
+
+
+def find_objid(table, objid):
+    """
+    Parameters
+    ----------
+    table : astropy.table.Table
+        needs to have an integer column called `OBJID`
+    objid : int
+
+    Returns
+    -------
+    table : astropy.table.Table
+    """
+    t = Query('OBJID=={}'.format(objid)).filter(table)
+    if len(t) == 0:
+        raise KeyError('Cannot find OBJID {}'.format(objid))
+    return t[0]
+
+def find_near_coord(table, coord, within_arcsec=3.0):
+    """
+    Parameters
+    ----------
+    table : astropy.table.Table
+        needs to have a SkyCoord column called `coord`
+    coord : astropy.coordinates.SkyCoord
+    within_arcsec : float
+
+    Returns
+    -------
+    table : astropy.table.Table
+    """
+    return table[table['coord'].separation(coord).arcsec < within_arcsec]
+
+def find_near_ra_dec(table, ra, dec, within_arcsec=3.0):
+    """
+    Parameters
+    ----------
+    table : astropy.table.Table
+        needs to have a SkyCoord column called `coord`
+    ra : float
+        in degree
+    dec : float
+        in degree
+    within_arcsec : float
+
+    Returns
+    -------
+    table : astropy.table.Table
+    """
+    return find_near_coord(table, SkyCoord(ra, dec, unit='deg'), within_arcsec)
+
+def find_near_objid(table, objid, within_arcsec=3.0):
+    """
+    Parameters
+    ----------
+    table : astropy.table.Table
+        needs to have a SkyCoord column called `coord` and an integer column called `OBJID`
+    objid : int
+    within_arcsec : float
+
+    Returns
+    -------
+    table : astropy.table.Table
+    """
+    return find_near_coord(table, find_objid(table, objid)['coord'], within_arcsec)

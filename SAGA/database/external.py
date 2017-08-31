@@ -4,12 +4,13 @@ import re
 import gzip
 import random
 import string
+import numpy as np
 from astropy import units as u
 from casjobs import CasJobs
 from .core import FitsTable
 
 
-__all__ = ['SdssQuery', 'WiseQuery']
+__all__ = ['SdssQuery', 'WiseQuery', 'download_catalogs_for_hosts']
 
 
 def get_random_string(length=6):
@@ -130,7 +131,7 @@ class SdssQuery(object):
 
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
-        self.run_casjob(self.query, self.host_name, file_path, compress=compress, overwrite=True, context=self.context)
+        self.run_casjob(self.query, self.host_name, file_path, compress=compress, overwrite=overwrite, context=self.context)
 
 
     @classmethod
@@ -218,3 +219,63 @@ class SdssQuery(object):
                     cjob.request_and_get_output(db_table_name, 'FITS', f_out)
                 finally:
                     cjob.drop_table(db_table_name)
+
+
+def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
+                                overwrite=False, compress=True, file_size_check=1e6,
+                                host_id_label='NSAID', host_ra_label='RA', host_dec_label='Dec',
+                                **query_class_kwargs):
+    """
+    A convenience function of getting all catalogs for hosts.
+
+    Examples
+    --------
+    >>> hosts = saga_host_catalog.load()
+    >>> file_path_pattern = '/path/to/SAGA/wise/nsa{}.fits.gz'
+    >>> failed = download_catalogs_for_hosts(hosts, SdssQuery, file_path_pattern, context='DR14')
+
+    You then can try again for failed ones:
+    >>> failed = download_catalogs_for_hosts(hosts[failed], SdssQuery, file_path_pattern, context='DR14')
+
+
+    Parameters
+    ----------
+    hosts : astropy.table.Table
+    query_class : SdssQuery or WiseQuery
+    file_path_pattern : str
+    overwrite : bool, optional
+    compress : bool, optional
+    file_size_check : int, optional
+    host_id_label : str, optional
+    host_ra_label : str, optional
+    host_dec_label : str, optional
+    **query_class_kwargs : passed to query_class
+
+    Returns
+    -------
+    failed : np.array
+    """
+    failed = np.zeros(len(hosts), np.bool)
+
+    for i, host in enumerate(hosts):
+        host_id = host[host_id_label]
+        host_ra = host[host_ra_label]
+        host_dec = host[host_dec_label]
+        path = file_path_pattern.format(host_id)
+
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'Getting catalog for host {} ...'.format(host_id))
+        query_obj = query_class(host_ra, host_dec, **query_class_kwargs)
+
+        try:
+            query_obj.download_as_file(path, overwrite=overwrite, compress=compress)
+        except (IOError, OSError, RuntimeError) as e:
+            print(e.args[0])
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Fail to get catalog for host {}'.format(host_id))
+            failed[i] = True
+        else:
+            if os.path.getsize(path) < 1e6:
+                print(time.strftime('[%m/%d %H:%M:%S]'), 'Downloaded catalog corrupted for host {} !!'.format(host_id))
+                os.unlink(path)
+                failed[i] = True
+
+    return failed

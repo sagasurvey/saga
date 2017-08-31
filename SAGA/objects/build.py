@@ -1,8 +1,8 @@
+import warnings
 import numpy as np
 import numexpr as ne
-import warnings
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, join, vstack
+from astropy.table import Table, join
 from astropy.constants import c
 from easyquery import Query
 from . import cuts as C
@@ -12,6 +12,7 @@ from ..utils import (fill_values_by_query, get_empty_str_array, get_sdss_bands, 
 
 __all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise', 'set_remove_flag',
            'remove_shreds_with_nsa', 'remove_shreds_with_sdss', 'clean_repeat_spectra',
+           'add_cleaned_spectra',
            'add_spectra', 'find_satellites', 'apply_manual_fixes', 'add_stellar_mass',
            'build_full_stack', 'wise_cols_used', 'nsa_cols_used']
 
@@ -19,6 +20,14 @@ wise_cols_used = ['has_wise_phot', 'objid', 'w1_mag', 'w1_mag_err', 'w2_mag', 'w
 
 nsa_cols_used = ['RA', 'DEC', 'PETROTH90', 'PETROTH50', 'SERSIC_BA', 'SERSIC_PHI',
                  'Z', 'HAEW', 'HAEWERR', 'ZSRC', 'NSAID', 'SERSICFLUX', 'SERSICFLUX_IVAR']
+
+
+def _join_spec_repeat(*repeats):
+    out = set()
+    for repeat in repeats:
+        if repeat:
+            out.update(repeat.split('+'))
+    return '+'.join(out)
 
 
 def initialize_base_catalog(base):
@@ -38,8 +47,8 @@ def initialize_base_catalog(base):
     base['HOST_NGC_NAME'] = empty_str_arr
     base['MASKNAME'] = empty_str_arr
     base['SPECOBJID'] = empty_str_arr
+    base['SPEC_REPEAT'] = empty_str_arr
 
-    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 96)
     base['TELNAME'] = get_empty_str_array(len(base), 6)
 
     fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
@@ -164,12 +173,12 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
     q |= Query('BAD_COUNTS_ERROR != 0')
     fill_values_by_query(base, q, {'REMOVE': 3})
 
-    q  = Query('abs(PETRORAD_R - PETRORAD_G) > 40', 'r < 18')
-    q |= Query('abs(PETRORAD_R - PETRORAD_I) > 40', 'r < 18')
+    q  = Query('r < 18')
+    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40') | Query('abs(PETRORAD_R - PETRORAD_G) > 40'))
     fill_values_by_query(base, q, {'REMOVE': 4})
 
-    q  = Query('SB_EXP_R > 24', '(PETRORADERR_G + PETRORADERR_R + PETRORADERR_I)/3.0 == -1000.0')
-    q |= Query('SB_EXP_R > 24', (lambda *x: np.median(x, axis=0) == -1000.0, 'PETRORADERR_G', 'PETRORADERR_R', 'PETRORADERR_I'), 'r < 18')
+    q  = Query('SB_EXP_R > 24', 'PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
+    q |= Query('SB_EXP_R > 24', 'r < 18', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
     fill_values_by_query(base, q, {'REMOVE': 5})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
@@ -257,12 +266,14 @@ def remove_shreds_with_nsa(base, nsa):
             'PETROR50_R': nsa_obj['PETROTH50'],
         }
 
-        mag = 22.5 - 2.5*np.log10(nsa_obj['SERSICFLUX'])
-        var = 1.0 / nsa_obj['SERSICFLUX_IVAR']
-        tmp1 = 2.5 / (nsa_obj['SERSICFLUX'] * np.log(10.0))
-        mag_err = np.sqrt(var * tmp1**2)     # IS THIS RIGHT??
-        mag[np.isnan(mag)] = -9999.0
-        mag_err[np.isnan(mag_err)] = -9999.0
+        invalid_mag = (nsa_obj['SERSICFLUX'] <= 0)
+        nsa_sersic_flux = np.array(nsa_obj['SERSICFLUX'])
+        nsa_sersic_flux[invalid_mag] = 1.0
+
+        mag = 22.5 - 2.5 * np.log10(nsa_sersic_flux)
+        mag_err = np.fabs((2.5/np.log(10.0))/nsa_sersic_flux/np.sqrt(nsa_obj['SERSICFLUX_IVAR']))
+        mag[invalid_mag] = -9999.0
+        mag_err[invalid_mag] = -9999.0
 
         for i, b in enumerate(get_sdss_bands()):
             values_to_rewrite[b] = mag[i+2]
@@ -289,7 +300,7 @@ def remove_shreds_with_sdss(base):
     sdss : astropy.table.Table
     """
 
-    sdss_specs = Query('SPEC_Z > 0.05', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE==-1').filter(base)
+    sdss_specs = Query('SPEC_Z > 0.05', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1').filter(base)
 
     for i, spec in enumerate(sdss_specs):
 
@@ -312,6 +323,10 @@ def clean_repeat_spectra(spectra):
     Clean all spectra to remove repeats.
     `spectra` is modified in-place.
 
+    Notes
+    -----
+    `add_spectra` calls this function.
+
     Parameters
     ----------
     spectra : astropy.table.Table
@@ -321,7 +336,7 @@ def clean_repeat_spectra(spectra):
     spectra : astropy.table.Table
     """
     spectra = add_skycoord(spectra)
-    spec_repeat = get_empty_str_array(len(spectra), 96)
+    spec_repeat = get_empty_str_array(len(spectra), 48)
     not_done = np.ones(len(spectra), np.bool)
 
     for i, spec in enumerate(spectra):
@@ -338,13 +353,74 @@ def clean_repeat_spectra(spectra):
         not_done[nearby_mask] = False
 
         best_spec_idx = nearby_mask[spectra['ZQUALITY'][nearby_mask].argmax()]
-        spec_repeat[best_spec_idx] = '+'.join(set(spectra['TELNAME'][nearby_mask]))
+        spec_repeat[best_spec_idx] = _join_spec_repeat(*spectra['TELNAME'][nearby_mask])
 
     del not_done
     spectra['SPEC_REPEAT'] = spec_repeat
     spectra = spectra[spectra['SPEC_REPEAT'] != '']
 
     return spectra
+
+
+def add_cleaned_spectra(base, spectra_clean):
+    """
+    Add cleaned spectra to base catalog.
+    `base` is modified in-place.
+    `spectra_clean` is expected to be the output of `clean_repeat_spectra`
+
+    Notes
+    -----
+    `add_spectra` calls this function.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+    spectra_clean : astropy.table.Table
+
+    Returns
+    -------
+    base : astropy.table.Table
+    """
+
+    for spec in spectra_clean:
+        sep = spec['coord'].separation(base['coord']).arcsec
+
+        nearby_obj_indices = np.where(sep < 20.0)[0]
+        if len(nearby_obj_indices) == 0:
+            warnings.warn('No object within 20 arcsec of {} spec ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
+            continue
+
+        nearby_obj = base[['REMOVE', 'ZQUALITY', 'SPEC_Z', 'OBJ_NSAID']][nearby_obj_indices]
+
+        nearby_mask = (nearby_obj['REMOVE'] == -1)
+        nearby_clean_indices = nearby_obj_indices[nearby_mask]
+
+        nearby_mask &= (nearby_obj['ZQUALITY'] == 4)
+        nearby_mask &= (np.abs(nearby_obj['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
+        nearby_has_spec_indices = nearby_obj_indices[nearby_mask]
+
+        nearby_mask &= (nearby_obj['OBJ_NSAID'] > -1)
+        nearby_nsa_indices = nearby_obj_indices[nearby_mask]
+
+        del nearby_obj, nearby_mask
+
+        for indices in (nearby_nsa_indices, nearby_has_spec_indices, nearby_clean_indices, nearby_obj_indices):
+            if len(indices) > 0:
+                closest_obj_index = indices[sep[indices].argmin()]
+                break
+
+        if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index] or \
+                (spec['ZQUALITY'] == base['ZQUALITY'][closest_obj_index] and spec['TELNAME'] == 'MMT'):
+            for col in ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID'):
+                base[col][closest_obj_index] = spec[col]
+
+        base['SPEC_REPEAT'][closest_obj_index] = _join_spec_repeat(spec['SPEC_REPEAT'], base['SPEC_REPEAT'][closest_obj_index], *base['SPEC_REPEAT'][nearby_has_spec_indices])
+
+        if len(nearby_has_spec_indices) > 0:
+            base['REMOVE'][nearby_has_spec_indices] = 3
+            base['REMOVE'][closest_obj_index] = -1
+
+    return base
 
 
 def add_spectra(base, spectra):
@@ -361,70 +437,21 @@ def add_spectra(base, spectra):
     -------
     base : astropy.table.Table
     """
-
     to_remove_coord = False
     if 'coord' not in spectra.colnames:
         spectra = add_skycoord(spectra)
-        to_remove_coord = True # because we cannot modify spectra
+        to_remove_coord = True # because we should NOT modify spectra in place!
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
-    spectra = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
-
-    if len(spectra) == 0:
-        if to_remove_coord:
-            del spectra['coord']
-        return base
-
-    spectra = clean_repeat_spectra(spectra)
-
-    for spec in spectra:
-        sep = base['coord'].separation(spec['coord']).arcsec
-
-        nearby_obj_indices = np.where(sep < 20.0)[0]
-        if len(nearby_obj_indices) == 0:
-            warnings.warn('No object within 20 arcsec of {} spec ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
-            continue
-
-        nearby_obj = base[nearby_obj_indices]
-
-        nearby_mask = (nearby_obj['REMOVE'] == -1)
-        nearby_clean_indices = nearby_obj_indices[nearby_mask]
-
-        nearby_mask &= (nearby_obj['ZQUALITY'] == 4)
-        nearby_mask &= (np.abs(nearby_obj['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
-        nearby_has_spec_indices = nearby_obj_indices[nearby_mask]
-
-        nearby_mask &= (nearby_obj['OBJ_NSAID'] > -1)
-        nearby_nsa_indices = nearby_obj_indices[nearby_mask]
-
-        del nearby_obj, nearby_mask, nearby_obj_indices
-
-        if len(nearby_nsa_indices) > 0:
-            closest_obj_index = nearby_nsa_indices[sep[nearby_nsa_indices].argmin()]
-        elif len(nearby_has_spec_indices) > 0:
-            closest_obj_index = nearby_has_spec_indices[sep[nearby_has_spec_indices].argmin()]
-        elif len(nearby_clean_indices) > 0:
-            closest_obj_index = nearby_clean_indices[sep[nearby_clean_indices].argmin()]
-        else:
-            closest_obj_index = sep.argmin()
-
-        if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index] or \
-                (spec['ZQUALITY'] == base['ZQUALITY'][closest_obj_index] and spec['TELNAME'] == 'MMT'):
-            for col in ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID'):
-                base[col][closest_obj_index] = spec[col]
-
-        spec_repeat = set(spec['SPEC_REPEAT'].split('+'))
-        for i in nearby_has_spec_indices:
-            if base['SPEC_REPEAT'][i]:
-                spec_repeat.update(base['SPEC_REPEAT'][i].split('+'))
-        base['SPEC_REPEAT'][closest_obj_index] = '+'.join(spec_repeat)
-
-        if len(nearby_clean_indices) > 0:
-            base['REMOVE'][nearby_clean_indices] = 0
-            base['REMOVE'][closest_obj_index] = -1
+    spectra_here = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
 
     if to_remove_coord:
         del spectra['coord']
+
+    del spectra
+
+    if len(spectra_here) > 0:
+        base = add_cleaned_spectra(base, clean_repeat_spectra(spectra_here))
 
     return base
 
@@ -470,7 +497,6 @@ def apply_manual_fixes(base):
     return base
 
 
-
 def add_stellar_mass(base):
     """
     Calculate stellar mass based only on gi colors and redshift
@@ -496,14 +522,14 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     base = add_host_info(base, host, saga_names)
     if wise is not None:
         base = add_wise(base, wise)
-    base = set_remove_flag(base, objects_to_remove, objects_to_add)
     if nsa is not None:
         base = remove_shreds_with_nsa(base, nsa)
     base = remove_shreds_with_sdss(base)
+    base = set_remove_flag(base, objects_to_remove, objects_to_add)
+    base = apply_manual_fixes(base)
     if spectra:
         base = add_spectra(base, spectra)
-    base = apply_manual_fixes(base)
     base = find_satellites(base)
-    base = add_stellar_mass(base)
+    #base = add_stellar_mass(base)
 
     return base
