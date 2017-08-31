@@ -74,9 +74,40 @@ class Database(object):
         for k, v in known_google_sheets.items():
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
-        self.base_file_path_pattern = os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz')
-        self.sdss_file_path_pattern = 'sdss_nsa{}.fits.gz'
-        self.wise_file_path_pattern = 'wise_nsa{}.fits'
+        self._file_path_pattern = {'base': os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz')}
+
+
+    def _set_file_path_pattern(self, key, value):
+        self._file_path_pattern[key] = value
+        keys_to_del = [k for k in self._tables if isinstance(k, tuple) and len(k) == 2 and k[0] == key]
+        for k in keys_to_del:
+            del self._tables[k]
+
+
+    @property
+    def base_file_path_pattern(self):
+        return self._file_path_pattern['base']
+
+    @base_file_path_pattern.setter
+    def base_file_path_pattern(self, value):
+        self._set_file_path_pattern('base', value)
+
+    @property
+    def sdss_file_path_pattern(self):
+        return self._file_path_pattern['sdss']
+
+    @sdss_file_path_pattern.setter
+    def sdss_file_path_pattern(self, value):
+        self._set_file_path_pattern('sdss', value)
+
+    @property
+    def wise_file_path_pattern(self):
+        return self._file_path_pattern['wise']
+
+    @wise_file_path_pattern.setter
+    def wise_file_path_pattern(self, value):
+        self._set_file_path_pattern('wise', value)
+
 
     def __getitem__(self, key):
         if key in self._tables:
