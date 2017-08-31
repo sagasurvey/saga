@@ -162,7 +162,7 @@ class HostCatalog(object):
         return table
 
 
-    def load_single(self, host, reload=False):
+    def load_single(self, host, host_type='no_flags', reload=False):
         """
         Gets the catalog row corresponding to a specific named host.
 
@@ -184,8 +184,6 @@ class HostCatalog(object):
         assert len(host_id) == 1
         host_id = host_id[0]
 
-        res = Query('NSAID == {}'.format(host_id)).filter(self.load('no_sdss_flags', reload=reload))
+        res = Query('NSAID == {}'.format(host_id)).filter(self.load(host_type, reload))
         assert len(res) == 1
         return res[0]
-
-
