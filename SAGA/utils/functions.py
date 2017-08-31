@@ -5,7 +5,7 @@ from astropy.coordinates import search_around_sky, SkyCoord
 from astropy import units as u
 
 
-__all__ = ['get_sdss_bands', 'get_sdss_colors',
+__all__ = ['get_sdss_bands', 'get_sdss_colors', 'add_skycoord',
            'get_empty_str_array', 'get_decals_viewer_image',
            'join_table_by_coordinates', 'fill_values_by_query']
 
@@ -25,6 +25,12 @@ def get_empty_str_array(array_length, string_length=48, initialize_with=''):
     a = np.empty(array_length, np.dtype('<U{}'.format(string_length)))
     a[:] = initialize_with
     return a
+
+
+def add_skycoord(table, ra_label='RA', dec_label='DEC', coord_label='coord', unit='deg'):
+    if coord_label not in table.colnames:
+        table[coord_label] = SkyCoord(table[ra_label], table[dec_label], unit=unit)
+    return table
 
 
 def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None):

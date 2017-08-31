@@ -4,6 +4,7 @@ from astropy.coordinates import SkyCoord
 from easyquery import Query
 from . import cuts as C
 from ..hosts import HostCatalog
+from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord
 
 __all__ = ['ObjectCatalog']
 
@@ -38,23 +39,39 @@ class ObjectCatalog(object):
 
 
     @staticmethod
-    def _annotate_catalog(table):
-        sdss_bands = 'ugriz'
-        for b in sdss_bands:
+    def _annotate_catalog(table, to_add_skycoord=True):
+        for b in get_sdss_bands():
             table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
 
-        for color in map(''.join, zip(sdss_bands[:-1], sdss_bands[1:])):
+        for color in get_sdss_colors():
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
             table['{}_err'.format(color)] = np.sqrt(table['{}_err'.format(color[0])]**2.0 + table['{}_err'.format(color[1])]**2.0)
 
-        table['coord'] = SkyCoord(table['RA'], table['DEC'], unit='deg')
+        if to_add_skycoord:
+            table = add_skycoord(table)
 
         return table
 
 
     @staticmethod
-    def _slice_columns(table, columns):
-       return table[columns] if columns is not None else table
+    def _slice_columns(table, columns, get_coord_later=False):
+        if columns is None:
+            return table
+
+        if get_coord_later:
+            columns_this = list(columns)
+            try:
+               columns_this.remove('coord')
+            except ValueError:
+                pass
+            if 'RA' not in columns_this:
+                columns_this.append('RA')
+            if 'DEC' not in columns_this:
+                columns_this.append('DEC')
+
+            return table[columns_this]
+
+        return table[columns]
 
 
     def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None):
@@ -141,12 +158,18 @@ class ObjectCatalog(object):
 
             hosts = self._hosts.resolve_id('all') if hosts is None else self._hosts.resolve_id(hosts)
 
-            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read())), columns) for host in hosts)
+            need_coord = (columns is None or 'coord' in columns)
+            to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
+
+            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
             elif return_as[0] == 's':
-                return vstack(list(output_iterator))
+                out = vstack(list(output_iterator), 'exact', 'error')
+                if need_coord:
+                    out = self._slice_columns(add_skycoord(out), columns)
+                return out
             else:
                 return list(output_iterator)
 

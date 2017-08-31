@@ -7,7 +7,7 @@ from astropy.constants import c
 from easyquery import Query
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
-from ..utils import join_table_by_coordinates, fill_values_by_query, get_empty_str_array, get_sdss_bands
+from ..utils import (fill_values_by_query, get_empty_str_array, get_sdss_bands, add_skycoord)
 
 
 __all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise', 'set_remove_flag',
@@ -197,14 +197,20 @@ def remove_shreds_with_nsa(base, nsa):
     sdss : astropy.table.Table
     """
 
-    if set(nsa.colnames).issuperset(set(nsa_cols_used)):
-        if len(nsa.colnames) > len(nsa_cols_used):
-            nsa = nsa[nsa_cols_used]
+    nsa_cols_used_this = set(nsa_cols_used)
+    if 'coord' in nsa.colnames:
+        nsa_cols_used_this.add('coord')
+
+    if set(nsa.colnames).issuperset(nsa_cols_used_this):
+        if len(nsa.colnames) > len(nsa_cols_used_this):
+            nsa = nsa[list(nsa_cols_used_this)]
     else:
         raise KeyError('`nsa` does not have all needed columns')
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
-    nsa = nsa[SkyCoord(nsa['RA'], nsa['DEC'], unit="deg").separation(host_sc).deg < 1.0]
+    nsa_sc = nsa['coord'] if 'coord' in nsa.colnames else SkyCoord(nsa['RA'], nsa['DEC'], unit="deg")
+    nsa = nsa[nsa_sc.separation(host_sc).deg < 1.0]
+    del nsa_sc
 
     if len(nsa) == 0:
         return base
@@ -314,10 +320,7 @@ def clean_repeat_spectra(spectra):
     -------
     spectra : astropy.table.Table
     """
-
-    if 'coord' not in spectra.colnames:
-        spectra['coord'] = SkyCoord(spectra['RA'], spectra['DEC'], unit="deg")
-
+    spectra = add_skycoord(spectra)
     spec_repeat = get_empty_str_array(len(spectra), 96)
     not_done = np.ones(len(spectra), np.bool)
 
@@ -359,12 +362,17 @@ def add_spectra(base, spectra):
     base : astropy.table.Table
     """
 
-    cols_to_copy = ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID')
+    to_remove_coord = False
+    if 'coord' not in spectra.colnames:
+        spectra = add_skycoord(spectra)
+        to_remove_coord = True # because we cannot modify spectra
 
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
-    spectra = spectra[SkyCoord(spectra['RA'], spectra['DEC'], unit="deg").separation(host_sc).deg < 1.0]
+    spectra = spectra[spectra['coord'].separation(host_sc).deg < 1.0]
 
     if len(spectra) == 0:
+        if to_remove_coord:
+            del spectra['coord']
         return base
 
     spectra = clean_repeat_spectra(spectra)
@@ -401,8 +409,8 @@ def add_spectra(base, spectra):
             closest_obj_index = sep.argmin()
 
         if spec['ZQUALITY'] > base['ZQUALITY'][closest_obj_index] or \
-                (spec['ZQUALITY'] == base['ZQUALITY'][closest_obj_index] and spec['TELNAME']=='MMT'):
-            for col in cols_to_copy:
+                (spec['ZQUALITY'] == base['ZQUALITY'][closest_obj_index] and spec['TELNAME'] == 'MMT'):
+            for col in ('TELNAME', 'MASKNAME', 'ZQUALITY', 'SPEC_Z', 'SPEC_Z_ERR', 'SPECOBJID'):
                 base[col][closest_obj_index] = spec[col]
 
         spec_repeat = set(spec['SPEC_REPEAT'].split('+'))
@@ -414,6 +422,9 @@ def add_spectra(base, spectra):
         if len(nearby_clean_indices) > 0:
             base['REMOVE'][nearby_clean_indices] = 0
             base['REMOVE'][closest_obj_index] = -1
+
+    if to_remove_coord:
+        del spectra['coord']
 
     return base
 

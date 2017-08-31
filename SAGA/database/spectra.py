@@ -4,7 +4,7 @@ from astropy.table import Table, vstack
 from astropy.coordinates import SkyCoord
 from easyquery import Query
 from .core import FitsTable
-from ..utils import get_empty_str_array
+from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
@@ -171,4 +171,4 @@ class SpectraData(object):
             read_deimos(),
         ]
 
-        return ensure_dtype(vstack(all_specs, 'exact', 'error'))
+        return add_skycoord(ensure_dtype(vstack(all_specs, 'exact', 'error')))
