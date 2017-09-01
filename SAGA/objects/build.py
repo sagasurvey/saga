@@ -331,7 +331,7 @@ def clean_repeat_spectra(spectra):
 
     Notes
     -----
-    `add_spectra` calls this function.
+    `add_spectra` and `clean_sdss_spectra` calls this function.
 
     Parameters
     ----------
@@ -344,6 +344,8 @@ def clean_repeat_spectra(spectra):
     spectra = add_skycoord(spectra)
     spec_repeat = get_empty_str_array(len(spectra), 48)
     not_done = np.ones(len(spectra), np.bool)
+
+    spec_repeat_col = 'TELNAME' if 'TELNAME' in spectra.colnames else 'SPEC_REPEAT'
 
     for i, spec in enumerate(spectra):
         if not not_done[i]:
@@ -359,11 +361,13 @@ def clean_repeat_spectra(spectra):
         not_done[nearby_mask] = False
 
         best_spec_idx = nearby_mask[spectra['ZQUALITY'][nearby_mask].argmax()]
-        spec_repeat[best_spec_idx] = _join_spec_repeat(*spectra['TELNAME'][nearby_mask])
+        spec_repeat[best_spec_idx] = _join_spec_repeat(*spectra[spec_repeat_col][nearby_mask])
 
     del not_done
-    spectra['SPEC_REPEAT'] = spec_repeat
-    spectra = spectra[spectra['SPEC_REPEAT'] != '']
+
+    mask = (spec_repeat != '')
+    spectra = spectra[mask]
+    spectra['SPEC_REPEAT'] = spec_repeat[mask]
 
     return spectra
 
@@ -463,6 +467,32 @@ def add_spectra(base, spectra):
     return base
 
 
+def clean_sdss_spectra(base):
+    """
+    clean up SDSS spectra using `clean_repeat_spectra`
+    `base` is modified in-place.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+
+    Returns
+    -------
+    base : astropy.table.Table
+    """
+    find_sdss_only = lambda t: np.fromiter(((x and set(x.split('+')).issubset({'NSA', 'SDSS'})) for x in t['SPEC_REPEAT']), np.bool, len(t))
+    sdss_specs_indices = np.where(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))[0]
+    if len(sdss_specs_indices) > 0:
+        sdss_specs = base[['SPEC_REPEAT', 'SPEC_Z', 'ZQUALITY', 'coord']][sdss_specs_indices]
+        sdss_specs['indices'] = sdss_specs_indices
+        sdss_specs = clean_repeat_spectra(sdss_specs)
+        base['REMOVE'][sdss_specs_indices] = 3
+        base['REMOVE'][sdss_specs['indices']] = -1
+        base['SPEC_REPEAT'][sdss_specs['indices']] = sdss_specs['SPEC_REPEAT']
+
+    return base
+
+
 def find_satellites(base):
     """
     Add `SATS` column to the base catalog.
@@ -536,6 +566,7 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     base = apply_manual_fixes(base)
     if spectra:
         base = add_spectra(base, spectra)
+    base = clean_sdss_spectra(base)
     base = find_satellites(base)
     #base = add_stellar_mass(base)
 
