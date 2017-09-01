@@ -12,6 +12,8 @@ See the [SAGA Survey website](http://sagasurvey.org/) for details about SAGA.
 
 ## Example Usage
 
+See more examples at https://github.com/sagasurvey/examples/tree/master/notebooks
+
 ```python
 import SAGA
 from SAGA import ObjectCuts as C
