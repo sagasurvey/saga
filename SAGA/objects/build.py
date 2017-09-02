@@ -547,7 +547,9 @@ def find_satellites(base):
      0 - high-z galaxies
      1 - Satellites!!!
      2 - low-z galaxies
-     3 - host galaxy
+     3 - host galaxy itself
+    91 - removed objects but otherwise satisfying satellite cut
+    92 - removed objects but otherwise satisfying low-z galaxy cut
 
     `base` is modified in-place.
 
@@ -559,11 +561,20 @@ def find_satellites(base):
     -------
     base : astropy.table.Table
     """
-    basic_cuts = C.is_galaxy & C.has_spec & C.is_clean
-    fill_values_by_query(base, basic_cuts & C.is_high_z, {'SATS':0})
-    fill_values_by_query(base, basic_cuts & ~C.is_high_z, {'SATS':2})
-    fill_values_by_query(base, basic_cuts & C.sat_rcut & C.sat_vcut, {'SATS':1})
-    fill_values_by_query(base, basic_cuts & C.obj_is_host, {'SATS':3})
+
+    # clean objects
+    clean_obj = C.is_galaxy & C.has_spec & C.is_clean
+    fill_values_by_query(base, clean_obj & C.is_high_z, {'SATS':0})
+    fill_values_by_query(base, clean_obj & ~C.is_high_z, {'SATS':2})
+    fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {'SATS':1})
+
+    # removed objects
+    removed_obj = C.is_galaxy & C.has_spec & (~C.is_clean)
+    fill_values_by_query(base, removed_obj & ~C.is_high_z, {'SATS':92})
+    fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {'SATS':91})
+
+    # host itself!
+    fill_values_by_query(base, C.obj_is_host, {'SATS':3, 'REMOVE':-1})
 
     return base
 
