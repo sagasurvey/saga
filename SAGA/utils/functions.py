@@ -92,7 +92,10 @@ def find_near_coord(table, coord, within_arcsec=3.0):
     -------
     table : astropy.table.Table
     """
-    return table[table['coord'].separation(coord).arcsec < within_arcsec]
+    sep = table['coord'].separation(coord).arcsec
+    nearby_indices = np.where(sep < within_arcsec)[0]
+    nearby_indices = nearby_indices[sep[nearby_indices].argsort()]
+    return table[nearby_indices]
 
 def find_near_ra_dec(table, ra, dec, within_arcsec=3.0):
     """
