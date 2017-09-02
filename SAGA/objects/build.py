@@ -3,7 +3,7 @@ import numpy as np
 import numexpr as ne
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, join
-from astropy.constants import c
+import astropy.constants
 from easyquery import Query
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
@@ -12,18 +12,20 @@ from ..utils import (fill_values_by_query, get_empty_str_array, get_sdss_bands, 
 
 __all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise',
            'remove_human_inspected', 'remove_too_close_to_host',
-           'remove_shreds_with_nsa', 'remove_shreds_with_sdss',
+           'remove_shreds_with_nsa', 'remove_shreds_with_highz',
            'remove_bad_photometry', 'recover_whitelisted_objects',
            'apply_manual_fixes', 'clean_repeat_spectra', 'add_cleaned_spectra',
            'add_spectra', 'clean_sdss_spectra', 'find_satellites',
            'add_stellar_mass', 'build_full_stack',
-           'wise_cols_used', 'nsa_cols_used']
+           'WISE_COLS_USED', 'NSA_COLS_USED']
 
 
-wise_cols_used = ['has_wise_phot', 'objid', 'w1_mag', 'w1_mag_err', 'w2_mag', 'w2_mag_err']
+_WISE_COLS_USED = ['has_wise_phot', 'objid', 'w1_mag', 'w1_mag_err', 'w2_mag', 'w2_mag_err']
+WISE_COLS_USED = list(_WISE_COLS_USED)
 
-nsa_cols_used = ['RA', 'DEC', 'PETROTH90', 'PETROTH50', 'SERSIC_BA', 'SERSIC_PHI',
+_NSA_COLS_USED = ['RA', 'DEC', 'PETROTH90', 'PETROTH50', 'SERSIC_BA', 'SERSIC_PHI',
                  'Z', 'HAEW', 'HAEWERR', 'ZSRC', 'NSAID', 'SERSICFLUX', 'SERSICFLUX_IVAR']
+NSA_COLS_USED = list(_NSA_COLS_USED)
 
 
 def _join_spec_repeat(*repeats):
@@ -42,6 +44,13 @@ def _get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
+def _get_spec_search_radius(spec_z):
+    return 20.0 if spec_z < 0.2 else 10.0
+
+
+_spec_search_dz = 50.0/astropy.constants.c.to('km/s').value
+
+
 def initialize_base_catalog(base):
     """
     Initialize the base catalog with empty columns.
@@ -57,7 +66,6 @@ def initialize_base_catalog(base):
     -------
     base : astropy.table.Table
     """
-
     base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
 
     base['REMOVE'] = np.int16(-1)
@@ -100,7 +108,6 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     -------
     base : astropy.table.Table
     """
-
     if ('HOST_NSAID' in base.colnames and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
         raise ValueError('Host info exists and differs from input host info.')
 
@@ -149,12 +156,11 @@ def add_wise(base, wise, missing_value=9999.0):
     Currently this function only adds wise data, but in the future this function
     may add more photometric data
     """
-
     cols_rename = {'w1_mag':'W1', 'w1_mag_err':'W1ERR', 'w2_mag':'W2', 'w2_mag_err':'W2ERR'}
 
-    if set(wise.colnames).issuperset(set(wise_cols_used)):
-        if len(wise.colnames) > len(wise_cols_used):
-            wise = wise[wise_cols_used]
+    if set(wise.colnames).issuperset(set(_WISE_COLS_USED)):
+        if len(wise.colnames) > len(_WISE_COLS_USED):
+            wise = wise[_WISE_COLS_USED]
     else:
         raise KeyError('`wise` does not have all needed columns')
 
@@ -240,8 +246,7 @@ def remove_shreds_with_nsa(base, nsa):
     -------
     sdss : astropy.table.Table
     """
-
-    nsa_cols_used_this = set(nsa_cols_used)
+    nsa_cols_used_this = set(_NSA_COLS_USED)
     if 'coord' in nsa.colnames:
         nsa_cols_used_this.add('coord')
 
@@ -320,48 +325,10 @@ def remove_shreds_with_nsa(base, nsa):
     return base
 
 
-def remove_shreds_with_sdss(base):
-    """
-    Use SDSS catalog (i.e., base catalog itself) to remove shereded objects.
-    Set REMOVE to 4.
-    This is step (4) of object removal.
-
-    For SDSS galaxies that has good spec beyond NSA redshift cutoff,
-    find in the base catalog all objects within 1.25 R and mark them as removed.
-
-    `base` is modified in-place.
-
-    Parameters
-    ----------
-    base : astropy.table.Table
-
-    Returns
-    -------
-    base : astropy.table.Table
-    """
-
-    sdss_specs = Query('SPEC_Z > 0.05', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1').filter(base)
-
-    for i, spec in enumerate(sdss_specs):
-
-        nearby_obj_indices = np.where(base['coord'].separation(spec['coord']).arcsec < 1.25 * spec['PETRORAD_R'])[0]
-        nearby_obj_indices = nearby_obj_indices[nearby_obj_indices != i]
-
-        if len(nearby_obj_indices) == 0:
-            continue
-
-        base['REMOVE'][nearby_obj_indices] = 4
-
-        if len(nearby_obj_indices) > 25:
-            logging.warning('In SAGA.objects.build.remove_shreds_with_sdss()\n Too many (> 25) shreds around SDSS {} ({}, {})'.format(spec['OBJID'], spec['RA'], spec['DEC']))
-
-    return base
-
-
 def remove_bad_photometry(base):
     """
     Remove objects that have bad SDSS photometry. Set REMOVE to 3, 4, or 5.
-    This is step (5) of object removal.
+    This is step (4) of object removal.
 
     `base` is modified in-place.
 
@@ -375,19 +342,18 @@ def remove_bad_photometry(base):
     -------
     base : astropy.table.Table
     """
-
     q  = Query('BINNED1 == 0')
     q |= Query('SATURATED != 0')
     q |= Query('BAD_COUNTS_ERROR != 0')
     fill_values_by_query(base, q, {'REMOVE': 3})
 
-    q  = Query('r < 18')
-    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40') | Query('abs(PETRORAD_R - PETRORAD_G) > 40'))
+    q  = Query('r < 18.0')
+    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40.0') | Query('abs(PETRORAD_R - PETRORAD_I) > 40.0'))
     fill_values_by_query(base, q, {'REMOVE': 4})
 
     q  = Query('PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
-    q |= Query('r < 18', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
-    q &= Query('SB_EXP_R > 24')
+    q |= Query('r < 18.0', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
+    q &= Query('SB_EXP_R > 24.0')
     fill_values_by_query(base, q, {'REMOVE': 5})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
@@ -399,7 +365,8 @@ def remove_bad_photometry(base):
 def recover_whitelisted_objects(base, objects_to_add):
     """
     Use the "add list" to set REMOVE back to -1 for whitelisted objects.
-    This is step (6), the final step, of object removal.
+    This is mainly to deal with objects that are removed by `remove_bad_photometry`
+    This is step (5) of object removal.
 
     `base` is modified in-place.
 
@@ -412,9 +379,52 @@ def recover_whitelisted_objects(base, objects_to_add):
     -------
     base : astropy.table.Table
     """
-
     ids_to_add = _get_unique_objids(objects_to_add['SDSS ID'])
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
+    return base
+
+
+def remove_shreds_with_highz(base):
+    """
+    Remove shereded objects that are within 1.25 R of each high-z (beyond NSA
+    redshift cutoff) object in the base catalog. Set REMOVE to 4.
+
+    Because this function uses objects with specs, it should be applied to
+    base catalog after the specs are cleaned (i.e., after `clean_sdss_spectra`)
+
+    `base` is modified in-place.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+
+    Returns
+    -------
+    base : astropy.table.Table
+    """
+    highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1')
+    highz_spec_indices = np.where(highz_spec_cut.mask(base))[0]
+
+    for idx in highz_spec_indices:
+
+        if base['REMOVE'][idx] != -1:
+            continue
+
+        nearby_obj_mask  = (base['coord'].separation(base['coord'][idx]).arcsec < 1.25 * base['PETRORAD_R'][idx])
+        nearby_obj_mask &= (base['REMOVE'] == -1)
+
+        assert nearby_obj_mask[idx]
+        nearby_obj_mask[idx] = False
+        nearby_obj_count = np.count_nonzero(nearby_obj_mask)
+
+        if not nearby_obj_count:
+            continue
+
+        if nearby_obj_count > 25:
+            logging.warning('In SAGA.objects.build.remove_shreds_with_highz()\n Too many (> 25) shreds around high-z object {} ({}, {})'.format(base['OBJID'][idx], base['RA'][idx], base['DEC'][idx]))
+
+        base['REMOVE'][nearby_obj_mask] = 4
+
     return base
 
 
@@ -440,7 +450,8 @@ def apply_manual_fixes(base):
 
 def clean_repeat_spectra(spectra):
     """
-    Remove repeated spectra by search nearby spectra in 3D.
+    Remove repeated spectra by search nearby spectra in 3D,
+    within 20 arcsec (or 10 arcsec for z > 0.2) and dz in +/-50 km/s
     Keep the best one, other are removed (but TELNAME is recorded and added to SPEC_REPEAT)
 
     `spectra` is modified in-place.
@@ -456,7 +467,6 @@ def clean_repeat_spectra(spectra):
     Notes
     -----
     `add_spectra` and `clean_sdss_spectra` calls this function.
-
     """
     spectra = add_skycoord(spectra)
     spec_repeat = get_empty_str_array(len(spectra), 48)
@@ -469,8 +479,8 @@ def clean_repeat_spectra(spectra):
             continue
 
         # search nearby spectra in 3D
-        nearby_mask = (np.fabs(spectra['SPEC_Z'] - spec['SPEC_Z']) < 50.0/c.to('km/s').value)
-        nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < 20.0)
+        nearby_mask = (np.fabs(spectra['SPEC_Z'] - spec['SPEC_Z']) < _spec_search_dz)
+        nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < _get_spec_search_radius(spec['SPEC_Z']))
         nearby_mask &= not_done
         nearby_mask = np.where(nearby_mask)[0]
         assert len(nearby_mask) >= 1
@@ -507,6 +517,8 @@ def add_cleaned_spectra(base, spectra_clean):
     Once a match is found, any other objects that satisfy the condition (2) above
     are turned off (REMOVE set to 3).
 
+    For high-z objects (z > 0.2), the number "20 arcsec" becomes "10 arcsec"
+
     `base` is modified in-place.
     `spectra_clean` is expected to be the output of `clean_repeat_spectra`
 
@@ -522,12 +534,10 @@ def add_cleaned_spectra(base, spectra_clean):
     Notes
     -----
     `add_spectra` calls this function.
-
     """
-
     for spec in spectra_clean:
         sep = spec['coord'].separation(base['coord']).arcsec
-        nearby_obj_indices = np.where(sep < 20.0)[0]
+        nearby_obj_indices = np.where(sep < _get_spec_search_radius(spec['SPEC_Z']))[0]
 
         if len(nearby_obj_indices) == 0:
             if spec['TELNAME'] != 'GAMA':
@@ -543,7 +553,7 @@ def add_cleaned_spectra(base, spectra_clean):
         mask &= Query('REMOVE == -1').mask(nearby_obj)
         very_close_clean_indices = nearby_obj_indices[mask]
 
-        mask = Query('REMOVE == -1', 'ZQUALITY == 4', 'abs(SPEC_Z - {}) < {}'.format(spec['SPEC_Z'], 50.0/c.to('km/s').value)).mask(nearby_obj)
+        mask = Query('REMOVE == -1', 'ZQUALITY == 4', 'abs(SPEC_Z - {}) < {}'.format(spec['SPEC_Z'], _spec_search_dz)).mask(nearby_obj)
         nearby_has_spec_indices = nearby_obj_indices[mask]
 
         mask &= Query('OBJ_NSAID > -1').mask(nearby_obj)
@@ -628,8 +638,10 @@ def clean_sdss_spectra(base):
     find_sdss_only = lambda t: np.fromiter(((x and set(x.split('+')).issubset({'NSA', 'SDSS'})) for x in t['SPEC_REPEAT']), np.bool, len(t))
     sdss_specs_indices = np.where(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))[0]
     if len(sdss_specs_indices) > 0:
-        sdss_specs = base[['SPEC_REPEAT', 'SPEC_Z', 'ZQUALITY', 'coord']][sdss_specs_indices]
+        sdss_specs = base[['SPEC_REPEAT', 'SPEC_Z', 'TELNAME', 'ZQUALITY', 'coord']][sdss_specs_indices]
         sdss_specs['indices'] = sdss_specs_indices
+        sdss_specs['ZQUALITY'][sdss_specs['TELNAME'] == 'NSA'] = 5 # so that `clean_repeat_spectra` will prefer NSA
+        del sdss_specs['TELNAME'] # so that `clean_repeat_spectra` will use SPEC_REPEAT rather than TELNAME
         sdss_specs = clean_repeat_spectra(sdss_specs)
         base['REMOVE'][sdss_specs_indices] = 3
         base['REMOVE'][sdss_specs['indices']] = -1
@@ -660,7 +672,6 @@ def find_satellites(base):
     -------
     base : astropy.table.Table
     """
-
     # clean objects
     clean_obj = C.is_galaxy & C.has_spec & C.is_clean
     fill_values_by_query(base, clean_obj & C.is_high_z, {'SATS':0})
@@ -709,15 +720,17 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     >>> remove_human_inspected(base, objects_to_remove)
     >>> remove_too_close_to_host(base)
     >>> remove_shreds_with_nsa(base, nsa)
-    >>> remove_shreds_with_sdss(base)
     >>> remove_bad_photometry(base)
     >>> recover_whitelisted_objects(base, objects_to_add)
     >>> apply_manual_fixes(base)
     >>> add_spectra(base, spectra)
     >>> clean_sdss_spectra(base)
+    >>> remove_shreds_with_highz(base)
     >>> find_satellites(base)
-    >>> add_stellar_mass(base)
+    >>> add_stellar_mass(base) # not yet implemented
 
+    Among these function, `add_wise` can be applied at any time. All other
+    functions should be applied in this particular order.
     See docstring of each function to learn more.
 
     `base` is always modified in-place.
@@ -746,7 +759,6 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     base = remove_too_close_to_host(base)
     if nsa is not None:
         base = remove_shreds_with_nsa(base, nsa)
-    base = remove_shreds_with_sdss(base)
     base = remove_bad_photometry(base)
     if objects_to_add is not None:
         base = recover_whitelisted_objects(base, objects_to_add)
@@ -754,6 +766,7 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     if spectra:
         base = add_spectra(base, spectra)
     base = clean_sdss_spectra(base)
+    base = remove_shreds_with_highz(base)
     base = find_satellites(base)
     #base = add_stellar_mass(base)
 
