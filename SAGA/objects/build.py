@@ -39,6 +39,20 @@ def _get_unique_objids(objid_col):
 
 
 def initialize_base_catalog(base):
+    """
+    Initialize the base catalog with empty columns.
+    Also fill in some columns for objects that already have SDSS specs.
+
+    `base` is modified in-place.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+
+    Returns
+    -------
+    base : astropy.table.Table
+    """
 
     base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
 
@@ -68,12 +82,15 @@ def initialize_base_catalog(base):
 def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
     """
     Add host information to the base catalog (for a single host).
+
     `base` is modified in-place.
 
     Parameters
     ----------
     base : astropy.table.Table
     host : astropy.table.Row
+    saga_names : astropy.table.Table or None, optional
+    overwrite_if_different_host : bool, optional
 
     Returns
     -------
@@ -109,13 +126,15 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
 
 def add_wise(base, wise, missing_value=9999.0):
     """
-    Add more photometric data to the base catalog (for a single host).
+    Add wise photometric data to the base catalog.
+
     `base` is modified in-place.
 
     Parameters
     ----------
     base : astropy.table.Table
     wise : astropy.table.Table
+    missing_value : float
 
     Returns
     -------
@@ -126,6 +145,7 @@ def add_wise(base, wise, missing_value=9999.0):
     Currently this function only adds wise data, but in the future this function
     may add more photometric data
     """
+
     cols_rename = {'w1_mag':'W1', 'w1_mag_err':'W1ERR', 'w2_mag':'W2', 'w2_mag_err':'W2ERR'}
 
     if set(wise.colnames).issuperset(set(wise_cols_used)):
@@ -152,10 +172,12 @@ def add_wise(base, wise, missing_value=9999.0):
     return base
 
 
-def set_remove_flag(base, objects_to_remove, objects_to_add):
+def set_remove_flag(base, objects_to_remove=None, objects_to_add=None):
     """
-    Set remove flag in the base catalog (for a single host),
-    using the remove list and other info existing in the base catalog.
+    Set remove flag in the base catalog.
+    Use the "remove list" and other SDSS flags that already exist in the base catalog.
+    Use the "add list" to add back objects that should not be removed.
+
     `base` is modified in-place.
 
     Parameters
@@ -203,7 +225,12 @@ def set_remove_flag(base, objects_to_remove, objects_to_add):
 
 def remove_shreds_with_nsa(base, nsa):
     """
-    Use NSA catalog to remove shereded object.
+    Use NSA catalog to remove shereded objects.
+
+    For each NSA galaxy, find in the base catalog all objects within the ellipse,
+    mark them as removed except for the closest one.
+
+    `base` is modified in-place.
 
     Parameters
     ----------
@@ -228,6 +255,7 @@ def remove_shreds_with_nsa(base, nsa):
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     nsa_sc = nsa['coord'] if 'coord' in nsa.colnames else SkyCoord(nsa['RA'], nsa['DEC'], unit="deg")
     nsa = nsa[nsa_sc.separation(host_sc).deg < 1.0]
+    nsa = Query('NSAID != 64408').filter(nsa) # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
     del nsa_sc
 
     if len(nsa) == 0:
@@ -295,7 +323,12 @@ def remove_shreds_with_nsa(base, nsa):
 
 def remove_shreds_with_sdss(base):
     """
-    Use SDSS catalog (i.e., base catalog itself) to remove shereded object.
+    Use SDSS catalog (i.e., base catalog itself) to remove shereded objects.
+
+    For SDSS galaxies that has good spec beyond NSA redshift cutoff,
+    find in the base catalog all objects within 1.25 R and mark them as removed.
+
+    `base` is modified in-place.
 
     Parameters
     ----------
@@ -326,12 +359,10 @@ def remove_shreds_with_sdss(base):
 
 def clean_repeat_spectra(spectra):
     """
-    Clean all spectra to remove repeats.
-    `spectra` is modified in-place.
+    Remove repeated spectra by search nearby spectra in 3D.
+    Keep the best one, other are removed (but TELNAME is recorded and added to SPEC_REPEAT)
 
-    Notes
-    -----
-    `add_spectra` and `clean_sdss_spectra` calls this function.
+    `spectra` is modified in-place.
 
     Parameters
     ----------
@@ -340,6 +371,11 @@ def clean_repeat_spectra(spectra):
     Returns
     -------
     spectra : astropy.table.Table
+
+    Notes
+    -----
+    `add_spectra` and `clean_sdss_spectra` calls this function.
+
     """
     spectra = add_skycoord(spectra)
     spec_repeat = get_empty_str_array(len(spectra), 48)
@@ -375,12 +411,12 @@ def clean_repeat_spectra(spectra):
 def add_cleaned_spectra(base, spectra_clean):
     """
     Add cleaned spectra to base catalog.
+    For each spectrum in cleaned spectra, search nearby objects in base catalog.
+    Choose the nearest one to add spec to, but will prefer NSA object or objects have specs already.
+    Once matched, nearby specs are turned off.
+
     `base` is modified in-place.
     `spectra_clean` is expected to be the output of `clean_repeat_spectra`
-
-    Notes
-    -----
-    `add_spectra` calls this function.
 
     Parameters
     ----------
@@ -390,6 +426,11 @@ def add_cleaned_spectra(base, spectra_clean):
     Returns
     -------
     base : astropy.table.Table
+
+    Notes
+    -----
+    `add_spectra` calls this function.
+
     """
 
     for spec in spectra_clean:
@@ -437,6 +478,9 @@ def add_cleaned_spectra(base, spectra_clean):
 def add_spectra(base, spectra):
     """
     Add spectra to base catalog.
+    This function calls `clean_repeat_spectra` to clean input spectra,
+    and then calls `add_cleaned_spectra` to add cleaned spectra to base catalog.
+
     `base` is modified in-place.
 
     Parameters
@@ -469,7 +513,9 @@ def add_spectra(base, spectra):
 
 def clean_sdss_spectra(base):
     """
-    clean up SDSS spectra using `clean_repeat_spectra`
+    Clean up SDSS spectra (i.e., those already in base catalog).
+    First, use `clean_repeat_spectra` to clean SDSS spectra, and then keep only unique ones.
+
     `base` is modified in-place.
 
     Parameters
@@ -496,6 +542,13 @@ def clean_sdss_spectra(base):
 def find_satellites(base):
     """
     Add `SATS` column to the base catalog.
+
+    -1 - default value
+     0 - high-z galaxies
+     1 - Satellites!!!
+     2 - low-z galaxies
+     3 - host galaxy
+
     `base` is modified in-place.
 
     Parameters
@@ -517,7 +570,8 @@ def find_satellites(base):
 
 def apply_manual_fixes(base):
     """
-    Apply manual fixes to base catalog.
+    Apply manual fixes to base catalog using `manual_fixes.fixes_by_sdss_objid`
+
     `base` is modified in-place.
 
     Parameters
@@ -536,9 +590,10 @@ def apply_manual_fixes(base):
 
 def add_stellar_mass(base):
     """
-    Calculate stellar mass based only on gi colors and redshift
-    Based on GAMA data using Taylor et al (2011)
-    Add to `base`, modified in-place.
+    Calculate stellar mass based only on gi colors and redshift and add to base catalog.
+    Based on GAMA data using Taylor et al (2011).
+
+    `base` is modified in-place.
 
     Parameters
     ----------
@@ -554,7 +609,41 @@ def add_stellar_mass(base):
 
 def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
                      objects_to_remove=None, objects_to_add=None, spectra=None):
+    """
+    This function calls all needed functions to complete the full stack of building
+    a base catalog (for a single host), in the following order:
 
+    >>> initialize_base_catalog(base)
+    >>> add_host_info(base, host, saga_names)
+    >>> add_wise(base, wise)
+    >>> remove_shreds_with_nsa(base, nsa)
+    >>> remove_shreds_with_sdss(base)
+    >>> set_remove_flag(base, objects_to_remove, objects_to_add)
+    >>> apply_manual_fixes(base)
+    >>> add_spectra(base, spectra)
+    >>> clean_sdss_spectra(base)
+    >>> find_satellites(base)
+    >>> add_stellar_mass(base)
+
+    See docstring of each function to learn more.
+
+    `base` is always modified in-place.
+
+    Parameters
+    ----------
+    base : astropy.table.Table
+    host : astropy.table.Row
+    saga_names : astropy.table.Table
+    wise : astropy.table.Table
+    nsa : astropy.table.Table
+    objects_to_remove : astropy.table.Table
+    objects_to_add : astropy.table.Table
+    spectra : astropy.table.Table
+
+    Returns
+    -------
+    base : astropy.table.Table
+    """
     base = initialize_base_catalog(base)
     base = add_host_info(base, host, saga_names)
     if wise is not None:
