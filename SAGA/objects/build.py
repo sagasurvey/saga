@@ -492,9 +492,20 @@ def clean_repeat_spectra(spectra):
 def add_cleaned_spectra(base, spectra_clean):
     """
     Add cleaned spectra to base catalog.
-    For each spectrum in cleaned spectra, search nearby objects in base catalog.
-    Choose the nearest one to add spec to, but will prefer NSA object or objects have specs already.
-    Once matched, nearby specs are turned off.
+    For each entry in `spectra_clean`, search nearby objects in base catalog
+    to find an object to match the spectrum to.
+
+    The search is done in the following order.
+    In each category, if any objects are found, the closest one (on the sky)
+    will be the match, and the search ends.
+
+    1. within 20 arcsec, spec within +/- 50 km/s, REMOVE==-1, has NSA
+    2. within 20 arcsec, spec within +/- 50 km/s, REMOVE==-1, any ZQUALITY==4
+    3. within 3 arcsec, REMOVE==-1
+    4. within 3 arcsec
+
+    Once a match is found, any other objects that satisfy the condition (2) above
+    are turned off (REMOVE set to 3).
 
     `base` is modified in-place.
     `spectra_clean` is expected to be the output of `clean_repeat_spectra`
