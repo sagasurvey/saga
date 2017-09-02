@@ -1,10 +1,14 @@
+import time
 import numpy as np
 from astropy.table import vstack
 from astropy.coordinates import SkyCoord
 from easyquery import Query
 from . import cuts as C
+from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
+from ..database import FitsTable
 from ..hosts import HostCatalog
 from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord
+
 
 __all__ = ['ObjectCatalog']
 
@@ -35,7 +39,7 @@ class ObjectCatalog(object):
 
     def __init__(self, database):
         self._database = database
-        self._hosts = HostCatalog(self._database)
+        self._host_catalog = HostCatalog(self._database)
 
 
     @staticmethod
@@ -135,7 +139,7 @@ class ObjectCatalog(object):
             t = self._database['spectra_clean'].read()
 
             if hosts is not None:
-                host_ids = self._hosts.resolve_id(hosts)
+                host_ids = self._host_catalog.resolve_id(hosts)
                 t = Query((lambda x: np.in1d(x, host_ids), 'HOST_NSAID')).filter(t)
 
             t = self._annotate_catalog(t)
@@ -156,7 +160,7 @@ class ObjectCatalog(object):
             if has_spec is not None:
                 q = q & (~C.has_spec)
 
-            hosts = self._hosts.resolve_id('all') if hosts is None else self._hosts.resolve_id(hosts)
+            hosts = self._host_catalog.resolve_id('all' if hosts is None else hosts)
 
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
@@ -174,10 +178,74 @@ class ObjectCatalog(object):
                 return list(output_iterator)
 
 
-    def build(self, hosts=None, rebuild=False):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None):
         """
-        This function is not yet implemented.
-        You can do `from SAGA.objects.build import *` to get
-        the functions for building object catalogs.
+        This function build base catalog and write to the database.
+
+        !! IMPORTANT !!
+        If you want to write the base catalog to an alternative location (not the database)
+        Make sure you set the base_file_path_pattern option!!
+
+        Parameters
+        ----------
+        hosts : int, str, list, None, optional
+            host names/IDs or a list of host names/IDs or short-hand names like
+            "paper1" or "paper1_complete"
+
+        overwrite : bool, optional
+            If set to True, overwrite existing base catalog
+
+        base_file_path_pattern : str, optional
+
+        Examples
+        --------
+        >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
+
+        You need to set some local paths first
+        >>> saga_database.sdss_file_path_pattern = '/path/to/sdss/nsa{}.fits.gz'
+        >>> saga_database.wise_file_path_pattern = '/path/to/wise/nsa{}.fits.gz'
+        >>> saga_database['spectra_gama'].local = '/path/to/gama/SpecObj.fits'
+        >>> saga_database['nsa_v0.1.2'].local = '/path/to/nsa_v0_1_2.fits'
+
+        >>> saga_object_catalog = SAGA.ObjectCatalog(saga_database)
+
+        Overwrite the database (Danger!!)
+        >>> saga_object_catalog.build_and_write_to_database('paper1', overwrite=True)
+
+        You can also do
+        >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
+
         """
-        raise NotImplementedError #TODO: implement this
+
+        nsa = add_skycoord(self._database['nsa_v0.1.2'].read()[NSA_COLS_USED])
+        spectra_raw_all = self._database['spectra_raw_all'].read()
+        host_ids = self._host_catalog.resolve_id('all' if hosts is None else hosts)
+
+        for i, host_id in enumerate(host_ids):
+
+            if base_file_path_pattern is None:
+                data_obj = self._database['base', host_id].remote
+            else:
+                data_obj = FitsTable(base_file_path_pattern.format(host_id))
+
+            if data_obj.isfile() and not overwrite:
+                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog of {} already exists.'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
+                continue
+
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Building base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
+            try:
+                wise = self._database['wise', host_id].read()[WISE_COLS_USED]
+            except OSError:
+                wise = None
+
+            base = build_full_stack(self._database['sdss', host_id].read(),
+                                    self._host_catalog.load_single(host_id),
+                                    self._database['hosts_named'].read(), wise, nsa,
+                                    self._database['objects_to_remove'].read(),
+                                    self._database['objects_to_add'].read(),
+                                    spectra_raw_all)
+
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
+            data_obj.write(base)
+
+        #TODO: extract all cleaned specs!
