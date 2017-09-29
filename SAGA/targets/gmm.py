@@ -45,7 +45,7 @@ def _change_table_format(table, cols):
         return np.vstack((table[c].data for c in cols)).T
 
 
-def calc_gmm_satellite_probability(base, model_parameters):
+def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=0.5):
 
     colors = _change_table_format(base, get_sdss_colors())
     colors_err = _change_table_format(base, ('{}_err'.format(c) for c in get_sdss_colors()))
@@ -56,12 +56,16 @@ def calc_gmm_satellite_probability(base, model_parameters):
                                 model_parameters['xcovar_nosat'])
 
     p_sat = _GMMlogposterior(colors, colors_err,
-                                model_parameters['xamp_sat'],
-                                model_parameters['xmean_sat'],
-                                model_parameters['xcovar_sat'])
+                             model_parameters['xamp_sat'],
+                             model_parameters['xmean_sat'],
+                             model_parameters['xcovar_sat'])
+
+    p_sat *= p_sat_prior
+    p_notsat *= (1.0 - p_sat_prior)
 
     p_notsat += p_sat
     p_sat /= p_notsat
-    p_sat[p_sat == np.inf] = 1.0
-    p_sat[~np.isfinite(p_sat)] = 0.0
+    p_sat[p_sat > 1.0] = 1.0
+    p_sat[p_sat < 0.0] = 0.0
+    p_sat[~np.isfinite(p_sat)] = p_sat_prior
     return p_sat
