@@ -4,10 +4,23 @@ import re
 import gzip
 import random
 import string
+import shutil
 import numpy as np
 from astropy import units as u
-from casjobs import CasJobs
 from .core import FitsTable
+
+_HAS_CASJOBS_ = True
+try:
+    import casjobs
+except ImportError:
+    _HAS_CASJOBS_ = False
+
+_HAS_SCISERVER_ = True
+try:
+    import SciServer.Authentication
+    import SciServer.CasJobs
+except ImportError:
+    _HAS_SCISERVER_ = False
 
 
 __all__ = ['SdssQuery', 'WiseQuery', 'download_catalogs_for_hosts']
@@ -125,20 +138,40 @@ class SdssQuery(object):
         WHERE n.objID = p.objID
     """
 
-    def __init__(self, ra, dec, radius=1.0, host_name=None, context='DR14'):
-        if not host_name:
-            host_name = 'SAGA' + get_random_string(4)
-        self.host_name = re.sub('[^A-Za-z]', '', host_name)
-        self.query = self.construct_query(self.host_name, ra, dec, radius)
+    def __init__(self, ra, dec, radius=1.0, db_table_name=None, context='DR14',
+                 user=None, password=None, default_use_sciserver=True):
+
+        self.sciserver_user = user or os.getenv('SCISERVER_USER')
+        self.sciserver_pass = password or os.getenv('SCISERVER_PASS')
+        self.casjobs_user = user or os.getenv('CASJOBS_WSID')
+        self.casjobs_pass = password or os.getenv('CASJOBS_PW')
+
+        self.use_sciserver = False
+        if default_use_sciserver and _HAS_SCISERVER_ and self.sciserver_user and self.sciserver_pass:
+            self.use_sciserver = True
+
+        if self.use_sciserver:
+            self.db_table_name = None
+        else:
+            if not db_table_name:
+                db_table_name = 'SAGA' + get_random_string(4)
+            self.db_table_name = re.sub('[^A-Za-z]', '', db_table_name)
+        self.query = self.construct_query(ra, dec, radius, self.db_table_name)
         self.context = context
 
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
-        self.run_casjob(self.query, self.host_name, file_path, compress=compress, overwrite=overwrite, context=self.context)
+        if os.path.isfile(file_path) and not overwrite:
+            return
+
+        if self.use_sciserver:
+            self.run_casjobs_with_sciserver(self.query, file_path, compress=compress, context=self.context, username=self.sciserver_user, password=self.sciserver_pass)
+        else:
+            self.run_casjobs_with_casjobs(self.query, self.db_table_name, file_path, compress=compress, context=self.context, userid=self.casjobs_user, password=self.casjobs_pass)
 
 
     @classmethod
-    def construct_query(cls, db_table_name, ra, dec, radius=1.0):
+    def construct_query(cls, ra, dec, radius=1.0, db_table_name=None):
         """
         Generates the query to send to the SDSS to get the full SDSS catalog around
         a target.
@@ -159,8 +192,10 @@ class SdssQuery(object):
             The SQL query to send to the SDSS skyserver
         """
 
-        if '{}'.format(db_table_name).lower() == 'none':
-            raise ValueError('`db_table_name` cannot be None')
+        select_into_mydb = True
+        if db_table_name is None:
+            db_table_name = 'TO_BE_REMOVED'
+            select_into_mydb = False
 
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
@@ -170,26 +205,30 @@ class SdssQuery(object):
         q = cls._query_template.format(**locals())
         q = re.sub(r'\s+', ' ', q).strip()
         q = re.sub(', ', ',', q)
+        if not select_into_mydb:
+            q = q.replace('INTO mydb.{} '.format(db_table_name), '')
         return q
 
 
     @staticmethod
-    def run_casjob(query, db_table_name, output_path, overwrite=False, compress=True, context='DR14'):
+    def run_casjobs_with_casjobs(query, db_table_name, output_path, compress=True, context='DR14',
+                                 userid=None, password=None):
         """
-        Run single casjob and download casjob output
+        Run a single casjobs and download casjobs output using Dan FM's casjobs
 
         Parameters
         ----------
         query : str, output from construct_query
         db_table_name : str
         output_path : str
-        overwrite : bool, optional
         compress : bool, optional
         context : str, optional
+        userid : str or int, optional
+        password : str, optional
 
         Notes
         -----
-        Follow these instructions to use `run_casjob`
+        Follow these instructions to use `run_casjobs_with_casjobs`
 
         1. Install by Dan FM's casjobs (https://github.com/dfm/casjobs):
             pip install casjobs
@@ -200,28 +239,65 @@ class SdssQuery(object):
             export CASJOBS_WSID='2090870927'   # get your WSID from site above
             export CASJOBS_PW='my password'
         """
-        if overwrite or not os.path.isfile(output_path):
+        if not _HAS_CASJOBS_:
+            raise ValueError('Please install casjobs.')
 
-            if not all(k in os.environ for k in ('CASJOBS_WSID', 'CASJOBS_PW')):
-                raise ValueError('You are not setup to run casjobs')
+        cjob = casjobs.CasJobs(userid, password, 'http://skyserver.sdss.org/casjobs/services/jobs.asmx', 'POST')
 
-            cjob = CasJobs(base_url='http://skyserver.sdss.org/casjobs/services/jobs.asmx', request_type='POST', context=context)
+        job_id = cjob.submit(query, context=context, task_name='casjobs_'+db_table_name, estimate=1)
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) submitted...'.format(db_table_name))
 
-            job_id = cjob.submit(query, estimate=1)
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) submitted...'.format(db_table_name))
+        code, status = cjob.monitor(job_id)
+        if code == 3 or code == 4:
+            raise RuntimeError('{} casjob ({}) {}!'.format(time.strftime('[%m/%d %H:%M:%S]'), db_table_name, 'cancelled' if code == 3 else 'failed'))
+        assert code == 5
 
-            code, status = cjob.monitor(job_id)
-            if code == 3 or code == 4:
-                raise RuntimeError('{} casjob ({}) {}!'.format(time.strftime('[%m/%d %H:%M:%S]'), db_table_name, 'cancelled' if code == 3 else 'failed'))
-            assert code == 5
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) finished, downloading data...'.format(db_table_name))
+        file_open = gzip.open if compress else open
+        with file_open(output_path, 'wb') as f_out:
+            try:
+                cjob.request_and_get_output(db_table_name, 'FITS', f_out)
+            finally:
+                cjob.drop_table(db_table_name)
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'casjob ({}) finished, downloading data...'.format(db_table_name))
-            file_open = gzip.open if compress else open
-            with file_open(output_path, 'wb') as f_out:
-                try:
-                    cjob.request_and_get_output(db_table_name, 'FITS', f_out)
-                finally:
-                    cjob.drop_table(db_table_name)
+
+    @staticmethod
+    def run_casjobs_with_sciserver(query, output_path, compress=True, context='DR14',
+                                   username=None, password=None):
+        """
+        Run a single casjobs and download casjobs output using SciServer
+
+        Parameters
+        ----------
+        query : str, output from construct_query
+        output_path : str
+        compress : bool, optional
+        context : str, optional
+        username : str, optional
+        password : str, optional
+
+        Notes
+        -----
+        Follow these instructions to use `run_casjobs_with_sciserver`
+
+        1. Install SciServer:
+           follow the instruction at https://github.com/sciserver/SciScript-Python
+
+        2. Register an account at https://portal.sciserver.org/login-portal/Account/Register
+
+        3. Edit your `.bashrc`:
+            export SCISERVER_USER='username'
+            export SCISERVER_PASS='password'
+        """
+        username = username or os.getenv('SCISERVER_USER')
+        password = password or os.getenv('SCISERVER_PASS')
+        if not (_HAS_SCISERVER_ and username and password):
+            raise ValueError('You are not setup to run casjobs with SciServer')
+        SciServer.Authentication.login(username, password)
+        r = SciServer.CasJobs.executeQuery(query, context=context, format="fits")
+        file_open = gzip.open if compress else open
+        with file_open(output_path, 'wb') as f_out:
+            shutil.copyfileobj(r, f_out)
 
 
 def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
