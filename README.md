@@ -7,7 +7,7 @@ See the [SAGA Survey website](http://sagasurvey.org/) for details about SAGA.
 
 ## Installation
 
-    pip install git+git://github.com/sagasurvey/saga.git
+    pip install https://github.com/sagasurvey/saga/archive/master.zip
 
 
 ## Example Usage
