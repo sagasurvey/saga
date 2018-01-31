@@ -43,10 +43,6 @@ class HostCatalog(object):
 
     def __init__(self, database):
         self._database = database
-        try:
-            self._all_host_ids = self.load()['NSAID'].tolist()
-        except FileNotFoundError:
-            self._all_host_ids = []
 
         try:
             t = self._database['hosts_named'].read()
@@ -56,6 +52,11 @@ class HostCatalog(object):
         else:
             self._host_name_to_id = dict(zip((n.lower() for n in t['SAGA']), t['NSA']))
             self._host_id_to_name = dict(zip(t['NSA'], t['SAGA']))
+
+        try:
+            self._all_host_ids = self.load()['NSAID'].tolist()
+        except FileNotFoundError:
+            self._all_host_ids = []
 
 
     def resolve_id(self, hosts):
@@ -156,9 +157,18 @@ class HostCatalog(object):
         return self._annotate_catalog(res)
 
 
-    @staticmethod
-    def _annotate_catalog(table):
+    def _annotate_catalog(self, table):
+        names = []
+        for i in table['NSAID']:
+            try:
+                name = self.id_to_name(i)
+                names.append(name)
+            except KeyError:
+                names.append('')
+        table['SAGA_name'] = names
+
         table['coord'] = SkyCoord(table['RA'], table['Dec'], unit='deg')
+
         return table
 
 
