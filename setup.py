@@ -7,11 +7,15 @@ Copyright (c) 2017 The SAGA Survey
 http://opensource.org/licenses/MIT
 """
 
+import os
 from setuptools import setup, find_packages
+
+with open(os.path.join(os.path.dirname(__file__), 'SAGA', 'version.py')) as f:
+    exec(f.read()) # pylint: disable=W0122
 
 setup(
     name='SAGA',
-    version='0.5.2',
+    version=__version__, # pylint: disable=E0602
     description='Code to access, create and edit SAGA Survey data catalogs.',
     url='https://github.com/sagasurvey/saga',
     author='The SAGA Survey',
