@@ -48,7 +48,7 @@ def _get_spec_search_radius(spec_z):
     return 20.0 if spec_z < 0.2 else 10.0
 
 
-_spec_search_dz = 50.0/astropy.constants.c.to('km/s').value
+_spec_search_dz = 50.0/astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
 
 def initialize_base_catalog(base):

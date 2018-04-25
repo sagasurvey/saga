@@ -85,7 +85,7 @@ class FitsTable(FileObject):
 
     def read(self):
         with fits.open(self.path, cache=False, lazy_load_hdus=True, **self.kwargs) as f:
-            return Table(f[1].data)
+            return Table(f[1].data) # pylint: disable=E1101
 
     def write(self, table):
         if 'coord' in table.columns and table['coord'].info.dtype.name == 'object':

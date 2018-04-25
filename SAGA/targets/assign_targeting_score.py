@@ -53,6 +53,7 @@ def assign_targeting_score(base, manual_selected_objids=None,
     cut = C.gri_cut & C.faint_end_limit & C.sat_rcut
     high_p = Query('P_SIMPLE > 0.02') | Query('P_GMM > 0.5')
 
+    # pylint: disable=E1130
     fill_values_by_query(base, ~C.gri_cut, {'TARGETING_SCORE': 970.0})
     fill_values_by_query(base, ~C.faint_end_limit, {'TARGETING_SCORE': 960.0})
     fill_values_by_query(base, ~C.sat_rcut, {'TARGETING_SCORE': 950.0})

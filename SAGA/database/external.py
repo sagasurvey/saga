@@ -32,7 +32,7 @@ def get_random_string(length=6):
 
 def ensure_deg(value):
     if isinstance(value, u.Quantity):
-        return value.to(u.deg).value
+        return value.to(u.deg).value # pylint: disable=E1101
     return float(value)
 
 
