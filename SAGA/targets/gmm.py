@@ -75,9 +75,9 @@ def check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_wei
 
 
 def calc_log_likelihood(data, data_cov, gmm_means, gmm_covs, gmm_weights):
+    check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_weights)
     if gmm_covs.ndim == 2:
         gmm_covs = np.stack((np.diag(c) for c in gmm_covs))
-    check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_weights)
     d = data[:, np.newaxis] - gmm_means
     cov = data_cov[:, np.newaxis] + gmm_covs
     tmp_result = np.einsum('...i,...ij,...j->...', d, np.linalg.inv(cov), d)
