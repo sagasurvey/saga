@@ -65,7 +65,8 @@ class Database(object):
             'spectra_clean': DataObject(FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))),
             'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'), use_local_first=True),
             'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits'), use_local_first=True),
-            'spectra_gama': DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'), use_local_first=True),
+            'spectra_gama_dr2': DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'), use_local_first=True),
+            'spectra_gama': DataObject(FitsTable('http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits'), use_local_first=True),
         }
 
         self._tables['nsa'] = self._tables['nsa_v0.1.2']
