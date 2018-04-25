@@ -1,71 +1,77 @@
-import os
+"""
+GMM related routines
+"""
 import numpy as np
-from scipy.misc import logsumexp
-from ..utils import get_sdss_colors
+from scipy.special import logsumexp
+from ..utils import get_sdss_bands, get_sdss_colors
 
-# compute distance from GMM model with diagonal or full covariances
-def _GMMlogposterior(y, yerr, xmap, xmean, xcovar):
-    """
-    Examples
-    --------
-    # cols and colerrs are arrays of nobj rows and 4 columns containing the
-    # u-g, g-r, r-i and i-z colors and color-errors.
-
-    allpost_nosat = GMMlogposterior(cols[:, :], colerrs[:, :], xamp_nosat, xmean_nosat, xcovar_nosat)
-    allpost_sat = GMMlogposterior(cols[:, :], colerrs[:, :], xamp_sat, xmean_sat, xcovar_sat)
-    norms = allpost_nosat + allpost_sat
-
-    # Normalize the probabilities like in a binary Bayes classifier.
-
-    allpost_nosat /= norms
-    allpost_sat /= norms
-    """
-    assert y.shape[1] == xmean.shape[1]
-    assert xmean.shape[0] == xcovar.shape[0]
-    assert xmean.shape[1] == xcovar.shape[1]
-    nobj = y.shape[0]
-    ndim = xcovar.shape[1]
-    dys = y[:, None, :] - xmean[None, :, :] # nobj * ncomp * ndim
-    if len(xcovar.shape) == 2:
-        covs = yerr[:, None, :]**2 + xcovar[None, :, :]
-        lnprobs = - 0.5 * np.sum(dys**2 / covs, axis=2) - 0.5*np.sum(np.log(covs), axis=2)
-    if len(xcovar.shape) == 3:
-        eyes = np.repeat(np.eye(ndim), nobj).reshape((ndim, ndim, 1, nobj)).T
-        covs = yerr[:, None, :, None]**2 * eyes + xcovar[None, :, :, :]
-        temp = np.sum(np.linalg.inv(covs) * dys[:, :, None, :], axis=3)
-        lnprobs = - 0.5 * np.sum(temp * dys, axis=2) - 0.5*np.log(np.linalg.det(covs))
-    lnprobs += np.log(xmap[None, :])
-    return np.exp(logsumexp(lnprobs, axis=1)) # nobj
+__all__ = ['param_labels_sat', 'param_labels_nosat', 'calc_gmm_satellite_probability', 'get_input_data', 'calc_model1_prob']
 
 
-def _change_table_format(table, cols):
-    if table.masked:
-        return np.vstack((table[c].data.data for c in cols)).T
-    else:
-        return np.vstack((table[c].data for c in cols)).T
+param_labels_sat = ('xmean_sat', 'xcovar_sat', 'xamp_sat')
+param_labels_nosat = ('xmean_nosat', 'xcovar_nosat', 'xamp_nosat')
+
+def table2ndarray(table, cols, dtype=None, copy=False):
+    cols = list(cols)
+    dtype_orig = getattr(np, table[cols[0]].dtype.name)
+    out = np.array(table[cols], copy=copy).view((dtype_orig, len(cols)))
+    if dtype and np.dtype(dtype) != dtype_orig:
+        out = out.astype(np.dtype(dtype))
+    return out
 
 
-def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=0.5):
+def get_input_data(catalog, colors=None, bands=None, include_covariance=True):
+    if colors is None:
+        colors = get_sdss_colors()
+    if bands is None:
+        bands = get_sdss_bands()
+    assert len(bands) == len(colors) + 1
+    X = table2ndarray(catalog, colors, np.float64)
+    Xcov = np.stack((np.diag(e*e) for e in table2ndarray(catalog, [c+'_err' for c in colors], np.float64)))
+    if include_covariance:
+        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in table2ndarray(catalog, [b+'_err' for b in bands[1:-1]], np.float64)))
+    return X, Xcov
 
-    colors = _change_table_format(base, get_sdss_colors())
-    colors_err = _change_table_format(base, ('{}_err'.format(c) for c in get_sdss_colors()))
 
-    p_notsat = _GMMlogposterior(colors, colors_err,
-                                model_parameters['xamp_nosat'],
-                                model_parameters['xmean_nosat'],
-                                model_parameters['xcovar_nosat'])
+def check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_weights):
+    assert 1 == gmm_weights.ndim
+    assert 2 == data.ndim == gmm_means.ndim
+    assert 3 == data_cov.ndim == gmm_covs.ndim
+    assert data.shape[0] == data_cov.shape[0]
+    assert gmm_means.shape[0] == gmm_covs.shape[0] == gmm_weights.shape[0]
+    assert data.shape[1] == data_cov.shape[1] == data_cov.shape[2] == gmm_means.shape[1] == gmm_covs.shape[1] == gmm_covs.shape[2]
 
-    p_sat = _GMMlogposterior(colors, colors_err,
-                             model_parameters['xamp_sat'],
-                             model_parameters['xmean_sat'],
-                             model_parameters['xcovar_sat'])
 
-    p_sat *= p_sat_prior
-    p_notsat *= (1.0 - p_sat_prior)
+def calc_log_likelihood(data, data_cov, gmm_means, gmm_covs, gmm_weights):
+    check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_weights)
+    d = data[:, np.newaxis] - gmm_means
+    cov = data_cov[:, np.newaxis] + gmm_covs
+    tmp_result = np.einsum('...i,...ij,...j->...', d, np.linalg.inv(cov), d)
+    tmp_result += np.log(np.fabs(np.linalg.det(cov)))
+    tmp_result += (np.log(np.pi*2.0) * data.shape[-1])
+    tmp_result *= -0.5
+    return logsumexp(tmp_result, axis=1, b=gmm_weights)
 
-    p_notsat += p_sat
-    p_sat /= p_notsat
-    p_sat[p_sat > 1.0] = 1.0
-    p_sat[p_sat < 0.0] = 0.0
-    p_sat[~np.isfinite(p_sat)] = p_sat_prior
-    return p_sat
+
+def calc_model1_prob(data, data_cov, model_params, priors=None):
+    p = np.exp(np.stack((calc_log_likelihood(data, data_cov, *model_params_this) for model_params_this in model_params)))
+    if priors:
+        priors = np.asarray(priors)
+        assert len(priors) == len(p)
+        assert (priors >= 0).all() and priors.sum() > 0
+        p *= priors[:, np.newaxis]
+    p_total = p.sum(axis=0)
+    mask = (p_total == 0)
+    p_total[mask] = 1.0
+    p_out = p[0] / p_total
+    p_out[mask] = (priors[0] / priors.sum()) if priors else (1.0 / len(p))
+    return p_out
+
+
+def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=0.5, include_covariance=True):
+    data, data_cov = get_input_data(base, include_covariance=include_covariance)
+    model_params = (
+        tuple(model_parameters[k] for k in param_labels_sat),
+        tuple(model_parameters[k] for k in param_labels_nosat)
+    )
+    return calc_model1_prob(data, data_cov, model_params, [p_sat_prior, 1-p_sat_prior])
