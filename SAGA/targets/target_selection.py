@@ -1,7 +1,7 @@
 from astropy.table import vstack
 from ..objects import ObjectCatalog
 from ..objects import cuts as C
-from ..utils import get_sdss_colors
+from ..utils import get_sdss_bands, get_sdss_colors
 
 from .assign_targeting_score import assign_targeting_score
 
@@ -20,6 +20,7 @@ class TargetSelection(object):
 
         columns_in = list(set(list(columns) + get_sdss_colors() \
                 + ['{}_err'.format(c) for c in get_sdss_colors()] \
+                + ['{}_err'.format(b) for b in get_sdss_bands()] \
                 + ['OBJID', 'RA', 'DEC'] + C.COLUMNS_USED))
 
         if columns is None:
