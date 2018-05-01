@@ -347,17 +347,17 @@ def remove_bad_photometry(base):
     q |= Query('BAD_COUNTS_ERROR != 0')
     fill_values_by_query(base, q, {'REMOVE': 3})
 
-    q  = Query('r < 18.0')
-    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40.0') | Query('abs(PETRORAD_R - PETRORAD_I) > 40.0'))
-    fill_values_by_query(base, q, {'REMOVE': 4})
+#    q  = Query('r < 18.0')
+#    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40.0') | Query('abs(PETRORAD_R - PETRORAD_I) > 40.0'))
+#    fill_values_by_query(base, q, {'REMOVE': 4})
 
-    q  = Query('PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
-    q |= Query('r < 18.0', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
-    q &= Query('SB_EXP_R > 24.0')
-    fill_values_by_query(base, q, {'REMOVE': 5})
+#    q  = Query('PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
+#    q |= Query('r < 18.0', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
+#    q &= Query('SB_EXP_R > 24.0')
+#    fill_values_by_query(base, q, {'REMOVE': 5})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
-    fill_values_by_query(base, q, {'REMOVE': 3})
+    fill_values_by_query(base, q, {'REMOVE': 4})
 
     return base
 
