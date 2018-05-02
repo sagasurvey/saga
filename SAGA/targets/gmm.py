@@ -46,21 +46,26 @@ def table2ndarray(table, cols, dtype=None, copy=False):
     cols = list(cols)
     dtype_orig = getattr(np, table[cols[0]].dtype.name)
     out = np.array(table[cols], copy=copy).view((dtype_orig, len(cols)))
+    if len(cols) == 1:
+        out = out.reshape(-1, 1)
     if dtype and np.dtype(dtype) != dtype_orig:
         out = out.astype(np.dtype(dtype))
     return out
 
 
-def get_input_data(catalog, colors=None, bands=None, include_covariance=True):
+def get_input_data(catalog, colors=None, color_errors=None, mag_errors=None,
+                   include_covariance=True, subtable_getter=table2ndarray):
     if colors is None:
         colors = get_sdss_colors()
-    if bands is None:
-        bands = get_sdss_bands()
-    assert len(bands) == len(colors) + 1
-    X = table2ndarray(catalog, colors, np.float64)
-    Xcov = np.stack((np.diag(e*e) for e in table2ndarray(catalog, [c+'_err' for c in colors], np.float64)))
+    if color_errors is None:
+        color_errors = [c+'_err' for c in colors]
+    if mag_errors is None:
+        mag_errors = [b+'_err' for b in get_sdss_bands()[1:-1]]
+    assert len(mag_errors) == len(colors) - 1
+    X = subtable_getter(catalog, colors, np.float64)
+    Xcov = np.stack((np.diag(e*e) for e in subtable_getter(catalog, color_errors, np.float64)))
     if include_covariance:
-        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in table2ndarray(catalog, [b+'_err' for b in bands[1:-1]], np.float64)))
+        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in subtable_getter(catalog, mag_errors, np.float64)))
     return X, Xcov
 
 
