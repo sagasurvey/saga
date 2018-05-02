@@ -5,9 +5,10 @@ from astropy.coordinates import SkyCoord
 from easyquery import Query
 from . import cuts as C
 from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
+from .manual_fixes import fixes_to_nsa_v012
 from ..database import FitsTable
 from ..hosts import HostCatalog
-from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord
+from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord, fill_values_by_query
 
 
 __all__ = ['ObjectCatalog']
@@ -178,6 +179,17 @@ class ObjectCatalog(object):
                 return list(output_iterator)
 
 
+    def load_nsa(self, version='0.1.2'):
+        nsa = self._database['nsa_v{}'.format(version)].read()[NSA_COLS_USED]
+        if version == '0.1.2':
+            for nsaid, fixes in fixes_to_nsa_v012.items():
+                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
+            # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
+            nsa = Query('NSAID != 64408').filter(nsa)
+        nsa = add_skycoord(nsa)
+        return nsa
+
+
     def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None):
         """
         This function build base catalog and write to the database.
@@ -217,7 +229,7 @@ class ObjectCatalog(object):
 
         """
 
-        nsa = add_skycoord(self._database['nsa_v0.1.2'].read()[NSA_COLS_USED])
+        nsa = self.load_nsa('0.1.2')
         spectra_raw_all = self._database['spectra_raw_all'].read()
         host_ids = self._host_catalog.resolve_id('all' if hosts is None else hosts)
 
