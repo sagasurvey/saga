@@ -103,8 +103,13 @@ def calc_model1_prob(data, data_cov, model_params, priors=None):
     return p
 
 
-def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=None, include_covariance=True):
-    data, data_cov = get_input_data(base, include_covariance=include_covariance)
+def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=None, 
+                                   colors=None, color_errors=None, mag_errors=None, 
+                                   include_covariance=True, subtable_getter=table2ndarray):
+    data, data_cov = get_input_data(base, colors=colors, color_errors=color_errors,
+                                    mag_errors=mag_errors, 
+                                    include_covariance=include_covariance,
+                                    subtable_getter=subtable_getter)
     model_params = (
         tuple(model_parameters[k] for k in param_labels_sat),
         tuple(model_parameters[k] for k in param_labels_nosat)
