@@ -259,7 +259,6 @@ def remove_shreds_with_nsa(base, nsa):
     host_sc = SkyCoord(base['HOST_RA'][0], base['HOST_DEC'][0], unit='deg')
     nsa_sc = nsa['coord'] if 'coord' in nsa.colnames else SkyCoord(nsa['RA'], nsa['DEC'], unit="deg")
     nsa = nsa[nsa_sc.separation(host_sc).deg < 1.0]
-    nsa = Query('NSAID != 64408').filter(nsa) # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
     del nsa_sc
 
     if len(nsa) == 0:
@@ -267,25 +266,28 @@ def remove_shreds_with_nsa(base, nsa):
 
     for nsa_obj in nsa:
 
+        not_star_indices = np.where(base['PHOTPTYPE'] != 6)[0]
+
         ellipse_calculation = dict()
         ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
         ellipse_calculation['b'] = ellipse_calculation['a'] * nsa_obj['SERSIC_BA']
         ellipse_calculation['th'] = np.deg2rad(nsa_obj['SERSIC_PHI'] + 270.0)
         ellipse_calculation['s'] = np.sin(ellipse_calculation['th'])
         ellipse_calculation['c'] = np.cos(ellipse_calculation['th'])
-        ellipse_calculation['x'] = base['RA'] - nsa_obj['RA']
-        ellipse_calculation['y'] = base['DEC'] - nsa_obj['DEC']
+        ellipse_calculation['x'] = base['RA'][not_star_indices] - nsa_obj['RA']
+        ellipse_calculation['y'] = base['DEC'][not_star_indices] - nsa_obj['DEC']
 
         r2_ellipse = ne.evaluate('((x*c - y*s)/a)**2.0 + ((x*s + y*c)/b)**2.0',
                                  local_dict=ellipse_calculation, global_dict={})
 
-        closest_base_obj_index = r2_ellipse.argmin()
-        if r2_ellipse[closest_base_obj_index] > 1.0:
+        closest_base_obj_index = r2_ellipse.argmin() if len(r2_ellipse) else None
+        if closest_base_obj_index is None or r2_ellipse[closest_base_obj_index] > 1.0:
             logging.warning('In SAGA.objects.build.remove_shreds_with_nsa()\n No object within the radius of NSA {} ({}, {})'.format(nsa_obj['NSAID'], nsa_obj['RA'], nsa_obj['DEC']))
             continue
-        base['REMOVE'][r2_ellipse < 1.0] = 2
+        closest_base_obj_index = not_star_indices[closest_base_obj_index]
+        base['REMOVE'][not_star_indices[r2_ellipse < 1.0]] = 2
 
-        del r2_ellipse, ellipse_calculation
+        del r2_ellipse, not_star_indices, ellipse_calculation
 
         values_to_rewrite = {
             'REMOVE': -1,
@@ -346,15 +348,6 @@ def remove_bad_photometry(base):
     q |= Query('SATURATED != 0')
     q |= Query('BAD_COUNTS_ERROR != 0')
     fill_values_by_query(base, q, {'REMOVE': 3})
-
-#    q  = Query('r < 18.0')
-#    q &= (Query('abs(PETRORAD_R - PETRORAD_G) > 40.0') | Query('abs(PETRORAD_R - PETRORAD_I) > 40.0'))
-#    fill_values_by_query(base, q, {'REMOVE': 4})
-
-#    q  = Query('PETRORADERR_G == -1000.0', 'PETRORADERR_R == -1000.0', 'PETRORADERR_I == -1000.0')
-#    q |= Query('r < 18.0', '(where(PETRORADERR_G == -1000.0, 1, 0) + where(PETRORADERR_R == -1000.0, 1, 0) + where(PETRORADERR_I == -1000.0, 1, 0)) >= 2')
-#    q &= Query('SB_EXP_R > 24.0')
-#    fill_values_by_query(base, q, {'REMOVE': 5})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
     fill_values_by_query(base, q, {'REMOVE': 4})
