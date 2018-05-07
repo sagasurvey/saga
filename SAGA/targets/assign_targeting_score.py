@@ -1,11 +1,15 @@
+"""
+module assign_targeting_score
+"""
 from itertools import chain
 import numpy as np
 from easyquery import Query
 from ..objects import cuts as C
-from ..utils import fill_values_by_query, get_empty_str_array, get_sdss_bands, get_sdss_colors
+from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors
 from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_data, param_labels_nosat
 
 __all__ = ['assign_targeting_score', 'calc_simple_satellite_probability', 'calc_gmm_satellite_probability']
+
 
 COLUMNS_USED = list(set(chain(C.COLUMNS_USED,
                               ['PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'],
@@ -14,8 +18,14 @@ COLUMNS_USED = list(set(chain(C.COLUMNS_USED,
                               get_sdss_colors(),
                               map('{}_err'.format, get_sdss_colors()))))
 
+
 def calc_simple_satellite_probability(base,
-        model_parameters=(-0.84526783, -0.53434289, -1.0123662441968917, 0.18628167890581865, 9.4021013202593942, 0.055890285233031099)):
+                                      model_parameters=(-0.84526783,
+                                                        -0.53434289,
+                                                        -1.0123662441968917,
+                                                        0.18628167890581865,
+                                                        9.4021013202593942,
+                                                        0.055890285233031099)):
     x = np.asarray(base['gr'])*model_parameters[0] + np.asarray(base['ri'])*model_parameters[1]
     return np.where(x > model_parameters[2], np.minimum(np.exp((x-model_parameters[3])*model_parameters[4]), model_parameters[5]), 0.0)
 

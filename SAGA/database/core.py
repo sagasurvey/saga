@@ -174,7 +174,7 @@ class DataObject(object):
         else:
             try:
                 table = self.remote.read()
-            except Exception as read_exception:
+            except Exception as read_exception: #pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception
                 warnings.warn("Failed to read data, fall back to read local file")

@@ -1,7 +1,6 @@
 import time
 import numpy as np
 from astropy.table import vstack
-from astropy.coordinates import SkyCoord
 from easyquery import Query
 from . import cuts as C
 from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
@@ -66,7 +65,7 @@ class ObjectCatalog(object):
         if get_coord_later:
             columns_this = list(columns)
             try:
-               columns_this.remove('coord')
+                columns_this.remove('coord')
             except ValueError:
                 pass
             if 'RA' not in columns_this:
