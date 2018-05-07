@@ -1,5 +1,5 @@
 import os
-from .core import *
+from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary
 from .spectra import SpectraData
 
 __all__ = ['known_google_sheets', 'Database']
