@@ -60,6 +60,7 @@ class TargetSelection(object):
         self._cuts = cuts
         self._additional_columns = additional_columns or []
         self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
+                                      ('PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'),
                                       COLUMNS_USED,
                                       self._additional_columns)))
 
@@ -124,31 +125,35 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    is_target = Query('TARGETING_SCORE >= 100', 'TARGETING_SCORE < 900')
-    is_guide_star = Query('TARGETING_SCORE == 1')
-    is_flux_star = Query('TARGETING_SCORE == 2')
-    to_observe = is_target | is_guide_star | is_flux_star
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
 
-    target_catalog = to_observe.filter(target_catalog)
+    is_star = Query('PHOTPTYPE == 6')
+    is_guide_star = is_star & Query('PSFMAG_R >= 14', 'PSFMAG_R < 15')
+    is_flux_star = is_star & Query('PSFMAG_R >= 17', 'PSFMAG_R < 18')
+    is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6', 'PSFMAG_U - PSFMAG_G < 1.2')
+    is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
+    is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
+
+    target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
+
+    target_catalog['rank'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['rank'][Query('rank < 2').mask(target_catalog)] = 2 # rank 0 and 1 are reserved
+    target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
+    target_catalog['rank'][is_guide_star.mask(target_catalog)] = 0
 
     flux_star_indices = np.where(is_flux_star.mask(target_catalog))[0]
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog['TARGETING_SCORE'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 1000
-    target_catalog = to_observe.filter(target_catalog)
-
-    target_catalog['rank'] = np.where(Query('TARGETING_SCORE < 200').mask(target_catalog),
-                                    target_catalog['TARGETING_SCORE'] // 100 + 1,
-                                    target_catalog['TARGETING_SCORE'] // 100)
-    target_catalog['rank'][is_guide_star.mask(target_catalog)] = 0
+    target_catalog['rank'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = -1
+    target_catalog = Query('rank >= 0').filter(target_catalog)
 
     if verbose:
         print('# of guide stars     =', is_guide_star.count(target_catalog))
         print('# of flux stars      =', is_flux_star.count(target_catalog))
-        print('# of total targets   =', is_target.count(target_catalog))
+        print('# of rank>1 targets  =', is_target.count(target_catalog))
         for rank in range(1, 9):
-            print('# of rank-{} targets  ='.format(rank),
+            print('# of rank={} targets ='.format(rank),
                 Query('rank == {}'.format(rank)).count(target_catalog))
 
     target_catalog['type'] = 'TARGET'
@@ -168,9 +173,9 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                              overwrite=True,
                              format='ascii.tab',
                              formats={ # pylint: disable=E1101
-                                'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3),
-                                'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
-                                'mag': '%.2f',
+                                 'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3),
+                                 'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
+                                 'mag': '%.2f',
                              })
 
     return target_catalog

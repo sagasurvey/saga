@@ -12,7 +12,6 @@ __all__ = ['assign_targeting_score', 'calc_simple_satellite_probability', 'calc_
 
 
 COLUMNS_USED = list(set(chain(C.COLUMNS_USED,
-                              ['PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'],
                               map('{}_mag'.format, get_sdss_bands()),
                               map('{}_err'.format, get_sdss_bands()),
                               get_sdss_colors(),
@@ -103,16 +102,6 @@ def assign_targeting_score(base, manual_selected_objids=None,
         fill_values_by_query(base, \
                 Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID')), \
                 {'TARGETING_SCORE': 100})
-
-    is_star = Query('PHOTPTYPE == 6')
-    is_guide_star = is_star & Query('PSFMAG_R >= 14') & Query('PSFMAG_R < 15')
-    is_flux_star = is_star & Query('PSFMAG_R >= 17') & Query('PSFMAG_R < 18')
-    is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6') & Query('PSFMAG_U - PSFMAG_G < 1.2')
-    is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0') & Query('PSFMAG_G - PSFMAG_R < 0.6')
-    is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
-
-    fill_values_by_query(base, is_guide_star, {'TARGETING_SCORE': 1})
-    fill_values_by_query(base, is_flux_star, {'TARGETING_SCORE': 2})
 
     base.sort('TARGETING_SCORE')
     return base
