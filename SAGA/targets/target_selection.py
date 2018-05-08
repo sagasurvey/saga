@@ -169,13 +169,21 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     if write_to:
         if verbose:
             print('Writing to {}'.format(write_to))
-        target_catalog.write(write_to,
-                             overwrite=True,
-                             format='ascii.tab',
-                             formats={ # pylint: disable=E1101
-                                 'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3),
-                                 'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
-                                 'mag': '%.2f',
-                             })
+
+        if not write_to.endswith('.cat'):
+            print('Warning: filename should end with \'.cat\'')
+
+        with open(write_to, 'w') as fh:
+            fh.write('\t'.join(target_catalog.colnames) + '\n')
+            # the MMT format is odd and *requires* "---"'s in the second header line
+            fh.write('\t'.join(('-'*len(s) for s in target_catalog.colnames)) + '\n')
+            target_catalog.write(fh,
+                                 delimiter='\t',
+                                 format='ascii.fast_no_header',
+                                 formats={ # pylint: disable=E1101
+                                    'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3),
+                                    'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
+                                    'mag': '%.2f',
+                                 })
 
     return target_catalog
