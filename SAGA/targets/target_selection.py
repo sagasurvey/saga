@@ -1,6 +1,8 @@
 """
 TargetSelection class
 """
+import re
+from io import StringIO
 from itertools import chain
 import numpy as np
 from easyquery import Query
@@ -167,9 +169,8 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog = target_catalog[['ra', 'dec', 'object', 'rank', 'type', 'mag']]
 
     if write_to:
-        if verbose:
-            print('Writing to {}'.format(write_to))
-        target_catalog.write(write_to,
+        sio = StringIO()
+        target_catalog.write(sio,
                              overwrite=True,
                              format='ascii.tab',
                              formats={ # pylint: disable=E1101
@@ -177,5 +178,17 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                                  'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
                                  'mag': '%.2f',
                              })
+
+        # the MMT format is odd and *requires* "---"'s in the second header line
+        sio.seek(0)
+        header_line = sio.readline()
+        dash_line = re.sub('[A-Za-z0-9]', '-', header_line)
+        sio.write(dash_line)
+
+        if verbose:
+            print('Writing to {}'.format(write_to))
+        sio.seek(0)
+        with open(write_to, 'w') as fw:
+            fw.write(sio.read())
 
     return target_catalog
