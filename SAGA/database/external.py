@@ -131,7 +131,7 @@ class SdssQuery(object):
 
         FROM dbo.fGetNearbyObjEq({ra:.10g}, {dec:.10g}, {r_arcmin:.10g}) n, PhotoPrimary p
         INTO mydb.{db_table_name}
-        LEFT JOIN SpecObj s ON p.specObjID = s.specObjID
+        LEFT JOIN SpecObj s ON p.objID = s.bestObjID
         LEFT JOIN PHOTOZ  pz ON p.ObjID = pz.ObjID
         LEFT join WISE_XMATCH as wx on p.objid = wx.sdss_objid
         LEFT join wise_ALLSKY as w on  wx.wise_cntr = w.cntr
