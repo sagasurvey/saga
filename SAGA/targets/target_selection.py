@@ -120,6 +120,41 @@ class TargetSelection(object):
 
 
 def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
+    """
+    Prepare MMT target catalog.
+
+    Parameters
+    ----------
+    target_catalog : astropy.table.Table
+        Need to have `TARGETING_SCORE` column.
+        You can use `TargetSelection.build_target_catalogs` to generate `target_catalog`
+    write_to : str, optional
+        If set, it will write the catalog in MMT format to `write_to`.
+    flux_star_removal_threshold : float, optional
+        In arcseconds
+    verbose : bool, optional
+
+    Returns
+    -------
+    mmt_target_catalog : astropy.table.Table
+
+    Examples
+    --------
+    >>> import SAGA
+    >>> from SAGA.targets import prepare_mmt_catalog
+    >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
+    >>> saga_targets = SAGA.TargetSelection(saga_database, gmm_parameters='gmm_parameters_no_outlier')
+    >>> mmt18_hosts = [161174, 52773, 163956, 69028, 144953, 165082, 165707, 145729, 165980, 147606]
+    >>> for host_id, target_catalog in saga_targets.build_target_catalogs(mmt18_hosts, return_as='dict').items():
+    >>>     print('Working host NSA', host_id)
+    >>>     SAGA.targets.prepare_mmt_catalog(target_catalog, '/home/yymao/Downloads/mmt_nsa{}.cat'.format(host_id))
+    >>>     print()
+
+    Notes
+    -----
+    See https://www.cfa.harvard.edu/mmti/hectospec/hecto_software_manual.htm#4.1.1 for required format
+
+    """
 
     if 'TARGETING_SCORE' not in target_catalog.colnames:
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
@@ -137,16 +172,16 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
 
     target_catalog['rank'] = target_catalog['TARGETING_SCORE'] // 100
-    target_catalog['rank'][Query('rank < 2').mask(target_catalog)] = 2 # rank 0 and 1 are reserved
+    target_catalog['rank'][Query('rank < 2').mask(target_catalog)] = 2 # regular targets start at rank 2
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
-    target_catalog['rank'][is_guide_star.mask(target_catalog)] = 0
+    target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
     flux_star_indices = np.where(is_flux_star.mask(target_catalog))[0]
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog['rank'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = -1
-    target_catalog = Query('rank >= 0').filter(target_catalog)
+    target_catalog['rank'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
+    target_catalog = Query('rank > 0').filter(target_catalog)
 
     if verbose:
         print('# of guide stars     =', is_guide_star.count(target_catalog))
@@ -157,7 +192,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                 Query('rank == {}'.format(rank)).count(target_catalog))
 
     target_catalog['type'] = 'TARGET'
-    target_catalog['type'][is_guide_star.mask(target_catalog)] = 'GUIDE'
+    target_catalog['type'][is_guide_star.mask(target_catalog)] = 'guide'
 
     target_catalog.rename_column('RA', 'ra')
     target_catalog.rename_column('DEC', 'dec')
@@ -165,6 +200,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog.rename_column('r_mag', 'mag')
 
     target_catalog = target_catalog[['ra', 'dec', 'object', 'rank', 'type', 'mag']]
+    target_catalog.sort('rank')
 
     if write_to:
         if verbose:
@@ -180,10 +216,11 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
             target_catalog.write(fh,
                                  delimiter='\t',
                                  format='ascii.fast_no_header',
-                                 formats={ # pylint: disable=E1101
-                                    'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3),
-                                    'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
-                                    'mag': '%.2f',
+                                 formats={
+                                     'ra': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=':', precision=3), # pylint: disable=E1101
+                                     'dec': lambda x: Angle(x, 'deg').to_string('deg', sep=':', precision=3),
+                                     'mag': '%.2f',
+                                     'rank': lambda x: '' if x == 99 else '{:d}'.format(x),
                                  })
 
     return target_catalog
