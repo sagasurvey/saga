@@ -39,7 +39,7 @@ def ensure_proper_prob(p):
 def assign_targeting_score(base, manual_selected_objids=None,
                            gmm_parameters=None):
     """
-    Last updated: 05/07/2018 (for MMT run)
+    Last updated: 05/07/2018
      100 Human selection and Special targets
      150 satellites
      200 within host,  r < 17.77, gri cuts
@@ -90,7 +90,7 @@ def assign_targeting_score(base, manual_selected_objids=None,
     if len(need_random_selection) > 50:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
         random_mask[:50] = True
-        np.random.shuffle(random_mask)
+        np.random.RandomState(123).shuffle(random_mask)
         need_random_selection = need_random_selection[random_mask]
     base['TARGETING_SCORE'][need_random_selection] = 600
 

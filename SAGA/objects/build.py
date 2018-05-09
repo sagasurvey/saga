@@ -344,13 +344,15 @@ def remove_bad_photometry(base):
     -------
     base : astropy.table.Table
     """
+    has_nsa = Query('OBJ_NSAID > -1')
+
     q  = Query('BINNED1 == 0')
     q |= Query('SATURATED != 0')
     q |= Query('BAD_COUNTS_ERROR != 0')
-    fill_values_by_query(base, q, {'REMOVE': 3})
+    fill_values_by_query(base, q & (~has_nsa), {'REMOVE': 3})
 
     q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'))
-    fill_values_by_query(base, q, {'REMOVE': 4})
+    fill_values_by_query(base, q & (~has_nsa), {'REMOVE': 4})
 
     return base
 
