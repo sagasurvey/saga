@@ -199,8 +199,8 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog.rename_column('OBJID', 'object')
     target_catalog.rename_column('r_mag', 'mag')
 
+    target_catalog.sort(['rank', 'TARGETING_SCORE', 'mag'])
     target_catalog = target_catalog[['ra', 'dec', 'object', 'rank', 'type', 'mag']]
-    target_catalog.sort('rank')
 
     if write_to:
         if verbose:
