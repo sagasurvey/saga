@@ -112,6 +112,21 @@ class Database(object):
     def wise_file_path_pattern(self, value):
         self._set_file_path_pattern('wise', value)
 
+    @property
+    def des_file_path_pattern(self):
+        return self._file_path_pattern['des']
+
+    @des_file_path_pattern.setter
+    def des_file_path_pattern(self, value):
+        self._set_file_path_pattern('des', value)
+
+    @property
+    def decals_file_path_pattern(self):
+        return self._file_path_pattern['decals']
+
+    @decals_file_path_pattern.setter
+    def decals_file_path_pattern(self, value):
+        self._set_file_path_pattern('decals', value)
 
     def __getitem__(self, key):
         if key in self._tables:

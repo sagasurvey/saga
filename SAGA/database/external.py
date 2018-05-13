@@ -5,8 +5,11 @@ import gzip
 import random
 import string
 import shutil
+import requests
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import SkyCoord
+from astropy.table import Table, vstack
 from .core import FitsTable
 
 _HAS_CASJOBS_ = True
@@ -23,7 +26,7 @@ except ImportError:
     _HAS_SCISERVER_ = False
 
 
-__all__ = ['SdssQuery', 'WiseQuery', 'download_catalogs_for_hosts']
+__all__ = ['SdssQuery', 'WiseQuery', 'DesQuery', 'DecalsQuery', 'download_catalogs_for_hosts']
 
 
 def get_random_string(length=6):
@@ -300,6 +303,159 @@ class SdssQuery(object):
             shutil.copyfileobj(r, f_out)
 
 
+class DesQuery(object):
+
+    _query_template = """select
+        d.COADD_OBJECT_ID as objid,
+        d.ALPHAWIN_J2000 as ra,
+        d.DELTAWIN_J2000 as dec,
+        d.FLUX_RADIUS_G * 0.263 as g_radius,
+        d.FLUX_RADIUS_R * 0.263 as r_radius,
+        d.FLUX_RADIUS_I * 0.263 as i_radius,
+        d.FLUX_RADIUS_Z * 0.263 as z_radius,
+        d.FLUX_RADIUS_Y * 0.263 as y_radius,
+        d.MAG_AUTO_G_DERED as g_mag,
+        d.MAG_AUTO_R_DERED as r_mag,
+        d.MAG_AUTO_I_DERED as i_mag,
+        d.MAG_AUTO_Z_DERED as z_mag,
+        d.MAG_AUTO_Y_DERED as y_mag,
+        d.MAGERR_AUTO_G as g_err,
+        d.MAGERR_AUTO_R as r_err,
+        d.MAGERR_AUTO_I as i_err,
+        d.MAGERR_AUTO_Z as z_err,
+        d.MAGERR_AUTO_Y as y_err,
+        d.flags_r,
+        d.imaflags_iso_r,
+        (CASE WHEN (d.wavg_spread_model_i + 3*d.wavg_spreaderr_model_i) > 0.005 THEN 1 ELSE 0 END) +
+        (CASE WHEN (d.wavg_spread_model_i + d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) +
+        (CASE WHEN (d.wavg_spread_model_i - d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) as wavg_extended_coadd_i
+        from des_dr1.main d where
+        q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
+
+    def __init__(self, ra, dec, radius=1.0):
+        self.query = self.construct_query(ra, dec, radius)
+
+    @classmethod
+    def construct_query(cls, ra, dec, radius=1.0):
+        """
+        Generates the query to send to the DES to get the full DES catalog around
+        a target.
+
+        Parameters
+        ----------
+        ra : `Quantity` or float
+            The center/host RA (in degrees if float)
+        dec : `Quantity` or float
+            The center/host Dec (in degrees if float)
+        radius : `Quantity` or float
+            The radius to search out to (in degrees if float)
+
+        Returns
+        -------
+        query : str
+            The SQL query to send to the SDSS skyserver
+        """
+        ra = ensure_deg(ra)
+        dec = ensure_deg(dec)
+        r_deg = ensure_deg(radius)
+
+        # ``**locals()`` means "use the local variable names to fill the template"
+        q = cls._query_template.format(**locals())
+        q = re.sub(r'\s+', ' ', q).strip()
+        q = re.sub(', ', ',', q)
+        return q
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if os.path.isfile(file_path) and not overwrite:
+            return
+
+        r = requests.get('https://dlsvcs.datalab.noao.edu/query/query',
+                         {'sql': self.query, 'ofmt': 'fits', 'async': False},
+                         headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
+                         stream=True)
+
+        r.raw.decode_content = True
+        file_open = gzip.open if compress else open
+        with file_open(file_path, 'wb') as f:
+            shutil.copyfileobj(r.raw, f)
+
+
+class DecalsQuery(object):
+
+    columns_needed = "RELEASE BRICKID OBJID TYPE RA DEC DCHISQ FLUX_G FLUX_R FLUX_Z FLUX_IVAR_G FLUX_IVAR_R FLUX_IVAR_Z MW_TRANSMISSION_G MW_TRANSMISSION_R MW_TRANSMISSION_Z NOBS_G NOBS_R NOBS_Z RCHISQ_G RCHISQ_R RCHISQ_Z ANYMASK_G ANYMASK_R ANYMASK_Z ALLMASK_G ALLMASK_R ALLMASK_Z GALDEPTH_G GALDEPTH_R GALDEPTH_Z FRACDEV FRACDEV_IVAR SHAPEDEV_R SHAPEDEV_R_IVAR SHAPEDEV_E1 SHAPEDEV_E1_IVAR SHAPEDEV_E2 SHAPEDEV_E2_IVAR SHAPEEXP_R SHAPEEXP_R_IVAR SHAPEEXP_E1 SHAPEEXP_E1_IVAR SHAPEEXP_E2 SHAPEEXP_E2_IVAR".split()
+
+    def __init__(self, ra, dec, radius=1.0, decals_dr='dr5',
+                 decals_base_dir='/global/project/projectdirs/cosmo/data/legacysurvey'):
+
+        self.sweep_dir = os.path.join(decals_base_dir, decals_dr, 'sweep', decals_dr[-1]+'.0')
+        if not os.path.isdir(self.sweep_dir):
+            raise ValueError('DECaLS sweep directory {} does not exist!'.format(self.sweep_dir))
+
+        self.ra = ensure_deg(ra)
+        self.dec = ensure_deg(dec)
+        self.radius = ensure_deg(radius)
+
+    @staticmethod
+    def brickname_to_ra_dec(brickname):
+        ra, _, dec = brickname.partition('p' if 'p' in brickname else 'm')
+        ra = float(ra)
+        dec = float(dec) * (1 if 'p' in brickname else -1)
+        return ra, dec
+
+    @classmethod
+    def get_ra_dec_range(cls, filename):
+        bmin, bmax = filename.partition('.')[0].split('-')[1:]
+        ra_min, dec_min = cls.brickname_to_ra_dec(bmin)
+        ra_max, dec_max = cls.brickname_to_ra_dec(bmax)
+        return ra_min, ra_max, dec_min, dec_max
+
+    @staticmethod
+    def is_within(ra, dec, ra_min, ra_max, dec_min, dec_max, margin_ra=0, margin_dec=0):
+        return ((ra_min - margin_ra <= ra) & (ra_max + margin_ra >= ra) & (dec_min - margin_dec <= dec) & (dec_max + margin_dec >=dec))
+
+    @staticmethod
+    def annotate_catalog(d):
+        for band in 'grz':
+            BAND = band.upper()
+            d[band+'_mag'] = 22.5 - 2.5 * np.log10(d['FLUX_'+BAND] / d['MW_TRANSMISSION_'+BAND])
+            d[band+'_err'] = 2.5 / np.log(10) / (d['FLUX_'+BAND] / d['MW_TRANSMISSION_'+BAND]) / np.sqrt(d['FLUX_IVAR_'+BAND])
+            for model in ('exp', 'dev'):
+                MODEL = model.upper()
+                d['sb_{}_{}'.format(model, band)] = d[band+'_mag'] + 2.5 * np.log10(np.pi) + np.log10(d['SHAPE{}_R'.format(MODEL)]) * 5.0
+                d['sb_{}_err_{}'.format(model, band)] = np.sqrt(d[band+'_err']**2.0 + (5.0 / np.log(10) / d['SHAPE{}_R'.format(MODEL)])**2.0 / d['SHAPE{}_R_IVAR'.format(MODEL)])
+        return d
+
+    def get_decals_catalog(self):
+        output = []
+        for filename in sorted(os.listdir(self.sweep_dir)):
+            if not filename.startswith('sweep-'):
+                continue
+            if not self.is_within(self.ra, self.dec, *self.get_ra_dec_range(filename),
+                                  margin_ra=self.radius*1.01/max(np.cos(np.deg2rad(self.dec)), 1.0e-8),
+                                  margin_dec=self.radius*1.01):
+                continue
+
+            d = FitsTable(os.path.join(self.sweep_dir, filename)).read()[self.columns_needed]
+            sep = SkyCoord(d['RA'], d['DEC'], unit='deg').separation(SkyCoord(self.ra, self.dec, unit='deg')).deg
+            d = d[sep <= self.radius]
+            if len(d):
+                output.append(d)
+
+        del d
+        if not output:
+            return Table()
+
+        output = vstack(output, 'exact', 'error')
+        return self.annotate_catalog(output)
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if os.path.isfile(file_path) and not overwrite:
+            return
+        f = FitsTable(file_path)
+        f.compress_after_write = bool(compress)
+        f.write(self.get_decals_catalog())
+
+
 def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
                                 overwrite=False, compress=True, file_size_check=1e6,
                                 host_id_label='NSAID', host_ra_label='RA', host_dec_label='Dec',
@@ -352,7 +508,7 @@ def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Fail to get catalog for host {}'.format(host_id))
             failed[i] = True
         else:
-            if os.path.getsize(path) < 1e6:
+            if os.path.getsize(path) < file_size_check:
                 print(time.strftime('[%m/%d %H:%M:%S]'), 'Downloaded catalog corrupted for host {} !!'.format(host_id))
                 os.unlink(path)
                 failed[i] = True
