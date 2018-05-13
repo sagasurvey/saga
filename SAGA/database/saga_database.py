@@ -132,7 +132,7 @@ class Database(object):
         if key in self._tables:
             return self._tables[key]
 
-        if isinstance(key, tuple) and len(key) == 2 and key[0] in ('base', 'sdss', 'wise'):
+        if isinstance(key, tuple) and len(key) == 2 and key[0] in ('base', 'sdss', 'wise', 'des', 'decals'):
             path = getattr(self, '{}_file_path_pattern'.format(key[0])).format(key[1])
             self._tables[key] = DataObject(FitsTable(path))
             return self._tables[key]
