@@ -306,14 +306,12 @@ class SdssQuery(object):
 class DesQuery(object):
 
     _query_template = """select
-        d.COADD_OBJECT_ID as objid,
-        d.ALPHAWIN_J2000 as ra,
-        d.DELTAWIN_J2000 as dec,
-        d.FLUX_RADIUS_G * 0.263 as g_radius,
-        d.FLUX_RADIUS_R * 0.263 as r_radius,
-        d.FLUX_RADIUS_I * 0.263 as i_radius,
-        d.FLUX_RADIUS_Z * 0.263 as z_radius,
-        d.FLUX_RADIUS_Y * 0.263 as y_radius,
+        d.COADD_OBJECT_ID as OBJID,
+        d.ALPHAWIN_J2000 as RA,
+        d.DELTAWIN_J2000 as DEC,
+        d.FLUX_RADIUS_G * 0.263 as radius_g,
+        d.FLUX_RADIUS_R * 0.263 as radius_r,
+        d.FLUX_RADIUS_I * 0.263 as radius_i,
         d.MAG_AUTO_G_DERED as g_mag,
         d.MAG_AUTO_R_DERED as r_mag,
         d.MAG_AUTO_I_DERED as i_mag,
@@ -382,7 +380,7 @@ class DesQuery(object):
 
 class DecalsQuery(object):
 
-    columns_needed = "RELEASE BRICKID OBJID TYPE RA DEC DCHISQ FLUX_G FLUX_R FLUX_Z FLUX_IVAR_G FLUX_IVAR_R FLUX_IVAR_Z MW_TRANSMISSION_G MW_TRANSMISSION_R MW_TRANSMISSION_Z NOBS_G NOBS_R NOBS_Z RCHISQ_G RCHISQ_R RCHISQ_Z ANYMASK_G ANYMASK_R ANYMASK_Z ALLMASK_G ALLMASK_R ALLMASK_Z GALDEPTH_G GALDEPTH_R GALDEPTH_Z FRACDEV FRACDEV_IVAR SHAPEDEV_R SHAPEDEV_R_IVAR SHAPEDEV_E1 SHAPEDEV_E1_IVAR SHAPEDEV_E2 SHAPEDEV_E2_IVAR SHAPEEXP_R SHAPEEXP_R_IVAR SHAPEEXP_E1 SHAPEEXP_E1_IVAR SHAPEEXP_E2 SHAPEEXP_E2_IVAR".split()
+    columns_needed = "RELEASE BRICKID OBJID TYPE RA DEC FLUX_G FLUX_R FLUX_Z FLUX_IVAR_G FLUX_IVAR_R FLUX_IVAR_Z MW_TRANSMISSION_G MW_TRANSMISSION_R MW_TRANSMISSION_Z NOBS_G NOBS_R NOBS_Z RCHISQ_G RCHISQ_R RCHISQ_Z FRACMASKED_G FRACMASKED_R FRACMASKED_Z ALLMASK_G ALLMASK_R ALLMASK_Z FRACDEV FRACDEV_IVAR SHAPEDEV_R SHAPEDEV_R_IVAR SHAPEEXP_R SHAPEEXP_R_IVAR".split()
 
     def __init__(self, ra, dec, radius=1.0, decals_dr='dr5',
                  decals_base_dir='/global/project/projectdirs/cosmo/data/legacysurvey'):
@@ -411,7 +409,7 @@ class DecalsQuery(object):
 
     @staticmethod
     def is_within(ra, dec, ra_min, ra_max, dec_min, dec_max, margin_ra=0, margin_dec=0):
-        return ((ra_min - margin_ra <= ra) & (ra_max + margin_ra >= ra) & (dec_min - margin_dec <= dec) & (dec_max + margin_dec >=dec))
+        return ((ra_min - margin_ra <= ra) & (ra_max + margin_ra >= ra) & (dec_min - margin_dec <= dec) & (dec_max + margin_dec >= dec))
 
     @staticmethod
     def annotate_catalog(d):
@@ -419,10 +417,6 @@ class DecalsQuery(object):
             BAND = band.upper()
             d[band+'_mag'] = 22.5 - 2.5 * np.log10(d['FLUX_'+BAND] / d['MW_TRANSMISSION_'+BAND])
             d[band+'_err'] = 2.5 / np.log(10) / (d['FLUX_'+BAND] / d['MW_TRANSMISSION_'+BAND]) / np.sqrt(d['FLUX_IVAR_'+BAND])
-            for model in ('exp', 'dev'):
-                MODEL = model.upper()
-                d['sb_{}_{}'.format(model, band)] = d[band+'_mag'] + 2.5 * np.log10(np.pi) + np.log10(d['SHAPE{}_R'.format(MODEL)]) * 5.0
-                d['sb_{}_err_{}'.format(model, band)] = np.sqrt(d[band+'_err']**2.0 + (5.0 / np.log(10) / d['SHAPE{}_R'.format(MODEL)])**2.0 / d['SHAPE{}_R_IVAR'.format(MODEL)])
         return d
 
     def get_decals_catalog(self):
