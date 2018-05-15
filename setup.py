@@ -32,5 +32,5 @@ setup(
     ],
     keywords='SAGA',
     packages=find_packages(),
-    install_requires=['numpy', 'numexpr', 'astropy', 'easyquery', 'requests'],
+    install_requires=['numpy', 'numexpr', 'astropy', 'easyquery', 'requests', 'fast3tree'],
 )
