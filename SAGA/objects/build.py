@@ -85,8 +85,9 @@ def initialize_base_catalog(base):
 
     base['TELNAME'] = get_empty_str_array(len(base), 6)
 
-    fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
-    fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
+    if 'SPEC_Z' in base.colnames:
+        fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
+        fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
 
     return base
 
@@ -322,7 +323,8 @@ def remove_shreds_with_nsa(base, nsa):
         values_to_rewrite['SB_EXP_R'] = mag[4] + 2.5 * np.log10(2.0*np.pi*nsa_obj['PETROTH50']**2.0 + 1.0e-20)
 
         for k, v in values_to_rewrite.items():
-            base[k][closest_base_obj_index] = v
+            if k in base.colnames:
+                base[k][closest_base_obj_index] = v
 
     return base
 
@@ -397,7 +399,10 @@ def remove_shreds_with_highz(base):
     -------
     base : astropy.table.Table
     """
-    highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1')
+    highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'REMOVE == -1')
+    if 'PETRORAD_R' in base.colnames:
+        highz_spec_cut &= Query('PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R')
+
     highz_spec_indices = np.where(highz_spec_cut.mask(base))[0]
 
     for idx in highz_spec_indices:
