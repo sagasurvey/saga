@@ -1,6 +1,8 @@
+import logging
 from itertools import chain
 from collections import defaultdict
 import numpy as np
+import numexpr as ne
 from easyquery import Query
 from fast3tree import find_friends_of_friends
 from astropy.coordinates import SkyCoord
@@ -8,11 +10,16 @@ from astropy.table import Table, join, vstack
 
 from . import build
 from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
-from ..database.spectra import ensure_dtype
+from ..database.spectra import extract_nsa_spectra, extract_sdss_spectra
 
-__all__ = ['get_sdss_spectra', 'prepare_sdss_catalog_for_merging',
-           'prepare_des_catalog_for_merging', 'prepare_decals_catalog_for_merging',
-           'merge_catalogs']
+__all__ = ['prepare_sdss_catalog_for_merging',
+           'prepare_des_catalog_for_merging',
+           'prepare_decals_catalog_for_merging',
+           'merge_catalogs',
+           'merge_spectra',
+           'add_spectra',
+           'remove_shreds_near_spec_obj',
+           'build_full_stack']
 
 MERGED_CATALOG_COLUMNS = list(chain(
     ('OBJID', 'RA', 'DEC', 'REMOVE', 'is_galaxy', 'radius'),
@@ -23,16 +30,6 @@ MERGED_CATALOG_COLUMNS = list(chain(
 
 def arcsec2dist(sep, r=1.0):
     return np.sin(np.deg2rad(sep / 3600.0 / 2.0)) * 2.0 * r
-
-
-def get_sdss_spectra(catalog):
-    specs = Query('SPEC_Z > -1.0').filter(catalog['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN'])
-    specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
-    specs['TELNAME'] = get_empty_str_array(len(specs), 6, 'SDSS')
-    specs['MASKNAME'] = get_empty_str_array(len(specs), 48, 'SDSS')
-    specs['SPECOBJID'] = get_empty_str_array(len(specs), 48)
-    del specs['SPEC_Z_WARN']
-    return specs
 
 
 def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
@@ -150,34 +147,170 @@ def merge_catalogs(**catalog_dict):
     points = SkyCoord(stacked_catalog['RA'], stacked_catalog['DEC'], unit='deg').cartesian.xyz.value.T
     group_id = find_friends_of_friends(points, arcsec2dist(3), reassign_group_indices=False)
     _, group_id, counts = np.unique(group_id, return_inverse=True, return_counts=True)
-    n_groups = len(counts)
-    counts = counts[group_id]
-
-    rerun_mask = (counts > n_catalogs)
-    group_id[rerun_mask] = find_friends_of_friends(points[rerun_mask], arcsec2dist(1), reassign_group_indices=False) + n_groups
-    _, group_id, counts = np.unique(group_id, return_inverse=True, return_counts=True)
-
+    group_id_shift = group_id.max() + 1
+    rerun_mask = (counts[group_id] > n_catalogs)
+    group_id[rerun_mask] = find_friends_of_friends(points[rerun_mask], arcsec2dist(1), reassign_group_indices=False)
+    group_id[rerun_mask] += group_id_shift
     stacked_catalog['group_id'] = group_id
+    del points, group_id, rerun_mask
+
     stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
-    stacked_catalog['choice'] = -1
+    stacked_catalog['chosen'] = 0
 
     group_id_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']), [1])))
     for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        stacked_catalog['choice'][i:j] = 2 if (j-i == 1) else assign_choice(stacked_catalog['survey'][i:j])
+        stacked_catalog['chosen'][i:j] = 2 if (j-i == 1) else assign_choice(stacked_catalog['survey'][i:j])
 
-    merged_catalog = Query('choice == 2').filter(stacked_catalog)
+    merged_catalog = Query('chosen == 2').filter(stacked_catalog)
     for name in catalog_dict:
         merged_catalog = join(merged_catalog,
-                              Query('choice > 0', (lambda x: x == name, 'survey')).filter(stacked_catalog)[MERGED_CATALOG_COLUMNS+['group_id']],
+                              Query('chosen > 0', (lambda x: x == name, 'survey')).filter(stacked_catalog)[MERGED_CATALOG_COLUMNS+['group_id']],
                               keys='group_id',
                               join_type='left',
                               uniq_col_name='{col_name}{table_name}',
                               table_names=['', '_'+name])
 
     del merged_catalog['group_id']
-    del merged_catalog['choice']
+    del merged_catalog['chosen']
 
     return merged_catalog
+
+
+def find_best_spec(specs):
+    rank = ((specs['TELNAME'] == 'NSA') * 2 + (specs['TELNAME'] == 'MMT')) * (specs['ZQUALITY'] == 4) + specs['ZQUALITY']
+    return rank.argsort()[-1], '+'.join(set(specs['TELNAME']))
+
+
+def merge_spectra(specs):
+    specs = add_skycoord(specs)
+    points = specs['coord'].cartesian.xyz.value.T
+    low_z_mask = Query('SPEC_Z < 0.2').mask(specs)
+    group_id = np.repeat(-1, len(specs))
+    group_id[low_z_mask] = find_friends_of_friends(points[low_z_mask], arcsec2dist(20), reassign_group_indices=False)
+    group_id_shift = group_id.max() + 1
+    group_id[~low_z_mask] = find_friends_of_friends(points[~low_z_mask], arcsec2dist(10), reassign_group_indices=False)
+    group_id[~low_z_mask] += group_id_shift
+    assert (group_id >= 0).all()
+    specs['group_id'] = group_id
+    del points, low_z_mask, group_id, specs['coord']
+    specs.sort(['group_id', 'SPEC_Z'])
+    specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48)
+    specs['chosen'] = False
+
+    edge_mask = (np.ediff1d(specs['group_id']) > 0) | (np.ediff1d(specs['SPEC_Z']) > build._spec_search_dz)
+    group_id_edges = np.flatnonzero(np.hstack(([True], edge_mask, [True])))
+    del edge_mask
+
+    for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
+        if j == i + 1:
+            specs['chosen'][i] = True
+            specs['SPEC_REPEAT'][i] = specs['TELNAME'][i]
+        else:
+            k, spec_repeat = find_best_spec(specs[i:j])
+            specs['chosen'][k] = True
+            specs['SPEC_REPEAT'][k] = spec_repeat
+
+    specs = Query('chosen').filter(specs)
+
+    del specs['group_id']
+    del specs['chosen']
+
+    return specs
+
+
+def add_spectra(base, specs):
+    specs = add_skycoord(specs)
+
+    matched_idx = np.repeat(-1, len(specs))
+    base_idx = np.flatnonzero(Query('is_galaxy', 'REMOVE == 0').mask(base))
+    idx, sep, _ = specs['coord'].match_to_catalog_sky(base['coord'][base_idx])
+    matched_mask = (sep.arcsec < 3.0)
+    matched_idx[matched_mask] = base_idx[idx[matched_mask]]
+
+    not_yet_matched_mask = (matched_idx == -1)
+    if not_yet_matched_mask.any():
+        base_idx = np.flatnonzero(Query('is_galaxy', 'REMOVE > 0').mask(base))
+        idx, sep, _ = specs['coord'][not_yet_matched_mask].match_to_catalog_sky(base['coord'][base_idx])
+        matched_mask = (sep.arcsec < 3.0)
+        matched_idx[np.flatnonzero(not_yet_matched_mask)[matched_mask]] = base_idx[idx[matched_mask]]
+
+    not_yet_matched_mask = (matched_idx == -1)
+    if not_yet_matched_mask.any():
+        base_idx = np.flatnonzero((~Query('is_galaxy')).mask(base))
+        idx, sep, _ = specs['coord'][not_yet_matched_mask].match_to_catalog_sky(base['coord'][base_idx])
+        matched_mask = (sep.arcsec < 1.0)
+        matched_idx[np.flatnonzero(not_yet_matched_mask)[matched_mask]] = base_idx[idx[matched_mask]]
+
+    specs['matched_idx'] = matched_idx
+    del matched_idx, base_idx, idx, sep, matched_mask, not_yet_matched_mask
+
+    base['SPEC_Z'] = np.float32(-1)
+    base['SPEC_Z_ERR'] = np.float32(-1)
+    base['ZQUALITY'] = np.int16(-1)
+    base['TELNAME'] = get_empty_str_array(len(base), 6)
+    base['MASKNAME'] = get_empty_str_array(len(base), 48)
+    base['SPECOBJID'] = get_empty_str_array(len(base), 48)
+    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
+
+    del specs['coord']
+    specs.sort('matched_idx')
+    start_idx = np.flatnonzero(specs['matched_idx'] > -1)[0]
+    for col in ('SPEC_Z', 'SPEC_Z_ERR', 'ZQUALITY', 'TELNAME', 'MASKNAME', 'SPECOBJID', 'SPEC_REPEAT'):
+        base[col][specs['matched_idx'][start_idx:]] = specs[col][start_idx:]
+
+    has_nsa = (base['TELNAME'] == 'NSA')
+    base['OBJ_NSAID'] = np.int32(-1)
+    base['OBJ_NSAID'][has_nsa] = np.array(base['SPECOBJID'][has_nsa], dtype=np.int32)
+
+    for spec in specs[:start_idx]:
+        if spec['SPEC_REPEAT'] != 'GAMA':
+            logging.warning('No photo obj matched to {} spec obj ({}, {})'.format(spec['TELNAME'], spec['RA'], spec['DEC']))
+
+    return base
+
+
+def remove_shreds_near_spec_obj(base, nsa=None):
+
+    spec_obj = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'is_galaxy', 'radius > 0')
+    spec_obj |= Query((lambda x: x == 'NSA', 'TELNAME'))
+    spec_obj_indices = np.flatnonzero(spec_obj.mask(base))
+
+    for idx in spec_obj_indices:
+        obj_this = base[idx]
+
+        if nsa is not None and obj_this['TELNAME'] == 'NSA':
+            nsa_obj = Query('NSAID == {}'.format(obj_this['SPECOBJID'])).filter(nsa)[0]
+            ellipse_calculation = dict()
+            ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
+            ellipse_calculation['b'] = ellipse_calculation['a'] * nsa_obj['SERSIC_BA']
+            ellipse_calculation['th'] = np.deg2rad(nsa_obj['SERSIC_PHI'] + 270.0)
+            ellipse_calculation['s'] = np.sin(ellipse_calculation['th'])
+            ellipse_calculation['c'] = np.cos(ellipse_calculation['th'])
+            ellipse_calculation['x'] = base['RA'] - nsa_obj['RA']
+            ellipse_calculation['y'] = base['DEC'] - nsa_obj['DEC']
+            r2_ellipse = ne.evaluate('((x*c - y*s)/a)**2.0 + ((x*s + y*c)/b)**2.0',
+                                    local_dict=ellipse_calculation, global_dict={})
+            nearby_obj_mask = (r2_ellipse < 1.0)
+            remove_flag = 21
+
+        else:
+            if obj_this['REMOVE'] > 0:
+                continue
+            nearby_obj_mask = (base['coord'].separation(obj_this['coord']).arcsec < 1.25 * obj_this['radius'])
+            remove_flag = 22
+
+        nearby_obj_mask[idx] = False
+        nearby_obj_count = np.count_nonzero(nearby_obj_mask)
+
+        if not nearby_obj_count:
+            continue
+
+        if nearby_obj_count > 25:
+            logging.warning('Too many (> 25) shreds around spec object {} ({}, {})'.format(obj_this['OBJID'], obj_this['RA'], obj_this['DEC']))
+
+        base['REMOVE'][nearby_obj_mask] += (1 << remove_flag)
+
+    return base
 
 
 def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, nsa=None,
@@ -190,33 +323,37 @@ def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, ns
     -------
     base : astropy.table.Table
     """
-    if sdss:
-        specs_sdss = get_sdss_spectra(sdss)
+    all_spectra = []
+    if sdss is not None:
+        all_spectra.append(extract_sdss_spectra(sdss))
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
 
-    if des:
+    if des is not None:
         des = prepare_des_catalog_for_merging(des)
 
-    if decals:
+    if decals is not None:
         decals = prepare_decals_catalog_for_merging(decals)
 
-    base = merge_catalogs(sdss=sdss, des=des, decals=decals)
-
-    base = build.initialize_base_catalog(base)
-    base = build.add_host_info(base, host, saga_names)
-    base = build.remove_too_close_to_host(base)
     if nsa is not None:
-        base = build.remove_shreds_with_nsa(base, nsa)
-    #base = build.apply_manual_fixes(base) #TODO: fix this
-    if spectra:
-        if sdss:
-            if 'coord' in spectra.colnames:
-                del spectra['coord']
-            spectra = add_skycoord(ensure_dtype(vstack((specs_sdss, spectra), 'exact', 'error')))
-        base = build.add_spectra(base, spectra)
-    base = build.clean_sdss_spectra(base)
-    base = build.remove_shreds_with_highz(base)
+        all_spectra.append(extract_nsa_spectra(nsa))
+
+    if spectra is not None:
+        if 'coord' in spectra.colnames:
+            del spectra['coord']
+        all_spectra.append(spectra)
+
+    base = merge_catalogs(sdss=sdss, des=des, decals=decals)
+    del sdss, des, decals, spectra
+
+    base = build.add_host_info(base, host, saga_names)
+    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
+
+    if all_spectra:
+        all_spectra = merge_spectra(vstack(all_spectra, 'exact', 'error'))
+        base = add_spectra(base, all_spectra)
+        del all_spectra
+        base = remove_shreds_near_spec_obj(base)
+
     base = build.find_satellites(base)
-    #base = add_stellar_mass(base)
 
     return base
