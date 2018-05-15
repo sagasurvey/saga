@@ -176,7 +176,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
     target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
-    flux_star_indices = np.where(is_flux_star.mask(target_catalog))[0]
+    flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]

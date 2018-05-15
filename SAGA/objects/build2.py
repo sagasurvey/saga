@@ -161,7 +161,7 @@ def merge_catalogs(**catalog_dict):
     stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
     stacked_catalog['choice'] = -1
 
-    group_id_edges = np.append(np.insert(np.where(np.ediff1d(stacked_catalog['group_id']))[0]+1, 0, 0), len(stacked_catalog))
+    group_id_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']), [1])))
     for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
         stacked_catalog['choice'][i:j] = 2 if (j-i == 1) else assign_choice(stacked_catalog['survey'][i:j])
 

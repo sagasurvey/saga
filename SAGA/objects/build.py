@@ -131,7 +131,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     del sep
 
     if saga_names:
-        idx = np.where(saga_names['NSA'] == host['NSAID'])[0]
+        idx = np.flatnonzero(saga_names['NSA'] == host['NSAID'])
         if len(idx) == 1:
             base['HOST_SAGA_NAME'] = saga_names['SAGA'][idx]
             base['HOST_NGC_NAME'] = saga_names['NGC'][idx]
@@ -269,9 +269,9 @@ def remove_shreds_with_nsa(base, nsa):
         return base
 
     if 'PHOTPTYPE' in base.colnames:
-        not_star_indices = np.where(base['PHOTPTYPE'] != 6)[0]
+        not_star_indices = np.flatnonzero(base['PHOTPTYPE'] != 6)
     else:
-        not_star_indices = np.where(base['is_galaxy'])[0]
+        not_star_indices = np.flatnonzero(base['is_galaxy'])
 
     for nsa_obj in nsa:
 
@@ -413,7 +413,7 @@ def remove_shreds_with_highz(base):
     else:
         radius_label = 'radius'
 
-    highz_spec_indices = np.where(highz_spec_cut.mask(base))[0]
+    highz_spec_indices = np.flatnonzero(highz_spec_cut.mask(base))
 
     for idx in highz_spec_indices:
 
@@ -492,7 +492,7 @@ def clean_repeat_spectra(spectra):
         nearby_mask = (np.fabs(spectra['SPEC_Z'] - spec['SPEC_Z']) < _spec_search_dz)
         nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < _get_spec_search_radius(spec['SPEC_Z']))
         nearby_mask &= not_done
-        nearby_mask = np.where(nearby_mask)[0]
+        nearby_mask = np.flatnonzero(nearby_mask)
         assert len(nearby_mask) >= 1
 
         not_done[nearby_mask] = False
@@ -547,7 +547,7 @@ def add_cleaned_spectra(base, spectra_clean):
     """
     for spec in spectra_clean:
         sep = spec['coord'].separation(base['coord']).arcsec
-        nearby_obj_indices = np.where(sep < _get_spec_search_radius(spec['SPEC_Z']))[0]
+        nearby_obj_indices = np.flatnonzero(sep < _get_spec_search_radius(spec['SPEC_Z']))
 
         if len(nearby_obj_indices) == 0:
             if spec['TELNAME'] != 'GAMA':
@@ -646,7 +646,7 @@ def clean_sdss_spectra(base):
     base : astropy.table.Table
     """
     find_sdss_only = lambda t: np.fromiter(((x and set(x.split('+')).issubset({'NSA', 'SDSS'})) for x in t['SPEC_REPEAT']), np.bool, len(t))
-    sdss_specs_indices = np.where(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))[0]
+    sdss_specs_indices = np.flatnonzero(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))
     if len(sdss_specs_indices) > 0:
         sdss_specs = base[['SPEC_REPEAT', 'SPEC_Z', 'TELNAME', 'ZQUALITY', 'coord']][sdss_specs_indices]
         sdss_specs['indices'] = sdss_specs_indices
