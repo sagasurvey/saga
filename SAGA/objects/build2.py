@@ -8,7 +8,7 @@ from astropy.table import Table, join, vstack
 
 from . import build
 from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
-from ..database import spectra
+from ..database.spectra import ensure_dtype
 
 __all__ = ['get_sdss_spectra', 'prepare_sdss_catalog_for_merging',
            'prepare_des_catalog_for_merging', 'prepare_decals_catalog_for_merging',
@@ -31,7 +31,6 @@ def get_sdss_spectra(catalog):
     specs['TELNAME'] = get_empty_str_array(len(specs), 6, 'SDSS')
     specs['MASKNAME'] = get_empty_str_array(len(specs), 48, 'SDSS')
     specs['SPECOBJID'] = get_empty_str_array(len(specs), 48)
-    specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48, 'SDSS')
     del specs['SPEC_Z_WARN']
     return specs
 
@@ -208,12 +207,12 @@ def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, ns
     base = build.remove_too_close_to_host(base)
     if nsa is not None:
         base = build.remove_shreds_with_nsa(base, nsa)
-    base = build.apply_manual_fixes(base)
+    #base = build.apply_manual_fixes(base) #TODO: fix this
     if spectra:
         if sdss:
-            if 'coord' in spectra:
+            if 'coord' in spectra.colnames:
                 del spectra['coord']
-            spectra = add_skycoord(spectra.ensure_dtype(vstack((specs_sdss, spectra), 'exact', 'error')))
+            spectra = add_skycoord(ensure_dtype(vstack((specs_sdss, spectra), 'exact', 'error')))
         base = build.add_spectra(base, spectra)
     base = build.clean_sdss_spectra(base)
     base = build.remove_shreds_with_highz(base)

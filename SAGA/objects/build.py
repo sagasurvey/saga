@@ -88,6 +88,9 @@ def initialize_base_catalog(base):
     if 'SPEC_Z' in base.colnames:
         fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
         fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
+    else:
+        base['SPEC_Z'] = np.float32(-1.0)
+        base['SPEC_Z_ERR'] = np.float32(-1.0)
 
     return base
 
@@ -265,9 +268,12 @@ def remove_shreds_with_nsa(base, nsa):
     if len(nsa) == 0:
         return base
 
-    for nsa_obj in nsa:
-
+    if 'PHOTPTYPE' in base.colnames:
         not_star_indices = np.where(base['PHOTPTYPE'] != 6)[0]
+    else:
+        not_star_indices = np.where(base['is_galaxy'])[0]
+
+    for nsa_obj in nsa:
 
         ellipse_calculation = dict()
         ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
@@ -288,8 +294,9 @@ def remove_shreds_with_nsa(base, nsa):
         closest_base_obj_index = not_star_indices[closest_base_obj_index]
         base['REMOVE'][not_star_indices[r2_ellipse < 1.0]] = 2
 
-        del r2_ellipse, not_star_indices, ellipse_calculation
+        del r2_ellipse, ellipse_calculation
 
+        # TODO: make build2 compatible
         values_to_rewrite = {
             'REMOVE': -1,
             'ZQUALITY': 4,
@@ -402,6 +409,9 @@ def remove_shreds_with_highz(base):
     highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'REMOVE == -1')
     if 'PETRORAD_R' in base.colnames:
         highz_spec_cut &= Query('PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R')
+        radius_label = 'PETRORAD_R'
+    else:
+        radius_label = 'radius'
 
     highz_spec_indices = np.where(highz_spec_cut.mask(base))[0]
 
@@ -410,7 +420,7 @@ def remove_shreds_with_highz(base):
         if base['REMOVE'][idx] != -1:
             continue
 
-        nearby_obj_mask  = (base['coord'].separation(base['coord'][idx]).arcsec < 1.25 * base['PETRORAD_R'][idx])
+        nearby_obj_mask  = (base['coord'].separation(base['coord'][idx]).arcsec < 1.25 * base[radius_label][idx])
         nearby_obj_mask &= (base['REMOVE'] == -1)
 
         assert nearby_obj_mask[idx]
