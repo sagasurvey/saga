@@ -8,7 +8,8 @@ from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
-           'read_wiyn', 'read_deimos', 'SpectraData']
+           'read_wiyn', 'read_deimos', 'extract_sdss_spectra',
+           'extract_nsa_spectra', 'SpectraData']
 
 
 def ensure_dtype(spectra):
@@ -155,20 +156,44 @@ def read_deimos():
     return ensure_dtype(Table(data))
 
 
+def extract_sdss_spectra(sdss):
+    specs = Query('SPEC_Z > -1.0').filter(sdss['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN'])
+    specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
+    specs['TELNAME'] = 'SDSS'
+    specs['MASKNAME'] = 'SDSS'
+    specs['SPECOBJID'] = ''
+    del specs['SPEC_Z_WARN']
+    return ensure_dtype(specs)
+
+
+def extract_nsa_spectra(nsa):
+    specs = nsa['RA', 'DEC', 'Z', 'ZSRC', 'NSAID']
+    specs['TELNAME'] = 'NSA'
+    specs['SPEC_Z_ERR'] = 0
+    specs['ZQUALITY'] = 4
+    specs.rename_column('Z', 'SPEC_Z')
+    specs.rename_column('ZSRC', 'MASKNAME')
+    specs.rename_column('NSAID', 'SPECOBJID')
+    return ensure_dtype(specs)
+
+
 class SpectraData(object):
-    def __init__(self, spectra_dir_path, gama_file):
+    def __init__(self, spectra_dir_path=None, gama_file=None):
         self.spectra_dir_path = spectra_dir_path
         self.gama_file = gama_file
 
-    def read(self):
-        all_specs = [
-            read_gama(self.gama_file),
-            read_mmt(os.path.join(self.spectra_dir_path, 'MMT')),
-            read_aat(os.path.join(self.spectra_dir_path, 'AAT')),
-            read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT')),
-            read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
-            read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
-            read_deimos(),
-        ]
-
-        return add_skycoord(ensure_dtype(vstack(all_specs, 'exact', 'error')))
+    def read(self, add_coord=True):
+        all_specs = []
+        if self.gama_file is not None:
+            all_specs.append(read_gama(self.gama_file))
+        if self.spectra_dir_path is not None:
+            all_specs.extend([
+                read_mmt(os.path.join(self.spectra_dir_path, 'MMT')),
+                read_aat(os.path.join(self.spectra_dir_path, 'AAT')),
+                read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT')),
+                read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
+                read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
+            ])
+        all_specs.append(read_deimos())
+        all_specs = vstack(all_specs, 'exact', 'error')
+        return add_skycoord(all_specs) if add_coord else all_specs
