@@ -7,6 +7,7 @@ from astropy import units as u
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors', 'add_skycoord',
            'get_empty_str_array', 'get_decals_viewer_image', 'fill_values_by_query',
+           'get_remove_flag',
            'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec']
 
 
@@ -46,7 +47,6 @@ def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out
 
 def fill_values_by_query(table, query, values_to_fill):
     """
-
     Examples
     --------
     fill_values_by_query(table, 'OBJID == 1237668367995568266',
@@ -60,6 +60,22 @@ def fill_values_by_query(table, query, values_to_fill):
             table[c][mask] = v
 
     return n_matched
+
+
+def get_remove_flag(catalog, remove_queries):
+    """
+    get remove flag by remove queries. remove_queries can be a list or dict.
+    """
+
+    try:
+        iter_queries = iter(remove_queries.items())
+    except AttributeError:
+        iter_queries = enumerate(remove_queries)
+
+    remove_flag = np.zeros(len(catalog), dtype=np.int)
+    for i, remove_query in iter_queries:
+        remove_flag[Query(remove_query).mask(catalog)] += (1 << i)
+    return remove_flag
 
 
 def find_objid(table, objid):
