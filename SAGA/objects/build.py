@@ -66,7 +66,7 @@ def initialize_base_catalog(base):
     -------
     base : astropy.table.Table
     """
-    base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
+    base = add_skycoord(base)
 
     base['REMOVE'] = np.int16(-1)
     base['ZQUALITY'] = np.int16(-1)
@@ -85,12 +85,8 @@ def initialize_base_catalog(base):
 
     base['TELNAME'] = get_empty_str_array(len(base), 6)
 
-    if 'SPEC_Z' in base.colnames:
-        fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
-        fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
-    else:
-        base['SPEC_Z'] = np.float32(-1.0)
-        base['SPEC_Z_ERR'] = np.float32(-1.0)
+    fill_values_by_query(base, Query('SPEC_Z > -1.0'), {'TELNAME':'SDSS', 'MASKNAME':'SDSS', 'SPEC_REPEAT':'SDSS', 'ZQUALITY':4})
+    fill_values_by_query(base, Query('SPEC_Z > -1.0', 'SPEC_Z_WARN != 0'), {'ZQUALITY':1})
 
     return base
 
@@ -125,6 +121,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     base['HOST_MG'] = np.float32(host['M_g'])
 
     host_sc = SkyCoord(host['RA'], host['Dec'], unit='deg')
+    base = add_skycoord(base)
     sep = base['coord'].separation(host_sc)
     base['RHOST_ARCM'] = sep.arcmin.astype(np.float32)
     base['RHOST_KPC'] = (np.sin(sep.radian) * (1000.0 * host['distance'])).astype(np.float32)
@@ -268,13 +265,9 @@ def remove_shreds_with_nsa(base, nsa):
     if len(nsa) == 0:
         return base
 
-    if 'PHOTPTYPE' in base.colnames:
-        not_star_indices = np.flatnonzero(base['PHOTPTYPE'] != 6)
-    else:
-        not_star_indices = np.flatnonzero(base['is_galaxy'])
+    not_star_indices = np.flatnonzero(base['PHOTPTYPE'] != 6)
 
     for nsa_obj in nsa:
-
         ellipse_calculation = dict()
         ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
         ellipse_calculation['b'] = ellipse_calculation['a'] * nsa_obj['SERSIC_BA']
@@ -296,7 +289,6 @@ def remove_shreds_with_nsa(base, nsa):
 
         del r2_ellipse, ellipse_calculation
 
-        # TODO: make build2 compatible
         values_to_rewrite = {
             'REMOVE': -1,
             'ZQUALITY': 4,
@@ -330,8 +322,7 @@ def remove_shreds_with_nsa(base, nsa):
         values_to_rewrite['SB_EXP_R'] = mag[4] + 2.5 * np.log10(2.0*np.pi*nsa_obj['PETROTH50']**2.0 + 1.0e-20)
 
         for k, v in values_to_rewrite.items():
-            if k in base.colnames:
-                base[k][closest_base_obj_index] = v
+            base[k][closest_base_obj_index] = v
 
     return base
 
@@ -406,12 +397,7 @@ def remove_shreds_with_highz(base):
     -------
     base : astropy.table.Table
     """
-    highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'REMOVE == -1')
-    if 'PETRORAD_R' in base.colnames:
-        highz_spec_cut &= Query('PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R')
-        radius_label = 'PETRORAD_R'
-    else:
-        radius_label = 'radius'
+    highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1')
 
     highz_spec_indices = np.flatnonzero(highz_spec_cut.mask(base))
 
@@ -420,7 +406,7 @@ def remove_shreds_with_highz(base):
         if base['REMOVE'][idx] != -1:
             continue
 
-        nearby_obj_mask  = (base['coord'].separation(base['coord'][idx]).arcsec < 1.25 * base[radius_label][idx])
+        nearby_obj_mask  = (base['coord'].separation(base['coord'][idx]).arcsec < 1.25 * base['PETRORAD_R'][idx])
         nearby_obj_mask &= (base['REMOVE'] == -1)
 
         assert nearby_obj_mask[idx]
@@ -682,14 +668,20 @@ def find_satellites(base):
     -------
     base : astropy.table.Table
     """
+    if 'SATS' not in base.colnames:
+        base['SATS'] = np.int16(-1)
+
+    is_galaxy = C.is_galaxy if 'PHOTPTYPE' in base.colnames else Query('is_galaxy')
+    is_clean = C.is_clean if 'PHOTPTYPE' in base.colnames else Query('REMOVE == 0')
+
     # clean objects
-    clean_obj = C.is_galaxy & C.has_spec & C.is_clean
+    clean_obj = is_galaxy & C.has_spec & is_clean
     fill_values_by_query(base, clean_obj & C.is_high_z, {'SATS':0})
     fill_values_by_query(base, clean_obj & ~C.is_high_z, {'SATS':2})
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {'SATS':1})
 
     # removed objects
-    removed_obj = C.is_galaxy & C.has_spec & (~C.is_clean)
+    removed_obj = is_galaxy & C.has_spec & (~is_clean)
     fill_values_by_query(base, removed_obj & ~C.is_high_z, {'SATS':92})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {'SATS':91})
 
