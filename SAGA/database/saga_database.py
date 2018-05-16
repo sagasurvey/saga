@@ -5,9 +5,7 @@ from .spectra import SpectraData
 __all__ = ['known_google_sheets', 'Database']
 
 known_google_sheets = {
-    'hosts_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 0, include_names=['SAGA', 'NSA', 'NGC']),
-    'hosts_no_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1136984451),
-    'hosts_no_sdss_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
+    'hosts': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
     'objects_to_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'objects_to_add': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'satellites_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 1),
@@ -78,7 +76,7 @@ class Database(object):
         for k, v in known_google_sheets.items():
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
-        self._file_path_pattern = {'base': os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz')}
+        self._file_path_pattern = {'base': os.path.join(self._root_dir, 'base_catalogs', 'base_sql_{}.fits.gz')}
 
 
     def _set_file_path_pattern(self, key, value):

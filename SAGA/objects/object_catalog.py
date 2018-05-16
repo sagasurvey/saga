@@ -139,7 +139,7 @@ class ObjectCatalog(object):
             t = self._database['spectra_clean'].read()
 
             if hosts is not None:
-                host_ids = self._host_catalog.resolve_id(hosts)
+                host_ids = self._host_catalog.resolve_id(hosts, 'NSA')
                 t = Query((lambda x: np.in1d(x, host_ids), 'HOST_NSAID')).filter(t)
 
             t = self._annotate_catalog(t)
@@ -160,7 +160,7 @@ class ObjectCatalog(object):
             if has_spec is not None:
                 q = q & (~C.has_spec)
 
-            hosts = self._host_catalog.resolve_id('all' if hosts is None else hosts)
+            hosts = self._host_catalog.resolve_id(hosts or 'all', 'string')
 
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
@@ -230,7 +230,7 @@ class ObjectCatalog(object):
 
         nsa = self.load_nsa('0.1.2')
         spectra_raw_all = self._database['spectra_raw_all'].read()
-        host_ids = self._host_catalog.resolve_id('all' if hosts is None else hosts)
+        host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
 
         for i, host_id in enumerate(host_ids):
 
