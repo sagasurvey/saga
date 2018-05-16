@@ -145,7 +145,7 @@ class HostCatalog(object):
                 if hosts in self._host_index:
                     indices = list(self._host_index[hosts])
 
-        elif hosts in self._host_index:
+        elif isinstance(hosts, int) and hosts in self._host_index:
             indices = list(self._host_index[hosts])
 
         elif isinstance(hosts, Iterable):
