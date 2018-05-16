@@ -214,24 +214,27 @@ def find_best_spec(specs):
     d = dict(SDSS=0, GAMA=1, NSA=2, AAT=4, MMT=5)
     rank = np.fromiter((d.get(t, 3) for t in specs['TELNAME']), np.int, len(specs))
     rank += specs['ZQUALITY'] * (rank.max() + 1)
+
     nsa_specs = specs[specs['TELNAME'] == 'NSA']
     if len(nsa_specs) > 1:
         logging.warning('More than one NSA obj near ({}, {}): {}'.format(nsa_specs['RA'][0], nsa_specs['DEC'][0], ', '.join(nsa_specs['SPECOBJID'])))
-    return rank.argmax(), '+'.join(set(specs['TELNAME'])), int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
+    nsa_id = int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
+
+    zq_thres = 3 if (specs['ZQUALITY'].max() >= 3) else 0
+    spec_repeat = '+'.join(set(specs['TELNAME'][specs['ZQUALITY'] >= zq_thres]))
+
+    return rank.argmax(), spec_repeat, nsa_id
 
 
 def merge_spectra(specs):
     if 'coord' in specs.colnames:
         del specs['coord']
 
-    specs['group_id_close'] = get_fof_group_id(specs, 1.0)
-
     specs['group_id'] = get_fof_group_id(specs, 20.0)
-    specs.sort(['group_id', 'group_id_close', 'SPEC_Z'])
+    specs.sort(['group_id', 'SPEC_Z'])
     group_id_shift = specs['group_id'][-1] + 1
 
-    edge_mask = (np.ediff1d(specs['group_id']) > 0)
-    edge_mask |= (np.ediff1d(specs['SPEC_Z']) > 100.0/_SPEED_OF_LIGHT) & (np.ediff1d(specs['group_id_close']) > 0)
+    edge_mask = (np.ediff1d(specs['group_id']) > 0) | (np.ediff1d(specs['SPEC_Z']) > 150.0/_SPEED_OF_LIGHT)
     group_id_edges = np.flatnonzero(np.hstack(([True], edge_mask, [True])))
     regroup_mask = np.zeros(len(specs), np.bool)
     for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
@@ -240,10 +243,10 @@ def merge_spectra(specs):
 
     if regroup_mask.any():
         specs['group_id'][regroup_mask] = get_fof_group_id(specs[regroup_mask], 10.0) + group_id_shift
-        specs.sort(['group_id', 'group_id_close', 'SPEC_Z'])
-        edge_mask = (np.ediff1d(specs['group_id']) > 0)
-        edge_mask |= (np.ediff1d(specs['SPEC_Z']) > 100.0/_SPEED_OF_LIGHT) & (np.ediff1d(specs['group_id_close']) > 0)
+        specs.sort(['group_id', 'SPEC_Z'])
+        edge_mask = (np.ediff1d(specs['group_id']) > 0) | (np.ediff1d(specs['SPEC_Z']) > 150.0/_SPEED_OF_LIGHT)
         group_id_edges = np.flatnonzero(np.hstack(([True], edge_mask, [True])))
+
     del regroup_mask, edge_mask
 
     specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48)
@@ -262,8 +265,7 @@ def merge_spectra(specs):
         specs['OBJ_NSAID'][k] = nsa_id
 
     specs = Query('chosen').filter(specs)
-
-    del specs['group_id'], specs['group_id_close'], specs['chosen']
+    del specs['chosen'], specs['group_id']
 
     return specs
 
@@ -294,17 +296,22 @@ def add_spectra(base, specs):
         possible_match = base['REMOVE', 'is_galaxy', 'r_mag', 'no_spec_yet', 'index'][base_idx[i:j]]
         possible_match['sep'] = sep[i:j]
 
+        if Query('sep < 1', ~Query('no_spec_yet')).count(possible_match) > 0:
+            specs['matched_idx'][spec_idx_this] = -2
+
         possible_match = possible_match[possible_match['no_spec_yet']]
         if not len(possible_match):
             continue
         possible_match.sort('sep')
 
+        larger_search_r = build._get_spec_search_radius(specs['SPEC_Z'][spec_idx_this])
         for q in (
                 Query('REMOVE == 0', 'sep < 1'),
                 Query('REMOVE == 0', 'is_galaxy', 'sep < 3'),
                 Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 3'),
-                Query('REMOVE == 0', 'is_galaxy', 'r_mag < 17.0', 'sep < 20'),
+                Query('REMOVE == 0', 'is_galaxy', 'r_mag < 17', 'sep < {:g}'.format(larger_search_r)),
                 Query('REMOVE > 0', 'sep < 3'),
+                Query('sep >= 3', 'sep < 4'),
         ):
             mask = q.mask(possible_match)
             if mask.any():
@@ -331,11 +338,13 @@ def add_spectra(base, specs):
     for col in ('RA_spec', 'DEC_spec', 'SPEC_Z', 'SPEC_Z_ERR', 'ZQUALITY',
                 'TELNAME', 'MASKNAME', 'SPECOBJID', 'SPEC_REPEAT', 'OBJ_NSAID'):
         base[col][specs['matched_idx'][start_idx:]] = specs[col.replace('_spec', '')][start_idx:]
-    del specs['matched_idx']
 
-    for spec in specs[:start_idx]:
+    start_idx2 = np.flatnonzero(specs['matched_idx'] > -2)[0]
+    for spec in specs[start_idx2:start_idx]:
         if spec['SPEC_REPEAT'] != 'GAMA':
             logging.warning('No photo obj matched to {} spec obj {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
+
+    del specs['matched_idx']
 
     return base
 
@@ -461,18 +470,18 @@ def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, ns
     del sdss, des, decals, spectra
 
     base = build.add_host_info(base, host, saga_names)
-    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
 
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
+        all_spectra_merged = merge_spectra(all_spectra)
         if debug is not None:
             debug['all_spectra'] = all_spectra
-        all_spectra_merged = merge_spectra(all_spectra)
         del all_spectra
         base = add_spectra(base, all_spectra_merged)
         del all_spectra_merged
         base = remove_shreds_near_spec_obj(base, nsa)
 
+    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
     base = add_surface_brightness(base)
     base = build.find_satellites(base)
     base['SATS'][base['RHOST_ARCM'].argmin()] = 3
