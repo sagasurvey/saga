@@ -437,7 +437,7 @@ def add_surface_brightness(base):
     return base
 
 
-def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, nsa=None,
+def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
                      sdss_remove=None, sdss_recover=None, spectra=None, debug=None):
     """
     This function calls all needed functions to complete the full stack of building
@@ -469,7 +469,7 @@ def build_full_stack(host, saga_names=None, sdss=None, des=None, decals=None, ns
     base = merge_catalogs(sdss=sdss, des=des, decals=decals)
     del sdss, des, decals, spectra
 
-    base = build.add_host_info(base, host, saga_names)
+    base = build.add_host_info(base, host)
 
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')

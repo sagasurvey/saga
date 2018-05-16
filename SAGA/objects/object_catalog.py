@@ -3,7 +3,7 @@ import numpy as np
 from astropy.table import vstack
 from easyquery import Query
 from . import cuts as C
-from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
+from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012
 from ..database import FitsTable, Database
 from ..hosts import HostCatalog
@@ -179,7 +179,7 @@ class ObjectCatalog(object):
 
 
     def load_nsa(self, version='0.1.2'):
-        nsa = self._database['nsa_v{}'.format(version)].read()[NSA_COLS_USED]
+        nsa = self._database['nsa_v{}'.format(version)].read()[build.NSA_COLS_USED]
         if version == '0.1.2':
             for nsaid, fixes in fixes_to_nsa_v012.items():
                 fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
@@ -245,16 +245,16 @@ class ObjectCatalog(object):
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Building base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
             try:
-                wise = self._database['wise', host_id].read()[WISE_COLS_USED]
+                wise = self._database['wise', host_id].read()[build.WISE_COLS_USED]
             except OSError:
                 wise = None
 
-            base = build_full_stack(self._database['sdss', host_id].read(),
-                                    self._host_catalog.load_single(host_id),
-                                    self._database['hosts_named'].read(), wise, nsa,
-                                    self._database['objects_to_remove'].read(),
-                                    self._database['objects_to_add'].read(),
-                                    spectra_raw_all)
+            base = build.build_full_stack(self._database['sdss', host_id].read(),
+                                          self._host_catalog.load_single(host_id),
+                                          wise, nsa,
+                                          self._database['objects_to_remove'].read(),
+                                          self._database['objects_to_add'].read(),
+                                          spectra_raw_all)
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
             data_obj.write(base)

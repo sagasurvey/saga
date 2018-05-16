@@ -77,8 +77,6 @@ def initialize_base_catalog(base):
     base['OBJ_NSAID'] = np.int32(-1)
 
     empty_str_arr = get_empty_str_array(len(base), 48)
-    base['HOST_SAGA_NAME'] = empty_str_arr
-    base['HOST_NGC_NAME'] = empty_str_arr
     base['MASKNAME'] = empty_str_arr
     base['SPECOBJID'] = empty_str_arr
     base['SPEC_REPEAT'] = empty_str_arr
@@ -91,7 +89,7 @@ def initialize_base_catalog(base):
     return base
 
 
-def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
+def add_host_info(base, host, overwrite_if_different_host=False):
     """
     Add host information to the base catalog (for a single host).
 
@@ -101,7 +99,6 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     ----------
     base : astropy.table.Table
     host : astropy.table.Row
-    saga_names : astropy.table.Table or None, optional
     overwrite_if_different_host : bool, optional
 
     Returns
@@ -112,6 +109,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
         raise ValueError('Host info exists and differs from input host info.')
 
     base['HOST_NSAID'] = np.int32(host['NSAID'])
+    base['HOST_NSA1ID'] = np.int32(host['NSA1ID'])
     base['HOST_RA'] = np.float32(host['RA'])
     base['HOST_DEC'] = np.float32(host['Dec'])
     base['HOST_DIST'] = np.float32(host['distance'])
@@ -119,19 +117,14 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     base['HOST_MK'] = np.float32(host['M_K'])
     base['HOST_MR'] = np.float32(host['M_r'])
     base['HOST_MG'] = np.float32(host['M_g'])
+    base['HOST_SAGA_NAME'] = get_empty_str_array(len(base), 48, host['SAGA_name'] or '')
+    base['HOST_NGC_NAME'] = np.int32(host['NGC'])
 
     host_sc = SkyCoord(host['RA'], host['Dec'], unit='deg')
     base = add_skycoord(base)
     sep = base['coord'].separation(host_sc)
     base['RHOST_ARCM'] = sep.arcmin.astype(np.float32)
     base['RHOST_KPC'] = (np.sin(sep.radian) * (1000.0 * host['distance'])).astype(np.float32)
-    del sep
-
-    if saga_names:
-        idx = np.flatnonzero(saga_names['NSA'] == host['NSAID'])
-        if len(idx) == 1:
-            base['HOST_SAGA_NAME'] = saga_names['SAGA'][idx]
-            base['HOST_NGC_NAME'] = saga_names['NGC'][idx]
 
     return base
 
@@ -710,14 +703,14 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
+def build_full_stack(base, host, wise=None, nsa=None,
                      objects_to_remove=None, objects_to_add=None, spectra=None):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
 
     >>> initialize_base_catalog(base)
-    >>> add_host_info(base, host, saga_names)
+    >>> add_host_info(base, host)
     >>> add_wise(base, wise)
     >>> remove_human_inspected(base, objects_to_remove)
     >>> remove_too_close_to_host(base)
@@ -741,7 +734,6 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     ----------
     base : astropy.table.Table
     host : astropy.table.Row
-    saga_names : astropy.table.Table
     wise : astropy.table.Table
     nsa : astropy.table.Table
     objects_to_remove : astropy.table.Table
@@ -753,7 +745,7 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     base : astropy.table.Table
     """
     base = initialize_base_catalog(base)
-    base = add_host_info(base, host, saga_names)
+    base = add_host_info(base, host)
     if wise is not None:
         base = add_wise(base, wise)
     if objects_to_remove is not None:
