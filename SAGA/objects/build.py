@@ -703,8 +703,8 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(base, host, wise=None, nsa=None,
-                     objects_to_remove=None, objects_to_add=None, spectra=None):
+def build_full_stack(sdss, host, wise=None, nsa=None, spectra=None,
+                     sdss_remove=None, sdss_recover=None, **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
@@ -712,11 +712,11 @@ def build_full_stack(base, host, wise=None, nsa=None,
     >>> initialize_base_catalog(base)
     >>> add_host_info(base, host)
     >>> add_wise(base, wise)
-    >>> remove_human_inspected(base, objects_to_remove)
+    >>> remove_human_inspected(base, sdss_remove)
     >>> remove_too_close_to_host(base)
     >>> remove_shreds_with_nsa(base, nsa)
     >>> remove_bad_photometry(base)
-    >>> recover_whitelisted_objects(base, objects_to_add)
+    >>> recover_whitelisted_objects(base, sdss_recover)
     >>> apply_manual_fixes(base)
     >>> add_spectra(base, spectra)
     >>> clean_sdss_spectra(base)
@@ -744,18 +744,19 @@ def build_full_stack(base, host, wise=None, nsa=None,
     -------
     base : astropy.table.Table
     """
+    base = sdss
     base = initialize_base_catalog(base)
     base = add_host_info(base, host)
     if wise is not None:
         base = add_wise(base, wise)
-    if objects_to_remove is not None:
-        base = remove_human_inspected(base, objects_to_remove)
+    if sdss_remove is not None:
+        base = remove_human_inspected(base, sdss_remove)
     base = remove_too_close_to_host(base)
     if nsa is not None:
         base = remove_shreds_with_nsa(base, nsa)
     base = remove_bad_photometry(base)
-    if objects_to_add is not None:
-        base = recover_whitelisted_objects(base, objects_to_add)
+    if sdss_recover is not None:
+        base = recover_whitelisted_objects(base, sdss_recover)
     base = apply_manual_fixes(base)
     if spectra:
         base = add_spectra(base, spectra)

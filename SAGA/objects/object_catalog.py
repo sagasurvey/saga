@@ -179,17 +179,20 @@ class ObjectCatalog(object):
 
 
     def load_nsa(self, version='0.1.2'):
-        nsa = self._database['nsa_v{}'.format(version)].read()[build.NSA_COLS_USED]
+        nsa = self._database['nsa_v{}'.format(version)].read()
         if version == '0.1.2':
+            nsa = nsa[build.NSA_COLS_USED]
             for nsaid, fixes in fixes_to_nsa_v012.items():
                 fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
             # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
             nsa = Query('NSAID != 64408').filter(nsa)
+        elif version == '1.0.1':
+            nsa = nsa[build2.NSA_COLS_USED]
         nsa = add_skycoord(nsa)
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=1):
         """
         This function build base catalog and write to the database.
 
@@ -227,11 +230,13 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+        build_module = build if version == 1 else build2
+        nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
+        spectra = self._database['spectra_raw_all'].read()
+        sdss_remove = self._database['objects_to_remove'].read()
+        sdss_recover = self._database['objects_to_add'].read()
 
-        nsa = self.load_nsa('0.1.2')
-        spectra_raw_all = self._database['spectra_raw_all'].read()
         host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
-
         for i, host_id in enumerate(host_ids):
 
             if base_file_path_pattern is None:
@@ -244,19 +249,20 @@ class ObjectCatalog(object):
                 continue
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Building base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
-            try:
-                wise = self._database['wise', host_id].read()[build.WISE_COLS_USED]
-            except OSError:
-                wise = None
 
-            base = build.build_full_stack(self._database['sdss', host_id].read(),
-                                          self._host_catalog.load_single(host_id),
-                                          wise, nsa,
-                                          self._database['objects_to_remove'].read(),
-                                          self._database['objects_to_add'].read(),
-                                          spectra_raw_all)
+            host = self._host_catalog.load_single(host_id)
+            catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
+
+            def get_catalog_or_none(catalog_name):
+                try:
+                    cat = self._database[catalog_name, host_id].read()
+                except OSError:
+                    return None
+                return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
+
+            base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
+                                                 sdss_remove=sdss_remove, sdss_recover=sdss_recover,
+                                                 **{k: get_catalog_or_none(k) for k in catalogs})
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
             data_obj.write(base)
-
-        #TODO: extract all cleaned specs!

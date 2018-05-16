@@ -40,6 +40,14 @@ NSA_COLS_USED = list(_NSA_COLS_USED)
 _SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
 
+def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
+    catalog = add_skycoord(catalog)
+    catalog = catalog[catalog['coord'].separation(host['coord']).deg < radius_deg]
+    if remove_coord:
+        del catalog['coord']
+    return catalog
+
+
 def arcsec2dist(sep, r=1.0):
     return np.sin(np.deg2rad(sep / 3600.0 / 2.0)) * 2.0 * r
 
@@ -270,6 +278,20 @@ def merge_spectra(specs):
     return specs
 
 
+def add_columns_for_spectra(base):
+    base['RA_spec'] = np.nan
+    base['DEC_spec'] = np.nan
+    base['SPEC_Z'] = np.float32(-1)
+    base['SPEC_Z_ERR'] = np.float32(-1)
+    base['ZQUALITY'] = np.int16(-1)
+    base['TELNAME'] = get_empty_str_array(len(base), 6)
+    base['MASKNAME'] = get_empty_str_array(len(base), 48)
+    base['SPECOBJID'] = get_empty_str_array(len(base), 48)
+    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
+    base['OBJ_NSAID'] = np.int32(-1)
+    return base
+
+
 def add_spectra(base, specs):
     if 'coord' in specs.colnames:
         del specs['coord']
@@ -322,26 +344,18 @@ def add_spectra(base, specs):
 
     del base['index'], base['no_spec_yet'], specs['coord'], specs_idx, base_idx, sep, specs_idx_edges
 
-    base['RA_spec'] = np.nan
-    base['DEC_spec'] = np.nan
-    base['SPEC_Z'] = np.float32(-1)
-    base['SPEC_Z_ERR'] = np.float32(-1)
-    base['ZQUALITY'] = np.int16(-1)
-    base['TELNAME'] = get_empty_str_array(len(base), 6)
-    base['MASKNAME'] = get_empty_str_array(len(base), 48)
-    base['SPECOBJID'] = get_empty_str_array(len(base), 48)
-    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
-    base['OBJ_NSAID'] = np.int32(-1)
-
     specs.sort('matched_idx')
     start_idx = np.flatnonzero(specs['matched_idx'] > -1)[0]
     for col in ('RA_spec', 'DEC_spec', 'SPEC_Z', 'SPEC_Z_ERR', 'ZQUALITY',
                 'TELNAME', 'MASKNAME', 'SPECOBJID', 'SPEC_REPEAT', 'OBJ_NSAID'):
         base[col][specs['matched_idx'][start_idx:]] = specs[col.replace('_spec', '')][start_idx:]
 
-    start_idx2 = np.flatnonzero(specs['matched_idx'] > -2)[0]
-    for spec in specs[start_idx2:start_idx]:
-        if spec['SPEC_REPEAT'] != 'GAMA':
+    specs_warn = specs[np.flatnonzero(specs['matched_idx'] > -2)[0]:start_idx]
+    specs_warn = specs_warn[specs_warn['SPEC_REPEAT'] != 'GAMA']
+    if len(specs_warn) > 100:
+        logging.warning('More than 100 spec objects have no match... something is very wrong!')
+    else:
+        for spec in specs_warn:
             logging.warning('No photo obj matched to {} spec obj {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
 
     del specs['matched_idx']
@@ -438,7 +452,8 @@ def add_surface_brightness(base):
 
 
 def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
-                     sdss_remove=None, sdss_recover=None, spectra=None, debug=None):
+                     sdss_remove=None, sdss_recover=None, spectra=None,
+                     debug=None, **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
@@ -447,7 +462,11 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     -------
     base : astropy.table.Table
     """
+    if sdss is None and des is None and decals is None:
+        raise ValueError('No photometry catalog to build!')
+
     all_spectra = []
+
     if sdss is not None:
         all_spectra.append(extract_sdss_spectra(sdss))
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
@@ -459,18 +478,22 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         decals = prepare_decals_catalog_for_merging(decals)
 
     if nsa is not None:
-        all_spectra.append(extract_nsa_spectra(nsa))
+        nsa = filter_nearby_object(nsa, host)
+        if len(nsa):
+            all_spectra.append(extract_nsa_spectra(nsa))
+        else:
+            nsa = None
 
     if spectra is not None:
-        if 'coord' in spectra.colnames:
-            del spectra['coord']
-        all_spectra.append(spectra)
+        spectra = filter_nearby_object(spectra, host)
+        if len(spectra):
+            all_spectra.append(spectra)
 
     base = merge_catalogs(sdss=sdss, des=des, decals=decals)
+    base = build.add_host_info(base, host)
     del sdss, des, decals, spectra
 
-    base = build.add_host_info(base, host)
-
+    base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
         all_spectra_merged = merge_spectra(all_spectra)
@@ -480,6 +503,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         base = add_spectra(base, all_spectra_merged)
         del all_spectra_merged
         base = remove_shreds_near_spec_obj(base, nsa)
+        del nsa
 
     base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
     base = add_surface_brightness(base)
