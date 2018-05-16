@@ -44,12 +44,13 @@ class ObjectCatalog(object):
 
     @staticmethod
     def _annotate_catalog(table, to_add_skycoord=True):
-        for b in get_sdss_bands():
-            table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
+        if 'EXTINCTION_R' in table.colnames:
+            for b in get_sdss_bands():
+                table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
 
         for color in get_sdss_colors():
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
-            table['{}_err'.format(color)] = np.sqrt(table['{}_err'.format(color[0])]**2.0 + table['{}_err'.format(color[1])]**2.0)
+            table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
 
         if to_add_skycoord:
             table = add_skycoord(table)
