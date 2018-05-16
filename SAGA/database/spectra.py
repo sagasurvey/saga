@@ -27,18 +27,18 @@ def ensure_dtype(spectra):
 def read_gama(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    gama = file_path.read()[['RA', 'DEC', 'SPECID', 'CATAID', 'NQ', 'Z', 'SURVEY']]
-    gama = Query('NQ >= 3', (lambda x: x != 'SDSS', 'SURVEY')).filter(gama)
-    del gama['SURVEY']
-    gama.rename_column('SPECID', 'SPECOBJID')
-    gama.rename_column('CATAID', 'MASKNAME')
-    gama.rename_column('NQ', 'ZQUALITY')
-    gama.rename_column('Z', 'SPEC_Z')
-    gama['SPEC_Z_ERR'] = np.float32(60)
-    gama['TELNAME'] = get_empty_str_array(len(gama), 6, 'GAMA')
-    gama['ZQUALITY'][Query('ZQUALITY > 4').mask(gama)] = 4
+    specs = file_path.read()['RA', 'DEC', 'SPECID', 'CATAID', 'NQ', 'Z', 'SURVEY']
+    specs = Query('NQ >= 3', (lambda x: x != 'SDSS', 'SURVEY')).filter(specs)
+    del specs['SURVEY']
+    specs.rename_column('SPECID', 'SPECOBJID')
+    specs.rename_column('CATAID', 'MASKNAME')
+    specs.rename_column('NQ', 'ZQUALITY')
+    specs.rename_column('Z', 'SPEC_Z')
+    specs['SPEC_Z_ERR'] = np.float32(60)
+    specs['TELNAME'] = get_empty_str_array(len(specs), 6, 'GAMA')
+    specs['ZQUALITY'][Query('ZQUALITY > 4').mask(specs)] = 4
 
-    return ensure_dtype(gama)
+    return ensure_dtype(specs)
 
 
 def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
@@ -146,12 +146,12 @@ def read_deimos():
     data = {
         'RA'         : [247.825839103498, 221.86742, 150.12470],
         'DEC'        : [20.210825313885, -0.28144459, 32.561687],
-        'MASKNAME'   : ['deimos2014', 'deimos2016-DN1','deimos2016-MD1'],
-        'SPECOBJID'  : [0,0,0],
+        'MASKNAME'   : ['deimos2014', 'deimos2016-DN1', 'deimos2016-MD1'],
+        'SPECOBJID'  : [0, 0, 0],
         'SPEC_Z'     : [2375.0/3.0e5, 0.056, 1.08],
         'SPEC_Z_ERR' : [0.001, 0.001, 0.001],
         'ZQUALITY'   : [4, 4, 4],
-        'TELNAME'    : ['DEIMOS','DEIMOS','DEIMOS'],
+        'TELNAME'    : ['DEIMOS', 'DEIMOS', 'DEIMOS'],
     }
     return ensure_dtype(Table(data))
 
@@ -165,7 +165,7 @@ def read_palomar():
         'SPEC_Z'     : [0.0907, 0.0524],
         'SPEC_Z_ERR' : [0.0001, 0.0001],
         'ZQUALITY'   : [4, 4],
-        'TELNAME'    : ['MMT','MMT'],
+        'TELNAME'    : ['MMT', 'MMT'],
     }
     return ensure_dtype(Table(data))
 
@@ -173,37 +173,39 @@ def read_palomar():
 def read_6dF(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    _6dF = file_path.read()[['RAJ2000', 'DEJ2000', '_6dFGS', 'cz', 'e_cz', 'q_cz']]
+    specs = file_path.read()['RAJ2000', 'DEJ2000', '_6dFGS', 'cz', 'e_cz', 'q_cz']
 
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
-    _6dF = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(_6dF)
-    _6dF.rename_column('_6dFGS', 'SPECOBJID')
-    _6dF.rename_column('RAJ2000', 'RA')
-    _6dF.rename_column('DEJ2000', 'DEC')
-    _6dF.rename_column('q_cz', 'ZQUALITY')
-    _6dF.rename_column('cz', 'SPEC_Z')
-    _6dF.rename_column('e_cz','SPEC_Z_ERR')
-    _6dF['TELNAME'] = get_empty_str_array(len(_6dF), 6, '6dF')
+    specs = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(specs)
+    specs.rename_column('_6dFGS', 'SPECOBJID')
+    specs.rename_column('RAJ2000', 'RA')
+    specs.rename_column('DEJ2000', 'DEC')
+    specs.rename_column('q_cz', 'ZQUALITY')
+    specs.rename_column('cz', 'SPEC_Z')
+    specs.rename_column('e_cz','SPEC_Z_ERR')
+    specs['TELNAME'] = '6dF'
+    specs['MASKNAME'] = '6dF'
 
-    return ensure_dtype(_6dF)
+    return ensure_dtype(specs)
 
 
 def read_2dF(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    _2dF = file_path.read()[['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z', 'n_z']]
+    specs = file_path.read()['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z']
 
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
-    _2dF = Query('q_z >= 3').filter(_2dF)
-    _2dF.rename_column('Name', 'SPECOBJID')
-    _2dF.rename_column('RAJ2000', 'RA')
-    _2dF.rename_column('DEJ2000', 'DEC')
-    _2dF.rename_column('q_z', 'ZQUALITY')
-    _2dF.rename_column('z', 'SPEC_Z')
-    _2dF['SPEC_Z_ERR'] = 60
-    _2dF['TELNAME'] = get_empty_str_array(len(_2dF), 6, '2dF')
+    specs = Query('q_z >= 3').filter(specs)
+    specs.rename_column('Name', 'SPECOBJID')
+    specs.rename_column('RAJ2000', 'RA')
+    specs.rename_column('DEJ2000', 'DEC')
+    specs.rename_column('q_z', 'ZQUALITY')
+    specs.rename_column('z', 'SPEC_Z')
+    specs['SPEC_Z_ERR'] = 60
+    specs['TELNAME'] = '2dF'
+    specs['MASKNAME'] = '2dF'
 
-    return ensure_dtype(_2dF)
+    return ensure_dtype(specs)
 
 
 def extract_sdss_spectra(sdss):
