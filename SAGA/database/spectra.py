@@ -8,7 +8,7 @@ from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
-           'read_wiyn', 'read_deimos', 'extract_sdss_spectra',
+           'read_wiyn', 'read_deimos', 'read_palomar', 'extract_sdss_spectra',
            'extract_nsa_spectra', 'SpectraData']
 
 
@@ -156,6 +156,20 @@ def read_deimos():
     return ensure_dtype(Table(data))
 
 
+def read_palomar():
+    data = {
+        'RA'         : [248.048926969, 335.696461603],
+        'DEC'        : [19.902625348, -3.311516291],
+        'MASKNAME'   : ['PAL', 'PAL'],
+        'SPECOBJID'  : ['', ''],
+        'SPEC_Z'     : [0.0907, 0.0524],
+        'SPEC_Z_ERR' : [0.0001, 0.0001],
+        'ZQUALITY'   : [4, 4],
+        'TELNAME'    : ['MMT','MMT'],
+    }
+    return ensure_dtype(Table(data))
+
+
 def extract_sdss_spectra(sdss):
     specs = Query('SPEC_Z > -1.0').filter(sdss['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN'])
     specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
@@ -194,6 +208,9 @@ class SpectraData(object):
                 read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
                 read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
             ])
-        all_specs.append(read_deimos())
+        all_specs.extend([
+            read_deimos(),
+            read_palomar(),
+        ])
         all_specs = vstack(all_specs, 'exact', 'error')
         return add_skycoord(all_specs) if add_coord else all_specs
