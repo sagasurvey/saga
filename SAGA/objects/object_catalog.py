@@ -5,7 +5,7 @@ from easyquery import Query
 from . import cuts as C
 from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
 from .manual_fixes import fixes_to_nsa_v012
-from ..database import FitsTable
+from ..database import FitsTable, Database
 from ..hosts import HostCatalog
 from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord, fill_values_by_query
 
@@ -37,8 +37,8 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
-    def __init__(self, database):
-        self._database = database
+    def __init__(self, database=None):
+        self._database = database or Database()
         self._host_catalog = HostCatalog(self._database)
 
 

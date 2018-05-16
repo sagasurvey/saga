@@ -6,7 +6,9 @@ This file defines the HostCatalog class
 from collections import defaultdict, Iterable
 import numpy as np
 from easyquery import Query
-from astropy.coordinates import SkyCoord
+
+from ..database import Database
+from ..utils import add_skycoord
 
 __all__ = ['HostCatalog']
 
@@ -58,6 +60,7 @@ class HostCatalog(object):
 
     _predefined_queries = {
         'all': Query(),
+        'no_sdss_flags': Query(),
         'paper1': Query((lambda x: np.in1d(x, _paper1_complete_nsa + _paper1_incomplete_nsa), 'NSAID')),
         'paper1_complete': Query((lambda x: np.in1d(x, _paper1_complete_nsa), 'NSAID')),
         'paper1_incomplete': Query((lambda x: np.in1d(x, _paper1_incomplete_nsa), 'NSAID')),
@@ -75,26 +78,27 @@ class HostCatalog(object):
     }
 
 
-    def __init__(self, database):
-        self._database = database
-        try:
-            self._hosts = self._database['hosts'].read()
-        except FileNotFoundError:
-            self._hosts = None
-            self._host_index = dict()
-        else:
-            index = defaultdict(list)
-            for i, n in enumerate(self._hosts['SAGA_name']):
-                n = str(n)
-                if n.strip() and n != '--':
-                    index[n.strip().replace(' ', '').lower()].append(i)
-            for col in ['NSAID', 'NSA1ID', 'PGC', 'NGC', 'UGC']:
-                for i, n in enumerate(self._hosts[col]):
-                    n = int(n)
-                    if n > -1:
-                        index['{}{}'.format(col[:3].lower(), n)].append(i)
-                        index[n].append(i)
-            self._host_index = {k: tuple(v) for k, v in index.items()}
+    def __init__(self, database=None):
+        self._database = database or Database()
+        self._hosts = None
+        self._host_index = dict()
+        self._index_hosts()
+
+
+    def _index_hosts(self):
+        self._hosts = self._database['hosts'].read()
+        index = defaultdict(list)
+        for i, n in enumerate(self._hosts['SAGA_name']):
+            n = str(n or '')
+            if n.strip() and n != '--':
+                index[n.strip().replace(' ', '').lower()].append(i)
+        for col in ['NSAID', 'NSA1ID', 'PGC', 'NGC', 'UGC']:
+            for i, n in enumerate(self._hosts[col]):
+                n = int(n)
+                if n > -1:
+                    index['{}{}'.format(col[:3].lower(), n)].append(i)
+                    index[n].append(i)
+        self._host_index = {k: tuple(v) for k, v in index.items()}
 
 
     def resolve_id(self, hosts, id_to_return='NSA'):
@@ -186,7 +190,7 @@ class HostCatalog(object):
         return names[0] or ''
 
 
-    def load(self, hosts=None):
+    def load(self, hosts=None, add_coord=True):
         """
         load a host catalog
 
@@ -206,26 +210,11 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_host_catalog.load('no_flags')
         >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
-        indices = self.resolve_id(hosts or 'all', 'internal')
-        return self._annotate_catalog(self._hosts[indices])
+        cat = self._hosts[self.resolve_id(hosts or 'all', 'internal')]
+        return add_skycoord(cat, dec_label='Dec') if add_coord else cat
 
 
-    def _annotate_catalog(self, table):
-        names = []
-        for i in table['NSAID']:
-            try:
-                name = self.id_to_name(i)
-                names.append(name)
-            except KeyError:
-                names.append('')
-        table['SAGA_name'] = names
-
-        table['coord'] = SkyCoord(table['RA'], table['Dec'], unit='deg')
-
-        return table
-
-
-    def load_single(self, host):
+    def load_single(self, host, add_coord=True):
         """
         Gets the catalog row corresponding to a specific named host.
 
@@ -246,4 +235,6 @@ class HostCatalog(object):
         indices = self.resolve_id(host, 'internal')
         if len(indices) != 1:
             raise ValueError('More than one hosts found!')
-        return self._annotate_catalog(self._hosts[indices])[0]
+        cat = self._hosts[indices]
+        cat = add_skycoord(cat, dec_label='Dec') if add_coord else cat
+        return cat[0]
