@@ -68,10 +68,15 @@ class Database(object):
             'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits'), use_local_first=True),
             'spectra_gama_dr2': DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'), use_local_first=True),
             'spectra_gama': DataObject(FitsTable('http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits'), use_local_first=True),
+            'spectra_2dF': DataObject(FitsTable(os.path.join(self._root_dir, 'data', '2df_best.fit'))),
+            'spectra_6dF': DataObject(FitsTable(os.path.join(self._root_dir, 'data', '6dF_DR3.fit'))),
         }
 
         self._tables['nsa'] = self._tables['nsa_v0.1.2']
-        self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._root_dir, 'Spectra', 'Final'), self._tables['spectra_gama']), FitsTable())
+        self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._root_dir, 'Spectra', 'Final'),
+                                                                 self._tables['spectra_gama'],
+                                                                 self._tables['spectra_2dF'],
+                                                                 self._tables['spectra_6dF']))
 
         for k, v in known_google_sheets.items():
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)

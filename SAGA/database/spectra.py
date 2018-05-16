@@ -8,8 +8,8 @@ from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
-           'read_wiyn', 'read_deimos', 'read_palomar', 'extract_sdss_spectra',
-           'extract_nsa_spectra', 'SpectraData']
+           'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
+           'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData']
 
 
 def ensure_dtype(spectra):
@@ -170,6 +170,42 @@ def read_palomar():
     return ensure_dtype(Table(data))
 
 
+def read_6dF(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FitsTable(file_path)
+    _6dF = file_path.read()[['RAJ2000', 'DEJ2000', '_6dFGS', 'cz', 'e_cz', 'q_cz']]
+
+    # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    _6dF = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(_6dF)
+    _6dF.rename_column('_6dFGS', 'SPECOBJID')
+    _6dF.rename_column('RAJ2000', 'RA')
+    _6dF.rename_column('DEJ2000', 'DEC')
+    _6dF.rename_column('q_cz', 'ZQUALITY')
+    _6dF.rename_column('cz', 'SPEC_Z')
+    _6dF.rename_column('e_cz','SPEC_Z_ERR')
+    _6dF['TELNAME'] = get_empty_str_array(len(_6dF), 6, '6dF')
+
+    return ensure_dtype(_6dF)
+
+
+def read_2dF(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FitsTable(file_path)
+    _2dF = file_path.read()[['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z', 'n_z']]
+
+    # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    _2dF = Query('q_z >= 3').filter(_2dF)
+    _2dF.rename_column('Name', 'SPECOBJID')
+    _2dF.rename_column('RAJ2000', 'RA')
+    _2dF.rename_column('DEJ2000', 'DEC')
+    _2dF.rename_column('q_z', 'ZQUALITY')
+    _2dF.rename_column('z', 'SPEC_Z')
+    _2dF['SPEC_Z_ERR'] = 60
+    _2dF['TELNAME'] = get_empty_str_array(len(_2dF), 6, '2dF')
+
+    return ensure_dtype(_2dF)
+
+
 def extract_sdss_spectra(sdss):
     specs = Query('SPEC_Z > -1.0').filter(sdss['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN'])
     specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
@@ -192,14 +228,23 @@ def extract_nsa_spectra(nsa):
 
 
 class SpectraData(object):
-    def __init__(self, spectra_dir_path=None, gama_file=None):
+    def __init__(self, spectra_dir_path=None, gama_file=None, twodf_file=None, sixdf_file=None):
         self.spectra_dir_path = spectra_dir_path
         self.gama_file = gama_file
+        self.twodf_file = twodf_file
+        self.sixdf_file = sixdf_file
 
     def read(self, add_coord=True):
         all_specs = []
         if self.gama_file is not None:
             all_specs.append(read_gama(self.gama_file))
+
+        if self.twodf_file is not None:
+            all_specs.append(read_2dF(self.twodf_file))
+
+        if self.sixdf_file is not None:
+            all_specs.append(read_6dF(self.sixdf_file))
+
         if self.spectra_dir_path is not None:
             all_specs.extend([
                 read_mmt(os.path.join(self.spectra_dir_path, 'MMT')),
@@ -208,9 +253,12 @@ class SpectraData(object):
                 read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
                 read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
             ])
+
         all_specs.extend([
             read_deimos(),
             read_palomar(),
         ])
+
         all_specs = vstack(all_specs, 'exact', 'error')
+
         return add_skycoord(all_specs) if add_coord else all_specs
