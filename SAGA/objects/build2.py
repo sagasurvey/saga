@@ -211,7 +211,10 @@ def merge_catalogs(**catalog_dict):
 
     group_id_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']), [1])))
     for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        stacked_catalog['chosen'][i] = 2 if (j-i == 1 or n_catalogs == 1) else assign_choice(stacked_catalog['survey'][i:j])
+        if j-i == 1 or n_catalogs == 1:
+            stacked_catalog['chosen'][i] = 2
+        else:
+            stacked_catalog['chosen'][i:j] = assign_choice(stacked_catalog['survey'][i:j])
 
     merged_catalog = Query('chosen == 2').filter(stacked_catalog)
     for name in catalog_dict:
