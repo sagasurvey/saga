@@ -513,18 +513,16 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
-        all_spectra_merged = merge_spectra(all_spectra)
+        all_spectra = merge_spectra(all_spectra)
         if debug is not None:
-            debug['all_spectra'] = all_spectra
+            debug['all_spectra'] = all_spectra.copy()
+        base = add_spectra(base, all_spectra)
         del all_spectra
-        base = add_spectra(base, all_spectra_merged)
-        del all_spectra_merged
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
     base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
     base = add_surface_brightness(base)
-    base = build.find_satellites(base)
-    base['SATS'][base['RHOST_ARCM'].argmin()] = 3
+    base = build.find_satellites(base, version=2)
 
     return base
