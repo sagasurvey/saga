@@ -232,6 +232,11 @@ def merge_catalogs(**catalog_dict):
     del merged_catalog['group_id']
     del merged_catalog['chosen']
 
+    for name in catalog_dict:
+        fill_values_by_query(merged_catalog,
+                             Query('OBJID_{} == 999999'.format(name), 'REMOVE_{} == 999999'.format(name)),
+                             {'OBJID_{}'.format(name): -1, 'REMOVE_{}'.format(name): -1, 'is_galaxy_{}'.format(name): False})
+
     return merged_catalog
 
 
