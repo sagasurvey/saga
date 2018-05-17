@@ -197,7 +197,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=1):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2):
         """
         This function build base catalog and write to the database.
 
@@ -215,6 +215,8 @@ class ObjectCatalog(object):
             If set to True, overwrite existing base catalog
 
         base_file_path_pattern : str, optional
+
+        version : int, optional
 
         Examples
         --------
