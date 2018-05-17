@@ -267,7 +267,7 @@ class ObjectCatalog(object):
 
             catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join(catalog_dict), host_id))
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join((k for k, v in catalog_dict.items() if v is not None)), host_id))
 
             base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
                                                  sdss_remove=sdss_remove, sdss_recover=sdss_recover,
