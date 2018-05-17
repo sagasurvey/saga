@@ -2,7 +2,9 @@ import os
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.coordinates import SkyCoord
+import astropy.constants
 from easyquery import Query
+
 from .core import FitsTable
 from ..utils import get_empty_str_array, add_skycoord
 
@@ -10,6 +12,9 @@ from ..utils import get_empty_str_array, add_skycoord
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
            'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
            'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData']
+
+
+_SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
 
 def ensure_dtype(spectra):
@@ -182,6 +187,7 @@ def read_6dF(file_path):
     specs.rename_column('DEJ2000', 'DEC')
     specs.rename_column('q_cz', 'ZQUALITY')
     specs.rename_column('cz', 'SPEC_Z')
+    specs['SPEC_Z'] /= _SPEED_OF_LIGHT
     specs.rename_column('e_cz','SPEC_Z_ERR')
     specs['TELNAME'] = '6dF'
     specs['MASKNAME'] = '6dF'
