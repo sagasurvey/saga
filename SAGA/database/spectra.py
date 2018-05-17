@@ -182,12 +182,12 @@ def read_6dF(file_path):
 
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
     specs = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(specs)
+    specs['SPEC_Z'] = specs['cz'] / _SPEED_OF_LIGHT
+    del specs['cz']
     specs.rename_column('_6dFGS', 'SPECOBJID')
     specs.rename_column('RAJ2000', 'RA')
     specs.rename_column('DEJ2000', 'DEC')
     specs.rename_column('q_cz', 'ZQUALITY')
-    specs.rename_column('cz', 'SPEC_Z')
-    specs['SPEC_Z'] /= _SPEED_OF_LIGHT
     specs.rename_column('e_cz','SPEC_Z_ERR')
     specs['TELNAME'] = '6dF'
     specs['MASKNAME'] = '6dF'
