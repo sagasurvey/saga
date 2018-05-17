@@ -52,14 +52,14 @@ def arcsec2dist(sep, r=1.0):
     return np.sin(np.deg2rad(sep / 3600.0 / 2.0)) * 2.0 * r
 
 
-def get_fof_group_id(catalog, linking_length_arcsec):
+def get_fof_group_id(catalog, linking_length_arcsec, reassign_group_indices=False):
     if 'coord' in catalog.colnames:
         sc = catalog['coord']
     else:
         sc = SkyCoord(catalog['RA'], catalog['DEC'], unit='deg')
     return find_friends_of_friends(sc.cartesian.xyz.value.T,
                                    arcsec2dist(linking_length_arcsec),
-                                   reassign_group_indices=False)
+                                   reassign_group_indices=reassign_group_indices)
 
 
 def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
@@ -177,31 +177,41 @@ def merge_catalogs(**catalog_dict):
 
     catalog_dict = {k: v for k, v in catalog_dict.items() if v is not None}
     n_catalogs = len(catalog_dict)
-    stacked_catalog = vstack(list(catalog_dict.values()), 'exact', 'error')
-    stacked_catalog['survey'] = get_empty_str_array(len(stacked_catalog), max(len(s) for s in catalog_dict))
-    i = 0
-    for name, cat in catalog_dict.items():
-        stacked_catalog['survey'][i:i+len(cat)] = name
-        i += len(cat)
 
-    group_id = get_fof_group_id(stacked_catalog, 3.0)
-    for sep in (2.0, 1.0):
-        _, group_id, counts = np.unique(group_id, return_inverse=True, return_counts=True)
-        group_id_shift = group_id.max() + 1
-        regroup_mask = (counts[group_id] > n_catalogs)
-        if not regroup_mask.any():
-            break
-        group_id[regroup_mask] = get_fof_group_id(stacked_catalog[regroup_mask], sep)
-        group_id[regroup_mask] += group_id_shift
-    stacked_catalog['group_id'] = group_id
-    del group_id, regroup_mask
+    if n_catalogs == 0:
+        raise ValueError('No catalogs to merge!!')
+
+    elif n_catalogs == 1:
+        survey, stacked_catalog = next(iter(catalog_dict.items()))
+        stacked_catalog['survey'] = get_empty_str_array(len(stacked_catalog), max(6, len(survey)), survey)
+        stacked_catalog['group_id'] = get_fof_group_id(stacked_catalog, 1.0, True)
+
+    else:
+        stacked_catalog = vstack(list(catalog_dict.values()), 'exact', 'error')
+        stacked_catalog['survey'] = get_empty_str_array(len(stacked_catalog), max(6, max(len(s) for s in catalog_dict)))
+        i = 0
+        for name, cat in catalog_dict.items():
+            stacked_catalog['survey'][i:i+len(cat)] = name
+            i += len(cat)
+
+        group_id = get_fof_group_id(stacked_catalog, 3.0)
+        for sep in (2.0, 1.0):
+            _, group_id, counts = np.unique(group_id, return_inverse=True, return_counts=True)
+            group_id_shift = group_id.max() + 1
+            regroup_mask = (counts[group_id] > n_catalogs)
+            if not regroup_mask.any():
+                break
+            group_id[regroup_mask] = get_fof_group_id(stacked_catalog[regroup_mask], sep)
+            group_id[regroup_mask] += group_id_shift
+        stacked_catalog['group_id'] = group_id
+        del group_id, regroup_mask
 
     stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
     stacked_catalog['chosen'] = 0
 
     group_id_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']), [1])))
     for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        stacked_catalog['chosen'][i:j] = 2 if (j-i == 1) else assign_choice(stacked_catalog['survey'][i:j])
+        stacked_catalog['chosen'][i] = 2 if (j-i == 1 or n_catalogs == 1) else assign_choice(stacked_catalog['survey'][i:j])
 
     merged_catalog = Query('chosen == 2').filter(stacked_catalog)
     for name in catalog_dict:
