@@ -8,7 +8,7 @@ import numpy as np
 from easyquery import Query
 
 from ..database import Database
-from ..utils import add_skycoord
+from ..utils import add_skycoord, find_near_ra_dec
 
 __all__ = ['HostCatalog']
 
@@ -237,4 +237,17 @@ class HostCatalog(object):
             raise ValueError('More than one hosts found!')
         cat = self._hosts[indices]
         cat = add_skycoord(cat, dec_label='Dec') if add_coord else cat
+        return cat[0]
+
+
+    def load_single_near_ra_dec(self, ra, dec):
+        """
+        ra, dec in degrees
+        """
+        add_skycoord(self._hosts, dec_label='Dec')
+        cat = find_near_ra_dec(self._hosts, ra, dec, 3603.0)
+        if len(cat) == 0:
+            raise KeyError('No hosts found!')
+        if len(cat) != 1:
+            raise ValueError('More than one hosts found!')
         return cat[0]
