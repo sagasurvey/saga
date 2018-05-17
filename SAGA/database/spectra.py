@@ -230,22 +230,15 @@ def extract_nsa_spectra(nsa):
 
 
 class SpectraData(object):
-    def __init__(self, spectra_dir_path=None, gama_file=None, twodf_file=None, sixdf_file=None):
+    def __init__(self, spectra_dir_path=None, external_specs_dict=None):
         self.spectra_dir_path = spectra_dir_path
-        self.gama_file = gama_file
-        self.twodf_file = twodf_file
-        self.sixdf_file = sixdf_file
+        self._external_specs_dict = external_specs_dict or {}
 
     def read(self, add_coord=True):
         all_specs = []
-        if self.gama_file is not None:
-            all_specs.append(read_gama(self.gama_file))
 
-        if self.twodf_file is not None:
-            all_specs.append(read_2dF(self.twodf_file))
-
-        if self.sixdf_file is not None:
-            all_specs.append(read_6dF(self.sixdf_file))
+        all_specs.extend((globals()['read_{}'.format(k)](v) \
+                for k, v in self._external_specs_dict.items()))
 
         if self.spectra_dir_path is not None:
             all_specs.extend([

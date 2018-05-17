@@ -79,7 +79,7 @@ class ObjectCatalog(object):
         return table[columns]
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, paper1=False):
         """
         load object catalogs (aka "base catalogs")
 
@@ -102,6 +102,8 @@ class ObjectCatalog(object):
 
         columns : list, optional
             If set, only load a subset of columns
+
+        paper1 : bool, optional
 
         Returns
         -------
@@ -136,8 +138,8 @@ class ObjectCatalog(object):
         if return_as[0] not in 'sli':
             raise ValueError('`return_as` should be "list", "stacked", or "iter"')
 
-        if has_spec:
-            t = self._database['spectra_clean'].read()
+        if has_spec and paper1:
+            t = self._database['saga_spectra_May2017'].read()
 
             if hosts is not None:
                 host_ids = self._host_catalog.resolve_id(hosts, 'NSA')
@@ -158,15 +160,17 @@ class ObjectCatalog(object):
 
         else:
             q = Query(cuts)
-            if has_spec is not None:
-                q = q & (~C.has_spec)
+            if has_spec:
+                q &= C.has_spec
+            elif has_spec is not None:
+                q &= (~C.has_spec)
 
             hosts = self._host_catalog.resolve_id(hosts or 'all', 'string')
 
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
 
-            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
+            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base_v1' if paper1 else 'base', host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
@@ -249,7 +253,7 @@ class ObjectCatalog(object):
                 print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog of {} already exists.'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
                 continue
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Building base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Start to base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
 
             host = self._host_catalog.load_single(host_id)
             catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
@@ -261,9 +265,14 @@ class ObjectCatalog(object):
                     return None
                 return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
 
+            catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
+
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join(catalog_dict), host_id))
+
             base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
                                                  sdss_remove=sdss_remove, sdss_recover=sdss_recover,
-                                                 **{k: get_catalog_or_none(k) for k in catalogs})
+                                                 **catalog_dict)
+            del catalog_dict
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
             data_obj.write(base)
