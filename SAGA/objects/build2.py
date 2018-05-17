@@ -83,7 +83,10 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         'SATURATED != 0',
         'BAD_COUNTS_ERROR != 0',
         (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'),
+        'abs(r_mag - i_mag) > 10',
+        'abs(g_mag - r_mag) > 10',
     ]
+
     if to_remove:
         ids_to_remove = build._get_unique_objids(to_remove['SDSS ID'])
         remove_queries.append((lambda x: np.in1d(x, ids_to_remove), 'OBJID'))
@@ -155,6 +158,7 @@ def prepare_decals_catalog_for_merging(catalog):
         Query('NOBS_G == 0', 'NOBS_R == 0'),
         'r_mag >= 25',
     ])
+
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
