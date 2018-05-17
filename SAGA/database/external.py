@@ -497,8 +497,8 @@ def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
 
         try:
             query_obj.download_as_file(path, overwrite=overwrite, compress=compress)
-        except (IOError, OSError, RuntimeError) as e:
-            print(e.args[0])
+        except (IOError, OSError, RuntimeError, requests.RequestException) as e:
+            print(e)
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Fail to get catalog for host {}'.format(host_id))
             failed[i] = True
         else:
