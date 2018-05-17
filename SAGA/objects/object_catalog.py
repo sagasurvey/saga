@@ -234,8 +234,8 @@ class ObjectCatalog(object):
         build_module = build if version == 1 else build2
         nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
         spectra = self._database['spectra_raw_all'].read()
-        sdss_remove = self._database['objects_to_remove'].read()
-        sdss_recover = self._database['objects_to_add'].read()
+        sdss_remove = self._database['sdss_remove'].read()
+        sdss_recover = self._database['sdss_recover'].read()
 
         host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
         for i, host_id in enumerate(host_ids):

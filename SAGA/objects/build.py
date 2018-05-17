@@ -210,8 +210,6 @@ def remove_too_close_to_host(base):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
 
     Returns
     -------
@@ -330,8 +328,6 @@ def remove_bad_photometry(base):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
 
     Returns
     -------
@@ -350,7 +346,7 @@ def remove_bad_photometry(base):
     return base
 
 
-def recover_whitelisted_objects(base, objects_to_add):
+def recover_whitelisted_objects(base, objects_to_recover):
     """
     Use the "add list" to set REMOVE back to -1 for whitelisted objects.
     This is mainly to deal with objects that are removed by `remove_bad_photometry`
@@ -361,13 +357,13 @@ def recover_whitelisted_objects(base, objects_to_add):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_add : astropy.table.Table
+    objects_to_recover : astropy.table.Table
 
     Returns
     -------
     base : astropy.table.Table
     """
-    ids_to_add = _get_unique_objids(objects_to_add['SDSS ID'])
+    ids_to_add = _get_unique_objids(objects_to_recover['SDSS ID'])
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
     return base
 
@@ -736,8 +732,8 @@ def build_full_stack(sdss, host, wise=None, nsa=None, spectra=None,
     host : astropy.table.Row
     wise : astropy.table.Table
     nsa : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
+    sdss_remove : astropy.table.Table
+    sdss_recover : astropy.table.Table
     spectra : astropy.table.Table
 
     Returns

@@ -6,8 +6,8 @@ __all__ = ['known_google_sheets', 'Database']
 
 known_google_sheets = {
     'hosts': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
-    'objects_to_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
-    'objects_to_add': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
+    'sdss_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
+    'sdss_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'satellites_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 1),
 }
 
