@@ -14,12 +14,17 @@ import numpy as np
 
 COLUMNS_USED = ['ZQUALITY', 'REMOVE', 'PHOTPTYPE', 'FIBERMAG_R', 'SPEC_Z',
                 'RHOST_KPC', 'HOST_VHOST', 'SATS', 'OBJ_NSAID', 'HOST_NSAID',
-                'SPEC_REPEAT',
+                'SPEC_REPEAT', 'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
+
+COLUMNS_USED2 = ['ZQUALITY', 'REMOVE', 'is_galaxy', 'SPEC_Z',
+                'RHOST_KPC', 'HOST_VHOST', 'SATS', 'SPEC_REPEAT',
                 'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
 
 has_spec = Query('ZQUALITY >= 3')
 is_clean = Query('REMOVE == -1')
+is_clean2 = Query('REMOVE == 0')
 is_galaxy = Query('PHOTPTYPE == 3')
+is_galaxy2 = Query('is_galaxy')
 fibermag_r_cut = Query('FIBERMAG_R <= 23.0')
 
 faint_end_limit = Query('r_mag < 20.75')
@@ -44,3 +49,4 @@ obj_is_host = Query('OBJ_NSAID==HOST_NSAID')
 has_sdss_spec = Query((lambda c: np.fromiter(('SDSS' in i for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
 
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
+basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
