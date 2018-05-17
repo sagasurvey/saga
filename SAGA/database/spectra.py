@@ -11,18 +11,33 @@ from ..utils import get_empty_str_array, add_skycoord
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
            'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
-           'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData']
+           'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData',
+           'SPECS_COLUMNS']
 
 
 _SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
+SPECS_COLUMNS = {
+    'RA': '<f8',
+    'DEC': '<f8',
+    'SPEC_Z': '<f4',
+    'SPEC_Z_ERR': '<f4',
+    'ZQUALITY': '<i2',
+    'SPECOBJID': '<U48',
+    'MASKNAME': '<U48',
+    'TELNAME': '<U6',
+    'EM_ABS': '<i2',
+}
 
 def ensure_dtype(spectra):
-
-    dtype = {'RA':'<f8', 'DEC':'<f8', 'SPEC_Z':'<f4', 'SPEC_Z_ERR': '<f4',
-             'ZQUALITY': '<i2', 'SPECOBJID':'<U48', 'MASKNAME': '<U48', 'TELNAME': '<U6'}
-
-    for c, t in dtype.items():
+    for c, t in SPECS_COLUMNS.items():
+        if c not in spectra.colnames:
+            if t[1] == 'f':
+                spectra[c] = np.nan
+            elif t[1] == 'i':
+                spectra[c] = -1
+            elif t[1] == 'U':
+                spectra[c] = ''
         if spectra[c].dtype.str != t:
             spectra[c] = spectra[c].astype(t)
 
@@ -198,7 +213,7 @@ def read_6dF(file_path):
 def read_2dF(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    specs = file_path.read()['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z']
+    specs = file_path.read()['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z', 'n_z']
 
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
     specs = Query('q_z >= 3').filter(specs)
@@ -207,6 +222,7 @@ def read_2dF(file_path):
     specs.rename_column('DEJ2000', 'DEC')
     specs.rename_column('q_z', 'ZQUALITY')
     specs.rename_column('z', 'SPEC_Z')
+    specs.rename_column('n_z', 'EM_ABS')
     specs['SPEC_Z_ERR'] = 60
     specs['TELNAME'] = '2dF'
     specs['MASKNAME'] = '2dF'

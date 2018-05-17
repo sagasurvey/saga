@@ -306,6 +306,7 @@ def add_columns_for_spectra(base):
     base['SPEC_Z'] = np.float32(-1)
     base['SPEC_Z_ERR'] = np.float32(-1)
     base['ZQUALITY'] = np.int16(-1)
+    base['EM_ABS'] = np.int16(-1)
     base['TELNAME'] = get_empty_str_array(len(base), 6)
     base['MASKNAME'] = get_empty_str_array(len(base), 48)
     base['SPECOBJID'] = get_empty_str_array(len(base), 48)
