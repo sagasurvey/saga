@@ -48,7 +48,7 @@ class ObjectCatalog(object):
             for b in get_sdss_bands():
                 table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
 
-        for color in get_sdss_colors():
+        for color in list(get_sdss_colors()) + ['rz']:
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
             table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
 
