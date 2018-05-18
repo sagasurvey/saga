@@ -378,6 +378,32 @@ class DesQuery(object):
             shutil.copyfileobj(r.raw, f)
 
 
+class DecalsPrebuilt(object):
+
+    requires_host_id = True
+
+    def __init__(self, ra, dec, host_id):
+        try:
+            host_id = int(host_id)
+        except ValueError:
+            self.host_id = host_id
+        else:
+            self.host_id = 'nsa{}'.format(host_id)
+
+        self.data_release = 'dr6' if ensure_deg(dec) > 32 else 'dr5'
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if not compress:
+            raise ValueError('Only support compress=True!')
+        if os.path.isfile(file_path) and not overwrite:
+            return
+        r = requests.get('http://www.slac.stanford.edu/~yymao/saga/base-catalogs-non-sdss/{}_decals_{}.fits.gz'.format(self.host_id, self.data_release),
+                         headers={'Content-Type': 'application/gzip'},
+                         stream=True)
+        with open(file_path, 'wb') as f:
+            shutil.copyfileobj(r.raw, f)
+
+
 class DecalsQuery(object):
 
     columns_needed = "RELEASE BRICKID OBJID TYPE RA DEC FLUX_G FLUX_R FLUX_Z FLUX_IVAR_G FLUX_IVAR_R FLUX_IVAR_Z MW_TRANSMISSION_G MW_TRANSMISSION_R MW_TRANSMISSION_Z NOBS_G NOBS_R NOBS_Z RCHISQ_G RCHISQ_R RCHISQ_Z FRACMASKED_G FRACMASKED_R FRACMASKED_Z ALLMASK_G ALLMASK_R ALLMASK_Z FRACDEV FRACDEV_IVAR SHAPEDEV_R SHAPEDEV_R_IVAR SHAPEEXP_R SHAPEEXP_R_IVAR".split()
@@ -493,6 +519,10 @@ def download_catalogs_for_hosts(hosts, query_class, file_path_pattern,
         path = file_path_pattern.format(host_id)
 
         print(time.strftime('[%m/%d %H:%M:%S]'), 'Getting catalog for host {} ...'.format(host_id))
+
+        if getattr(query_class, 'requires_host_id', False):
+            query_class_kwargs['host_id'] = host_id
+
         query_obj = query_class(host_ra, host_dec, **query_class_kwargs)
 
         try:
