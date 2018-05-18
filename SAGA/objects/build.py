@@ -66,7 +66,7 @@ def initialize_base_catalog(base):
     -------
     base : astropy.table.Table
     """
-    base['coord'] = SkyCoord(base['RA'], base['DEC'], unit="deg")
+    base = add_skycoord(base)
 
     base['REMOVE'] = np.int16(-1)
     base['ZQUALITY'] = np.int16(-1)
@@ -77,8 +77,6 @@ def initialize_base_catalog(base):
     base['OBJ_NSAID'] = np.int32(-1)
 
     empty_str_arr = get_empty_str_array(len(base), 48)
-    base['HOST_SAGA_NAME'] = empty_str_arr
-    base['HOST_NGC_NAME'] = empty_str_arr
     base['MASKNAME'] = empty_str_arr
     base['SPECOBJID'] = empty_str_arr
     base['SPEC_REPEAT'] = empty_str_arr
@@ -91,7 +89,7 @@ def initialize_base_catalog(base):
     return base
 
 
-def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False):
+def add_host_info(base, host, overwrite_if_different_host=False):
     """
     Add host information to the base catalog (for a single host).
 
@@ -101,7 +99,6 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     ----------
     base : astropy.table.Table
     host : astropy.table.Row
-    saga_names : astropy.table.Table or None, optional
     overwrite_if_different_host : bool, optional
 
     Returns
@@ -112,6 +109,7 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
         raise ValueError('Host info exists and differs from input host info.')
 
     base['HOST_NSAID'] = np.int32(host['NSAID'])
+    base['HOST_NSA1ID'] = np.int32(host['NSA1ID'])
     base['HOST_RA'] = np.float32(host['RA'])
     base['HOST_DEC'] = np.float32(host['Dec'])
     base['HOST_DIST'] = np.float32(host['distance'])
@@ -119,18 +117,14 @@ def add_host_info(base, host, saga_names=None, overwrite_if_different_host=False
     base['HOST_MK'] = np.float32(host['M_K'])
     base['HOST_MR'] = np.float32(host['M_r'])
     base['HOST_MG'] = np.float32(host['M_g'])
+    base['HOST_SAGA_NAME'] = get_empty_str_array(len(base), 48, host['SAGA_name'] or '')
+    base['HOST_NGC_NAME'] = np.int32(host['NGC'])
 
     host_sc = SkyCoord(host['RA'], host['Dec'], unit='deg')
+    base = add_skycoord(base)
     sep = base['coord'].separation(host_sc)
     base['RHOST_ARCM'] = sep.arcmin.astype(np.float32)
     base['RHOST_KPC'] = (np.sin(sep.radian) * (1000.0 * host['distance'])).astype(np.float32)
-    del sep
-
-    if saga_names:
-        idx = np.where(saga_names['NSA'] == host['NSAID'])[0]
-        if len(idx) == 1:
-            base['HOST_SAGA_NAME'] = saga_names['SAGA'][idx]
-            base['HOST_NGC_NAME'] = saga_names['NGC'][idx]
 
     return base
 
@@ -216,8 +210,6 @@ def remove_too_close_to_host(base):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
 
     Returns
     -------
@@ -264,10 +256,9 @@ def remove_shreds_with_nsa(base, nsa):
     if len(nsa) == 0:
         return base
 
+    not_star_indices = np.flatnonzero(base['PHOTPTYPE'] != 6)
+
     for nsa_obj in nsa:
-
-        not_star_indices = np.where(base['PHOTPTYPE'] != 6)[0]
-
         ellipse_calculation = dict()
         ellipse_calculation['a'] = nsa_obj['PETROTH90'] * 2.0 / 3600.0
         ellipse_calculation['b'] = ellipse_calculation['a'] * nsa_obj['SERSIC_BA']
@@ -287,7 +278,7 @@ def remove_shreds_with_nsa(base, nsa):
         closest_base_obj_index = not_star_indices[closest_base_obj_index]
         base['REMOVE'][not_star_indices[r2_ellipse < 1.0]] = 2
 
-        del r2_ellipse, not_star_indices, ellipse_calculation
+        del r2_ellipse, ellipse_calculation
 
         values_to_rewrite = {
             'REMOVE': -1,
@@ -337,8 +328,6 @@ def remove_bad_photometry(base):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
 
     Returns
     -------
@@ -357,7 +346,7 @@ def remove_bad_photometry(base):
     return base
 
 
-def recover_whitelisted_objects(base, objects_to_add):
+def recover_whitelisted_objects(base, objects_to_recover):
     """
     Use the "add list" to set REMOVE back to -1 for whitelisted objects.
     This is mainly to deal with objects that are removed by `remove_bad_photometry`
@@ -368,13 +357,13 @@ def recover_whitelisted_objects(base, objects_to_add):
     Parameters
     ----------
     base : astropy.table.Table
-    objects_to_add : astropy.table.Table
+    objects_to_recover : astropy.table.Table
 
     Returns
     -------
     base : astropy.table.Table
     """
-    ids_to_add = _get_unique_objids(objects_to_add['SDSS ID'])
+    ids_to_add = _get_unique_objids(objects_to_recover['SDSS ID'])
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
     return base
 
@@ -398,7 +387,8 @@ def remove_shreds_with_highz(base):
     base : astropy.table.Table
     """
     highz_spec_cut = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'PETRORADERR_R > 0', 'PETRORAD_R > 2.0*PETRORADERR_R', 'REMOVE == -1')
-    highz_spec_indices = np.where(highz_spec_cut.mask(base))[0]
+
+    highz_spec_indices = np.flatnonzero(highz_spec_cut.mask(base))
 
     for idx in highz_spec_indices:
 
@@ -477,7 +467,7 @@ def clean_repeat_spectra(spectra):
         nearby_mask = (np.fabs(spectra['SPEC_Z'] - spec['SPEC_Z']) < _spec_search_dz)
         nearby_mask &= (spectra['coord'].separation(spec['coord']).arcsec < _get_spec_search_radius(spec['SPEC_Z']))
         nearby_mask &= not_done
-        nearby_mask = np.where(nearby_mask)[0]
+        nearby_mask = np.flatnonzero(nearby_mask)
         assert len(nearby_mask) >= 1
 
         not_done[nearby_mask] = False
@@ -532,7 +522,7 @@ def add_cleaned_spectra(base, spectra_clean):
     """
     for spec in spectra_clean:
         sep = spec['coord'].separation(base['coord']).arcsec
-        nearby_obj_indices = np.where(sep < _get_spec_search_radius(spec['SPEC_Z']))[0]
+        nearby_obj_indices = np.flatnonzero(sep < _get_spec_search_radius(spec['SPEC_Z']))
 
         if len(nearby_obj_indices) == 0:
             if spec['TELNAME'] != 'GAMA':
@@ -631,7 +621,7 @@ def clean_sdss_spectra(base):
     base : astropy.table.Table
     """
     find_sdss_only = lambda t: np.fromiter(((x and set(x.split('+')).issubset({'NSA', 'SDSS'})) for x in t['SPEC_REPEAT']), np.bool, len(t))
-    sdss_specs_indices = np.where(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))[0]
+    sdss_specs_indices = np.flatnonzero(Query('ZQUALITY == 4', 'REMOVE == -1', find_sdss_only).mask(base))
     if len(sdss_specs_indices) > 0:
         sdss_specs = base[['SPEC_REPEAT', 'SPEC_Z', 'TELNAME', 'ZQUALITY', 'coord']][sdss_specs_indices]
         sdss_specs['indices'] = sdss_specs_indices
@@ -645,7 +635,7 @@ def clean_sdss_spectra(base):
     return base
 
 
-def find_satellites(base):
+def find_satellites(base, version=1):
     """
     Add `SATS` column to the base catalog.
 
@@ -667,19 +657,28 @@ def find_satellites(base):
     -------
     base : astropy.table.Table
     """
+    if 'SATS' not in base.colnames:
+        base['SATS'] = np.int16(-1)
+
+    is_galaxy = C.is_galaxy if version == 1 else Query('is_galaxy')
+    is_clean = C.is_clean if version == 1 else Query('REMOVE == 0')
+
     # clean objects
-    clean_obj = C.is_galaxy & C.has_spec & C.is_clean
+    clean_obj = is_galaxy & C.has_spec & is_clean
     fill_values_by_query(base, clean_obj & C.is_high_z, {'SATS':0})
     fill_values_by_query(base, clean_obj & ~C.is_high_z, {'SATS':2})
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {'SATS':1})
 
     # removed objects
-    removed_obj = C.is_galaxy & C.has_spec & (~C.is_clean)
+    removed_obj = is_galaxy & C.has_spec & (~is_clean)
     fill_values_by_query(base, removed_obj & ~C.is_high_z, {'SATS':92})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {'SATS':91})
 
     # host itself!
-    fill_values_by_query(base, C.obj_is_host, {'SATS':3, 'REMOVE':-1})
+    if version == 1:
+        fill_values_by_query(base, C.obj_is_host, {'SATS':3, 'REMOVE':-1})
+    else:
+        base['SATS'][base['RHOST_ARCM'].argmin()] = 3
 
     return base
 
@@ -703,20 +702,20 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
-                     objects_to_remove=None, objects_to_add=None, spectra=None):
+def build_full_stack(sdss, host, wise=None, nsa=None, spectra=None,
+                     sdss_remove=None, sdss_recover=None, **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
 
     >>> initialize_base_catalog(base)
-    >>> add_host_info(base, host, saga_names)
+    >>> add_host_info(base, host)
     >>> add_wise(base, wise)
-    >>> remove_human_inspected(base, objects_to_remove)
+    >>> remove_human_inspected(base, sdss_remove)
     >>> remove_too_close_to_host(base)
     >>> remove_shreds_with_nsa(base, nsa)
     >>> remove_bad_photometry(base)
-    >>> recover_whitelisted_objects(base, objects_to_add)
+    >>> recover_whitelisted_objects(base, sdss_recover)
     >>> apply_manual_fixes(base)
     >>> add_spectra(base, spectra)
     >>> clean_sdss_spectra(base)
@@ -734,29 +733,29 @@ def build_full_stack(base, host, saga_names=None, wise=None, nsa=None,
     ----------
     base : astropy.table.Table
     host : astropy.table.Row
-    saga_names : astropy.table.Table
     wise : astropy.table.Table
     nsa : astropy.table.Table
-    objects_to_remove : astropy.table.Table
-    objects_to_add : astropy.table.Table
+    sdss_remove : astropy.table.Table
+    sdss_recover : astropy.table.Table
     spectra : astropy.table.Table
 
     Returns
     -------
     base : astropy.table.Table
     """
+    base = sdss
     base = initialize_base_catalog(base)
-    base = add_host_info(base, host, saga_names)
+    base = add_host_info(base, host)
     if wise is not None:
         base = add_wise(base, wise)
-    if objects_to_remove is not None:
-        base = remove_human_inspected(base, objects_to_remove)
+    if sdss_remove is not None:
+        base = remove_human_inspected(base, sdss_remove)
     base = remove_too_close_to_host(base)
     if nsa is not None:
         base = remove_shreds_with_nsa(base, nsa)
     base = remove_bad_photometry(base)
-    if objects_to_add is not None:
-        base = recover_whitelisted_objects(base, objects_to_add)
+    if sdss_recover is not None:
+        base = recover_whitelisted_objects(base, sdss_recover)
     base = apply_manual_fixes(base)
     if spectra:
         base = add_spectra(base, spectra)

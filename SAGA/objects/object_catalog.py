@@ -3,9 +3,9 @@ import numpy as np
 from astropy.table import vstack
 from easyquery import Query
 from . import cuts as C
-from .build import build_full_stack, WISE_COLS_USED, NSA_COLS_USED
+from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012
-from ..database import FitsTable
+from ..database import FitsTable, Database
 from ..hosts import HostCatalog
 from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord, fill_values_by_query
 
@@ -37,19 +37,20 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
-    def __init__(self, database):
-        self._database = database
+    def __init__(self, database=None):
+        self._database = database or Database()
         self._host_catalog = HostCatalog(self._database)
 
 
     @staticmethod
     def _annotate_catalog(table, to_add_skycoord=True):
-        for b in get_sdss_bands():
-            table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
+        if 'EXTINCTION_R' in table.colnames:
+            for b in get_sdss_bands():
+                table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
 
-        for color in get_sdss_colors():
+        for color in list(get_sdss_colors()) + ['rz']:
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
-            table['{}_err'.format(color)] = np.sqrt(table['{}_err'.format(color[0])]**2.0 + table['{}_err'.format(color[1])]**2.0)
+            table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
 
         if to_add_skycoord:
             table = add_skycoord(table)
@@ -78,7 +79,7 @@ class ObjectCatalog(object):
         return table[columns]
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=2):
         """
         load object catalogs (aka "base catalogs")
 
@@ -101,6 +102,9 @@ class ObjectCatalog(object):
 
         columns : list, optional
             If set, only load a subset of columns
+
+        version : int or str, optional
+            Set to 'paper1' for paper1 catalogs
 
         Returns
         -------
@@ -135,11 +139,18 @@ class ObjectCatalog(object):
         if return_as[0] not in 'sli':
             raise ValueError('`return_as` should be "list", "stacked", or "iter"')
 
-        if has_spec:
-            t = self._database['spectra_clean'].read()
+        if str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
+            base_key = 'base_v0p1'
+        elif version in (1, 2):
+            base_key = 'base_v{}'.format(version)
+        else:
+            raise ValueError('`version` must be \'paper1\', 1 or 2.')
+
+        if has_spec and base_key == 'base_v0p1':
+            t = self._database['saga_spectra_May2017'].read()
 
             if hosts is not None:
-                host_ids = self._host_catalog.resolve_id(hosts)
+                host_ids = self._host_catalog.resolve_id(hosts, 'NSA')
                 t = Query((lambda x: np.in1d(x, host_ids), 'HOST_NSAID')).filter(t)
 
             t = self._annotate_catalog(t)
@@ -157,15 +168,17 @@ class ObjectCatalog(object):
 
         else:
             q = Query(cuts)
-            if has_spec is not None:
-                q = q & (~C.has_spec)
+            if has_spec:
+                q &= C.has_spec
+            elif has_spec is not None:
+                q &= (~C.has_spec)
 
-            hosts = self._host_catalog.resolve_id('all' if hosts is None else hosts)
+            hosts = self._host_catalog.resolve_id(hosts or 'all', 'string')
 
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
 
-            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base', host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
+            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database[base_key, host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
@@ -179,17 +192,20 @@ class ObjectCatalog(object):
 
 
     def load_nsa(self, version='0.1.2'):
-        nsa = self._database['nsa_v{}'.format(version)].read()[NSA_COLS_USED]
+        nsa = self._database['nsa_v{}'.format(version)].read()
         if version == '0.1.2':
+            nsa = nsa[build.NSA_COLS_USED]
             for nsaid, fixes in fixes_to_nsa_v012.items():
                 fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
             # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
             nsa = Query('NSAID != 64408').filter(nsa)
+        elif version == '1.0.1':
+            nsa = nsa[build2.NSA_COLS_USED]
         nsa = add_skycoord(nsa)
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2):
         """
         This function build base catalog and write to the database.
 
@@ -207,6 +223,8 @@ class ObjectCatalog(object):
             If set to True, overwrite existing base catalog
 
         base_file_path_pattern : str, optional
+
+        version : int, optional
 
         Examples
         --------
@@ -227,15 +245,19 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+        if version not in (1, 2):
+            raise ValueError('`version` must be 1 or 2.')
+        build_module = build if version == 1 else build2
+        nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
+        spectra = self._database['spectra_raw_all'].read()
+        sdss_remove = self._database['sdss_remove'].read()
+        sdss_recover = self._database['sdss_recover'].read()
 
-        nsa = self.load_nsa('0.1.2')
-        spectra_raw_all = self._database['spectra_raw_all'].read()
-        host_ids = self._host_catalog.resolve_id('all' if hosts is None else hosts)
-
+        host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
         for i, host_id in enumerate(host_ids):
 
             if base_file_path_pattern is None:
-                data_obj = self._database['base', host_id].remote
+                data_obj = self._database['base_v{}'.format(version), host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
@@ -243,20 +265,26 @@ class ObjectCatalog(object):
                 print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog of {} already exists.'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
                 continue
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Building base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
-            try:
-                wise = self._database['wise', host_id].read()[WISE_COLS_USED]
-            except OSError:
-                wise = None
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Start to base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
 
-            base = build_full_stack(self._database['sdss', host_id].read(),
-                                    self._host_catalog.load_single(host_id),
-                                    self._database['hosts_named'].read(), wise, nsa,
-                                    self._database['objects_to_remove'].read(),
-                                    self._database['objects_to_add'].read(),
-                                    spectra_raw_all)
+            host = self._host_catalog.load_single(host_id)
+            catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
+
+            def get_catalog_or_none(catalog_name):
+                try:
+                    cat = self._database[catalog_name, host_id].read()
+                except OSError:
+                    return None
+                return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
+
+            catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
+
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join((k for k, v in catalog_dict.items() if v is not None)), host_id))
+
+            base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
+                                                 sdss_remove=sdss_remove, sdss_recover=sdss_recover,
+                                                 **catalog_dict)
+            del catalog_dict
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
             data_obj.write(base)
-
-        #TODO: extract all cleaned specs!

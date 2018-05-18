@@ -5,11 +5,9 @@ from .spectra import SpectraData
 __all__ = ['known_google_sheets', 'Database']
 
 known_google_sheets = {
-    'hosts_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 0, include_names=['SAGA', 'NSA', 'NGC']),
-    'hosts_no_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1136984451),
-    'hosts_no_sdss_flags': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
-    'objects_to_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
-    'objects_to_add': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
+    'hosts': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
+    'sdss_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
+    'sdss_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'satellites_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 1),
 }
 
@@ -51,34 +49,62 @@ class Database(object):
     >>> saga_database['hosts_no_flags'].download('hosts_no_flags.csv')
     """
 
-    def __init__(self, root_dir=None):
-        if root_dir is None:
-            root_dir = os.curdir
+    def __init__(self, shared_dir=None, local_dir=None):
 
-        if not os.path.isdir(root_dir):
-            raise ValueError('cannot locate {}'.format(root_dir))
+        self._shared_dir = shared_dir or os.curdir
+        if not os.path.isdir(self._shared_dir):
+            raise ValueError('cannot locate {}'.format(self._shared_dir))
 
-        self._root_dir = root_dir
+        self._local_dir = local_dir or os.curdir
+        if not os.path.isdir(self._local_dir):
+            raise ValueError('cannot locate {}'.format(self._local_dir))
 
         self._tables = {
-            'gmm_parameters': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters.npz'))),
-            'gmm_parameters_decals': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters_decals.npz'))),
-            'gmm_parameters_no_outlier': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters_no_outlier.npz'))),
-            'gmm_parameters_201708': DataObject(NumpyBinary(os.path.join(self._root_dir, 'data', 'gmm_parameters_201708.npz'))),
-            'spectra_clean': DataObject(FitsTable(os.path.join(self._root_dir, 'data', 'saga_spectra_clean.fits.gz'))),
-            'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'), use_local_first=True),
-            'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits'), use_local_first=True),
-            'spectra_gama_dr2': DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'), use_local_first=True),
-            'spectra_gama': DataObject(FitsTable('http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits'), use_local_first=True),
+            'gmm_parameters': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters.npz'))),
+            'gmm_parameters_decals': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_decals.npz'))),
+            'gmm_parameters_no_outlier': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_no_outlier.npz'))),
+            'gmm_parameters_201708': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_201708.npz'))),
+            'saga_spectra_May2017': DataObject(FitsTable(os.path.join(self._shared_dir, 'Products', 'saga_spectra_May2017.fits.gz'))),
+            'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'),
+                                     FitsTable(os.path.join(self._local_dir, 'external_catalogs', 'nsa', 'nsa_v1_0_1.fits')),
+                                     use_local_first=True),
+            'nsa_v0.1.2': DataObject(FitsTable('http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits'),
+                                     FitsTable(os.path.join(self._local_dir, 'external_catalogs', 'nsa', 'nsa_v0_1_2.fits')),
+                                     use_local_first=True),
+            'spectra_gama_dr2': DataObject(FitsTable('http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits'),
+                                           FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'GAMA', 'GAMA_SpecObj_dr2.fits')),
+                                           use_local_first=True),
+            'spectra_gama_dr3': DataObject(FitsTable('http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits'),
+                                           FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'GAMA', 'GAMA_SpecObj_dr3.fits')),
+                                           use_local_first=True),
+            'spectra_2dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
+            'spectra_6dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
         }
 
-        self._tables['nsa'] = self._tables['nsa_v0.1.2']
-        self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._root_dir, 'Spectra', 'Final'), self._tables['spectra_gama']), FitsTable())
+        self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._shared_dir, 'Spectra', 'Final'),
+                                                                 {'gama': self._tables['spectra_gama_dr3'],
+                                                                  '2dF': self._tables['spectra_2dF'],
+                                                                  '6dF': self._tables['spectra_6dF']}))
 
         for k, v in known_google_sheets.items():
-            self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
+            if k == 'hosts':
+                self._tables[k] = DataObject(v, CsvTable(os.path.join(self._shared_dir, 'HostCatalogs', 'host_list.csv')), cache_in_memory=True)
+            else:
+                self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
-        self._file_path_pattern = {'base': os.path.join(self._root_dir, 'base_catalogs', 'base_sql_nsa{}.fits.gz')}
+        self._file_path_pattern = {
+            'base_v2':   os.path.join(self._local_dir, 'base_catalogs', 'base_v2_{}.fits.gz'),
+            'base_v1':   os.path.join(self._local_dir, 'base_catalogs', 'base_v1_{}.fits.gz'),
+            'base_v0p1': os.path.join(self._shared_dir, 'Paper1', 'base_catalogs', 'base_sql_{}.fits.gz'),
+            'sdss_dr14': os.path.join(self._local_dir, 'external_catalogs', 'sdss_dr14', '{}.fits.gz'),
+            'sdss_dr12': os.path.join(self._local_dir, 'external_catalogs', 'sdss_dr12', '{}.fits.gz'),
+            'wise':      os.path.join(self._local_dir, 'external_catalogs', 'wise', '{}.fits.gz'),
+            'des_dr1':   os.path.join(self._local_dir, 'external_catalogs', 'des_dr1', '{}_des_dr1.fits.gz'),
+            'decals':    os.path.join(self._local_dir, 'external_catalogs', 'decals', '{}_decals.fits.gz'),
+        }
+        self._file_path_pattern['base'] = self._file_path_pattern['base_v2']
+        self._file_path_pattern['sdss'] = self._file_path_pattern['sdss_dr14']
+        self._file_path_pattern['des'] = self._file_path_pattern['des_dr1']
 
 
     def _set_file_path_pattern(self, key, value):
@@ -132,8 +158,8 @@ class Database(object):
         if key in self._tables:
             return self._tables[key]
 
-        if isinstance(key, tuple) and len(key) == 2 and key[0] in ('base', 'sdss', 'wise', 'des', 'decals'):
-            path = getattr(self, '{}_file_path_pattern'.format(key[0])).format(key[1])
+        if isinstance(key, tuple) and len(key) == 2 and key[0] in self._file_path_pattern:
+            path = self._file_path_pattern[key[0]].format(key[1])
             self._tables[key] = DataObject(FitsTable(path))
             return self._tables[key]
 

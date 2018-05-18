@@ -36,7 +36,11 @@ class TargetSelection(object):
     """
     def __init__(self, database, cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
-                 manual_selected_objids=None):
+                 manual_selected_objids=None, version=2):
+        self._version = version
+        if self._version != 1:
+            raise ValueError('Only support version==1 for now!')
+
         self._database = database
         self._host_catalog = HostCatalog(self._database)
         self._object_catalog = ObjectCatalog(self._database)
@@ -90,12 +94,12 @@ class TargetSelection(object):
         if return_as[0] not in 'ndsli':
             raise ValueError('`return_as` should be None, "dict", "list", "stacked", or "iter"')
 
-        host_ids = self._host_catalog.resolve_id('all' if hosts is None else hosts)
+        host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
 
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:
                 self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
-                        cuts=self._cuts, columns=self.columns, return_as='list').pop()
+                        cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
@@ -176,7 +180,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
     target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
-    flux_star_indices = np.where(is_flux_star.mask(target_catalog))[0]
+    flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]

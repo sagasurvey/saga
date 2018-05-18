@@ -3,11 +3,30 @@ SAGA.host.host_catalog
 
 This file defines the HostCatalog class
 """
-
-from astropy.coordinates import SkyCoord
+from collections import defaultdict, Iterable
+import numpy as np
 from easyquery import Query
 
+from ..database import Database
+from ..utils import add_skycoord, find_near_ra_dec
+
 __all__ = ['HostCatalog']
+
+_paper1_complete_nsa = (166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887)
+_paper1_incomplete_nsa = (161174, 85746, 145729, 140594, 126115, 13927, 137625, 129237)
+_mmt_2018_nsa = (161174, 52773, 163956, 69028, 144953, 165082, 165707, 145729, 165980, 147606, 165980, 61945)
+
+
+def _is_string_like(obj):
+    """
+    Check whether obj behaves like a string.
+    """
+    try:
+        obj + ''
+    except (TypeError, ValueError):
+        return False
+    return True
+
 
 class HostCatalog(object):
     """
@@ -38,28 +57,51 @@ class HostCatalog(object):
     >>> saga_host_catalog.id_to_name(61945)
     'AnaK'
     """
-    _paper1_complete_hosts = (166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887)
-    _paper1_incomplete_hosts = (161174, 85746, 145729, 140594, 126115, 13927, 137625, 129237)
 
-    def __init__(self, database):
-        self._database = database
+    _predefined_queries = {
+        'all': Query(),
+        'no_sdss_flags': Query(),
+        'paper1': Query((lambda x: np.in1d(x, _paper1_complete_nsa + _paper1_incomplete_nsa), 'NSAID')),
+        'paper1_complete': Query((lambda x: np.in1d(x, _paper1_complete_nsa), 'NSAID')),
+        'paper1_incomplete': Query((lambda x: np.in1d(x, _paper1_incomplete_nsa), 'NSAID')),
+        'mmt_2018': Query((lambda x: np.in1d(x, _mmt_2018_nsa), 'NSAID')),
+        'no_flags': Query('flag == 0'),
+        'flag0': Query('flag == 0'),
+        'has_nsa': Query('NSAID != -1'),
+        'has_deeper_imaging': (Query('decals_dr5 >= 0.98') | Query('decals_dr6 >= 0.98') | Query('des_dr1 >= 0.98')),
+        'has_decam': (Query('decals_dr5 >= 0.98') | Query('des_dr1 >= 0.98')),
+        'has_des': Query('des_dr1 >= 0.98'),
+        'has_des_dr1': Query('des_dr1 >= 0.98'),
+        'has_decals': (Query('decals_dr5 >= 0.98') | Query('decals_dr6 >= 0.98')),
+        'has_decals_dr5': Query('decals_dr5 >= 0.98'),
+        'has_decals_dr6': Query('decals_dr6 >= 0.98'),
+    }
 
-        try:
-            t = self._database['hosts_named'].read()
-        except FileNotFoundError:
-            self._host_name_to_id = dict()
-            self._host_id_to_name = dict()
-        else:
-            self._host_name_to_id = dict(zip((n.lower() for n in t['SAGA']), t['NSA']))
-            self._host_id_to_name = dict(zip(t['NSA'], t['SAGA']))
 
-        try:
-            self._all_host_ids = self.load()['NSAID'].tolist()
-        except FileNotFoundError:
-            self._all_host_ids = []
+    def __init__(self, database=None):
+        self._database = database or Database()
+        self._hosts = None
+        self._host_index = dict()
+        self._index_hosts()
 
 
-    def resolve_id(self, hosts):
+    def _index_hosts(self):
+        self._hosts = self._database['hosts'].read()
+        index = defaultdict(list)
+        for i, n in enumerate(self._hosts['SAGA_name']):
+            n = str(n or '')
+            if n.strip() and n != '--':
+                index[n.strip().replace(' ', '').lower()].append(i)
+        for col in ['NSAID', 'NSA1ID', 'PGC', 'NGC', 'UGC']:
+            for i, n in enumerate(self._hosts[col]):
+                n = int(n)
+                if n > -1:
+                    index['{}{}'.format(col[:3].lower(), n)].append(i)
+                    index[n].append(i)
+        self._host_index = {k: tuple(v) for k, v in index.items()}
+
+
+    def resolve_id(self, hosts, id_to_return='NSA'):
         """
         Get a list of host IDs from SAGA names or some short-hand names (e.g. 'paper1')
 
@@ -70,6 +112,7 @@ class HostCatalog(object):
         ----------
         hosts : int, str, list
             host names/IDs or a list of host names/IDs
+        id_to_return : string
 
         Returns
         -------
@@ -85,41 +128,53 @@ class HostCatalog(object):
         [61945]
 
         """
-        try:
-            hosts = int(hosts)
-        except(TypeError, ValueError):
-            pass
-        else:
-            return [hosts]
+        indices = []
 
-        try:
-            hosts = hosts.lower()
-        except AttributeError:
-            pass
-        else:
-            if hosts == 'all' and self._all_host_ids:
-                return self._all_host_ids
-            elif hosts == 'paper1_complete':
-                return list(self._paper1_complete_hosts)
-            elif hosts == 'paper1_incomplete':
-                return list(self._paper1_incomplete_hosts)
-            elif hosts == 'paper1':
-                return list(self._paper1_complete_hosts + self._paper1_incomplete_hosts)
-            elif hosts.lower() in self._host_name_to_id:
-                return [self._host_name_to_id[hosts.lower()]]
+        if _is_string_like(hosts):
+            hosts = hosts.replace(' ', '').lower()
+
+            if hosts in self._predefined_queries:
+                indices = np.flatnonzero(self._predefined_queries[hosts].mask(self._hosts)).tolist()
+
             else:
-                raise ValueError('cannot resolve {}'.format(hosts))
+                try:
+                    hosts = int(hosts)
+                except ValueError:
+                    pass
 
-        out = []
-        for host in hosts:
-            out.extend(self.resolve_id(host))
-        return out
+                if hosts in self._host_index:
+                    indices = list(self._host_index[hosts])
+
+        elif isinstance(hosts, int) and hosts in self._host_index:
+            indices = list(self._host_index[hosts])
+
+        elif isinstance(hosts, Iterable):
+            for host in hosts:
+                indices.extend(self.resolve_id(host, id_to_return='internal'))
+
+        if not indices:
+            raise KeyError('Can not find {}'.format(hosts))
+
+        id_to_return = id_to_return.upper()
+        if id_to_return[:3] == 'INT':
+            return indices
+        if id_to_return[:3] in ('STR', 'FIL'):
+            return ['nsa{}'.format(self._hosts['NSAID'][i]) if self._hosts['NSAID'][i] != -1 else 'pgc{}'.format(self._hosts['PGC'][i]) for i in indices]
+        for start in ('NSA1', 'NSA', 'PGC', 'NGC', 'UGC', 'SAGA'):
+            if id_to_return.startswith(start):
+                col = start
+                if col == 'SAGA':
+                    col += '_name'
+                if col.startswith('NSA'):
+                    col += 'ID'
+                return self._hosts[col][indices].tolist()
+
+        raise ValueError('`id_to_return` not known!')
 
 
     def id_to_name(self, host_id):
         """
-        Get SAGA host name from a NSA ID.
-        Note that we are moving away from NSA ID. Use caution with this function!
+        Get SAGA host name from an ID.
 
         Parameters
         ----------
@@ -129,18 +184,20 @@ class HostCatalog(object):
         -------
         host_saga_name : str
         """
-        return self._host_id_to_name[int(host_id)]
+        names = self.resolve_id(host_id, 'SAGA')
+        if len(names) > 1:
+            raise ValueError('more than one names found!')
+        return names[0] or ''
 
 
-    def load(self, host_type='no_flags', reload=False):
+    def load(self, hosts=None, add_coord=True):
         """
         load a host catalog
 
         Parameters
         ----------
         host_type : str, optional
-            Currently it can be "no_flags" or "no_sdss_flags"
-
+            Currently it can be "no_flags", "has_nsa", "has_des", "has_decals",
         reload : bool, optional
             If set to True, do not use tha cached table. Default is False.
 
@@ -153,26 +210,11 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_host_catalog.load('no_flags')
         >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
-        res = self._database['hosts_{}'.format(host_type)].read(reload=reload)
-        return self._annotate_catalog(res)
+        cat = self._hosts[self.resolve_id(hosts or 'all', 'internal')]
+        return add_skycoord(cat, dec_label='Dec') if add_coord else cat
 
 
-    def _annotate_catalog(self, table):
-        names = []
-        for i in table['NSAID']:
-            try:
-                name = self.id_to_name(i)
-                names.append(name)
-            except KeyError:
-                names.append('')
-        table['SAGA_name'] = names
-
-        table['coord'] = SkyCoord(table['RA'], table['Dec'], unit='deg')
-
-        return table
-
-
-    def load_single(self, host, host_type='no_flags', reload=False):
+    def load_single(self, host, add_coord=True):
         """
         Gets the catalog row corresponding to a specific named host.
 
@@ -190,10 +232,22 @@ class HostCatalog(object):
         --------
         >>> anak = saga_host_catalog.load_single('AnaK')
         """
-        host_id = self.resolve_id(host)
-        assert len(host_id) == 1
-        host_id = host_id[0]
+        indices = self.resolve_id(host, 'internal')
+        if len(indices) != 1:
+            raise ValueError('More than one hosts found!')
+        cat = self._hosts[indices]
+        cat = add_skycoord(cat, dec_label='Dec') if add_coord else cat
+        return cat[0]
 
-        res = Query('NSAID == {}'.format(host_id)).filter(self.load(host_type, reload))
-        assert len(res) == 1
-        return res[0]
+
+    def load_single_near_ra_dec(self, ra, dec):
+        """
+        ra, dec in degrees
+        """
+        add_skycoord(self._hosts, dec_label='Dec')
+        cat = find_near_ra_dec(self._hosts, ra, dec, 3603.0)
+        if len(cat) == 0:
+            raise KeyError('No hosts found!')
+        if len(cat) != 1:
+            raise ValueError('More than one hosts found!')
+        return cat[0]

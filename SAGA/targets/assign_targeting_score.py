@@ -86,7 +86,7 @@ def assign_targeting_score(base, manual_selected_objids=None,
     fill_values_by_query(base, within_host & high_p, {'TARGETING_SCORE': 300})
     fill_values_by_query(base, within_host & C.sdss_limit, {'TARGETING_SCORE': 200})
 
-    need_random_selection = np.where(base['TARGETING_SCORE'] == 800)[0]
+    need_random_selection = np.flatnonzero(base['TARGETING_SCORE'] == 800)
     if len(need_random_selection) > 50:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
         random_mask[:50] = True
