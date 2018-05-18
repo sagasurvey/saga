@@ -79,7 +79,7 @@ class ObjectCatalog(object):
         return table[columns]
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, paper1=False):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=2):
         """
         load object catalogs (aka "base catalogs")
 
@@ -103,7 +103,8 @@ class ObjectCatalog(object):
         columns : list, optional
             If set, only load a subset of columns
 
-        paper1 : bool, optional
+        version : int or str, optional
+            Set to 'paper1' for paper1 catalogs
 
         Returns
         -------
@@ -138,7 +139,14 @@ class ObjectCatalog(object):
         if return_as[0] not in 'sli':
             raise ValueError('`return_as` should be "list", "stacked", or "iter"')
 
-        if has_spec and paper1:
+        if str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
+            base_key = 'base_v0p1'
+        elif version in (1, 2):
+            base_key = 'base_v{}'.format(version)
+        else:
+            raise ValueError('`version` must be \'paper1\', 1 or 2.')
+
+        if has_spec and base_key == 'base_v0p1':
             t = self._database['saga_spectra_May2017'].read()
 
             if hosts is not None:
@@ -170,7 +178,7 @@ class ObjectCatalog(object):
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
 
-            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database['base_v1' if paper1 else 'base', host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
+            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database[base_key, host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
 
             if return_as[0] == 'i':
                 return output_iterator
@@ -237,6 +245,8 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+        if version not in (1, 2):
+            raise ValueError('`version` must be 1 or 2.')
         build_module = build if version == 1 else build2
         nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
         spectra = self._database['spectra_raw_all'].read()
@@ -247,7 +257,7 @@ class ObjectCatalog(object):
         for i, host_id in enumerate(host_ids):
 
             if base_file_path_pattern is None:
-                data_obj = self._database['base', host_id].remote
+                data_obj = self._database['base_v{}'.format(version), host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 

@@ -36,7 +36,11 @@ class TargetSelection(object):
     """
     def __init__(self, database, cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
-                 manual_selected_objids=None):
+                 manual_selected_objids=None, version=2):
+        self._version = version
+        if self._version != 1:
+            raise ValueError('Only support version==1 for now!')
+
         self._database = database
         self._host_catalog = HostCatalog(self._database)
         self._object_catalog = ObjectCatalog(self._database)
@@ -95,7 +99,7 @@ class TargetSelection(object):
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:
                 self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
-                        cuts=self._cuts, columns=self.columns, return_as='list').pop()
+                        cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)

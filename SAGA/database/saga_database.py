@@ -93,14 +93,16 @@ class Database(object):
                 self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
         self._file_path_pattern = {
-            'base':      os.path.join(self._local_dir, 'base_catalogs', 'base_v2_{}.fits.gz'),
-            'base_v1':   os.path.join(self._shared_dir, 'Paper1', 'base_catalogs', 'base_sql_{}.fits.gz'),
+            'base_v2':   os.path.join(self._local_dir, 'base_catalogs', 'base_v2_{}.fits.gz'),
+            'base_v1':   os.path.join(self._local_dir, 'base_catalogs', 'base_v1_{}.fits.gz'),
+            'base_v0p1': os.path.join(self._shared_dir, 'Paper1', 'base_catalogs', 'base_sql_{}.fits.gz'),
             'sdss_dr14': os.path.join(self._local_dir, 'external_catalogs', 'sdss_dr14', '{}.fits.gz'),
             'sdss_dr12': os.path.join(self._local_dir, 'external_catalogs', 'sdss_dr12', '{}.fits.gz'),
             'wise':      os.path.join(self._local_dir, 'external_catalogs', 'wise', '{}.fits.gz'),
             'des_dr1':   os.path.join(self._local_dir, 'external_catalogs', 'des_dr1', '{}_des_dr1.fits.gz'),
             'decals':    os.path.join(self._local_dir, 'external_catalogs', 'decals', '{}_decals.fits.gz'),
         }
+        self._file_path_pattern['base'] = self._file_path_pattern['base_v2']
         self._file_path_pattern['sdss'] = self._file_path_pattern['sdss_dr14']
         self._file_path_pattern['des'] = self._file_path_pattern['des_dr1']
 
@@ -156,8 +158,8 @@ class Database(object):
         if key in self._tables:
             return self._tables[key]
 
-        if isinstance(key, tuple) and len(key) == 2 and key[0] in ('base', 'sdss', 'wise', 'des', 'decals'):
-            path = getattr(self, '{}_file_path_pattern'.format(key[0])).format(key[1])
+        if isinstance(key, tuple) and len(key) == 2 and key[0] in self._file_path_pattern:
+            path = self._file_path_pattern[key[0]].format(key[1])
             self._tables[key] = DataObject(FitsTable(path))
             return self._tables[key]
 
