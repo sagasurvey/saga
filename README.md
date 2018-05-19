@@ -15,7 +15,7 @@ The code is designed to be 2-3 compatible, but has mainly been tested with Pytho
 
 ### Dependencies
 
-All required dependencies will be installed automatically. There two optional dependencies that requires manual installation: 
+All required dependencies will be installed automatically. There are two optional dependencies that require manual installation: 
 
 1. casjobs OR sciservevr 
    
@@ -35,7 +35,7 @@ All required dependencies will be installed automatically. There two optional de
    
 2. kcorrect
    
-   You need kcorrect for calculating stellar mass. You need to both install the [C code](https://github.com/blanton144/kcorrect) and [Python wrapper](https://github.com/nirinA/kcorrect_python).
+   You need kcorrect to calculate stellar masses. You need to install both the [C code](https://github.com/blanton144/kcorrect) and the [Python wrapper](https://github.com/nirinA/kcorrect_python).
    
    * To install C code:
      1. Obtain the code from https://github.com/blanton144/kcorrect
@@ -47,8 +47,6 @@ All required dependencies will be installed automatically. There two optional de
         ```sh
         pip install https://github.com/nirinA/kcorrect_python/archive/master.zip
         ```
-   
-   
    
 ## Example Usage
 
