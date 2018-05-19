@@ -3,7 +3,7 @@ GMM related routines
 """
 import numpy as np
 from scipy.special import logsumexp
-from ..utils import get_sdss_bands, get_sdss_colors
+from ..utils import get_sdss_bands, get_sdss_colors, view_table_as_2d_array
 
 try:
     from sklearn.mixture import GaussianMixture
@@ -42,19 +42,8 @@ class XDGMM(object):
         return dict(zip(labels, self.params)) if labels else self.params
 
 
-def table2ndarray(table, cols, dtype=None, copy=False):
-    cols = list(cols)
-    dtype_orig = getattr(np, table[cols[0]].dtype.name)
-    out = np.array(table[cols], copy=copy).view((dtype_orig, len(cols)))
-    if len(cols) == 1:
-        out = out.reshape(-1, 1)
-    if dtype and np.dtype(dtype) != dtype_orig:
-        out = out.astype(np.dtype(dtype))
-    return out
-
-
 def get_input_data(catalog, colors=None, color_errors=None, mag_errors=None,
-                   include_covariance=True, subtable_getter=table2ndarray):
+                   include_covariance=True):
     if colors is None:
         colors = get_sdss_colors()
     if color_errors is None:
@@ -62,10 +51,10 @@ def get_input_data(catalog, colors=None, color_errors=None, mag_errors=None,
     if mag_errors is None:
         mag_errors = [b+'_err' for b in get_sdss_bands()[1:-1]]
     assert len(mag_errors) == len(colors) - 1
-    X = subtable_getter(catalog, colors, np.float64)
-    Xcov = np.stack((np.diag(e*e) for e in subtable_getter(catalog, color_errors, np.float64)))
+    X = view_table_as_2d_array(catalog, colors)
+    Xcov = np.stack((np.diag(e*e) for e in view_table_as_2d_array(catalog, color_errors)))
     if include_covariance:
-        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in subtable_getter(catalog, mag_errors, np.float64)))
+        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in view_table_as_2d_array(catalog, mag_errors)))
     return X, Xcov
 
 
@@ -103,13 +92,12 @@ def calc_model1_prob(data, data_cov, model_params, priors=None):
     return p
 
 
-def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=None, 
-                                   colors=None, color_errors=None, mag_errors=None, 
-                                   include_covariance=True, subtable_getter=table2ndarray):
+def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=None,
+                                   colors=None, color_errors=None, mag_errors=None,
+                                   include_covariance=True):
     data, data_cov = get_input_data(base, colors=colors, color_errors=color_errors,
-                                    mag_errors=mag_errors, 
-                                    include_covariance=include_covariance,
-                                    subtable_getter=subtable_getter)
+                                    mag_errors=mag_errors,
+                                    include_covariance=include_covariance)
     model_params = (
         tuple(model_parameters[k] for k in param_labels_sat),
         tuple(model_parameters[k] for k in param_labels_nosat)
