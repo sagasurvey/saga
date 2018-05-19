@@ -4,10 +4,19 @@ import numexpr as ne
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, join
 import astropy.constants
+from astropy.cosmology import WMAP9 # pylint: disable=E0611
 from easyquery import Query
+
+_HAS_KCORRECT = True
+try:
+    import kcorrect
+except ImportError:
+    _HAS_KCORRECT = False
+
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
-from ..utils import (fill_values_by_query, get_empty_str_array, get_sdss_bands, add_skycoord)
+from ..utils import (fill_values_by_query, get_empty_str_array, get_sdss_bands,
+                     add_skycoord, view_table_as_2d_array)
 
 
 __all__ = ['initialize_base_catalog', 'add_host_info', 'add_wise',
@@ -683,7 +692,7 @@ def find_satellites(base, version=1):
     return base
 
 
-def add_stellar_mass(base):
+def add_stellar_mass(base, cosmology=WMAP9):
     """
     Calculate stellar mass based only on gi colors and redshift and add to base catalog.
     Based on GAMA data using Taylor et al (2011).
@@ -698,7 +707,40 @@ def add_stellar_mass(base):
     -------
     base : astropy.table.Table
     """
-    #TODO: implement this
+    global _HAS_KCORRECT
+
+    base['log_sm'] = np.nan
+
+    if not _HAS_KCORRECT:
+        logging.warn('No kcorrect module. Stellar mass not calculated!')
+        return base
+
+    if _HAS_KCORRECT != 'LOADED':
+        kcorrect.load_templates()
+        kcorrect.load_filters()
+        _HAS_KCORRECT = 'LOADED'
+
+    has_specs_mask = C.has_spec.mask(base)
+    if not has_specs_mask.any():
+        return base
+
+    postfix = '_sdss' if 'r_mag_sdss' in base.colnames else ''
+    mag = view_table_as_2d_array(base[has_specs_mask], ('{}_mag{}'.format(b, postfix) for b in get_sdss_bands()), np.float32)
+    mag_err = view_table_as_2d_array(base[has_specs_mask], ('{}_err{}'.format(b, postfix) for b in get_sdss_bands()), np.float32)
+    redshift = view_table_as_2d_array(base[has_specs_mask], ['SPEC_Z'], np.float32)
+
+    # CONVERT SDSS MAGNITUDES INTO MAGGIES
+    mgy = 10.0 ** (-0.4 * mag)
+    mgy_ivar = (0.4 * np.log(10.0) * mgy * mag_err) ** -2.0
+
+    # USE ASTROPY TO CALCULATE LUMINOSITY DISTANCE
+    lf_distmod = cosmology.distmod(redshift.ravel()).value
+
+    # RUN KCORRECT FIT, AND CALCULATE STELLAR MASS
+    kcorrect_coeff = np.vstack((kcorrect.fit_coeffs(c) for c in np.hstack((redshift, mgy, mgy_ivar))))[:, 1:]
+    kcorrect_coeff *= np.array([0.601525, 0.941511, 0.607033, 0.523732, 0.763937], np.float32)
+    base['log_sm'][has_specs_mask] = np.log10(np.sum(kcorrect_coeff, axis=1, dtype=np.float64)) + (0.4 * lf_distmod)
+
     return base
 
 
@@ -721,7 +763,7 @@ def build_full_stack(sdss, host, wise=None, nsa=None, spectra=None,
     >>> clean_sdss_spectra(base)
     >>> remove_shreds_with_highz(base)
     >>> find_satellites(base)
-    >>> add_stellar_mass(base) # not yet implemented
+    >>> add_stellar_mass(base)
 
     Among these function, `add_wise` can be applied at any time. All other
     functions should be applied in this particular order.
@@ -762,6 +804,6 @@ def build_full_stack(sdss, host, wise=None, nsa=None, spectra=None,
     base = clean_sdss_spectra(base)
     base = remove_shreds_with_highz(base)
     base = find_satellites(base)
-    #base = add_stellar_mass(base)
+    base = add_stellar_mass(base)
 
     return base

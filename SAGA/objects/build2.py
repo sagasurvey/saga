@@ -530,5 +530,6 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
     base = add_surface_brightness(base)
     base = build.find_satellites(base, version=2)
+    base = build.add_stellar_mass(base)
 
     return base
