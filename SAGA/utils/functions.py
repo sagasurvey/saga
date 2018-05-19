@@ -7,7 +7,7 @@ from astropy import units as u
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors', 'add_skycoord',
            'get_empty_str_array', 'get_decals_viewer_image', 'fill_values_by_query',
-           'get_remove_flag',
+           'get_remove_flag', 'view_table_as_2d_array',
            'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec']
 
 
@@ -145,3 +145,10 @@ def find_near_objid(table, objid, within_arcsec=3.0):
     table : astropy.table.Table
     """
     return find_near_coord(table, find_objid(table, objid)['coord'], within_arcsec)
+
+
+def view_table_as_2d_array(table, cols=None, dtype=np.float64):
+    """
+    Convert an astropy Table to 2d ndarray with a fixed dtype.
+    """
+    return np.vstack((table[c].data.astype(dtype, casting='same_kind', copy=False) for c in (cols or table.colnames))).T
