@@ -7,9 +7,49 @@ See the [SAGA Survey website](http://sagasurvey.org/) for details about SAGA.
 
 ## Installation
 
-    pip install https://github.com/sagasurvey/saga/archive/master.zip
+```sh
+pip install https://github.com/sagasurvey/saga/archive/master.zip
+```
 
+The code is designed to be 2-3 compatible, but has mainly been tested with Python 3.6. 
 
+### Dependencies
+
+All required dependencies will be installed automatically. There two optional dependencies that requires manual installation: 
+
+1. casjobs OR sciservevr 
+   
+   You need to install [casjobs](https://github.com/dfm/casjobs) or [sciservevr](https://github.com/sciserver/SciScript-Python) to download SDSS catalogs. 
+   
+   * To install casjobs:
+     ```sh
+     pip install https://github.com/dfm/casjobs/archive/master.zip 
+     ```
+     (Note: Do *NOT* use `pip install casjobs`)
+   
+   * To install sciservevr:
+     ```sh
+     pip install -e "git+https://github.com/sciserver/SciScript-Python.git#egg=SciServer-1.10.2&subdirectory=py3"
+     ```
+   In both cases you need to set environmental variables to store your credentials. (`CASJOBS_WSID` and `CASJOBS_PW` for casjobs; `SCISERVER_USER` and `SCISERVER_PASS` for sciserver). 
+   
+2. kcorrect
+   
+   You need kcorrect for calculating stellar mass. You need to both install the [C code](https://github.com/blanton144/kcorrect) and [Python wrapper](https://github.com/nirinA/kcorrect_python).
+   
+   * To install C code:
+     1. Obtain the code from https://github.com/blanton144/kcorrect
+     2. Follow [this instruction](http://kcorrect.org/#Installing_the_software) and see [some trobuleshooting here](http://kcorrect.org/#Known_problems)
+   
+   * To install Python wrapper
+     1. Make sure you have set the environmental variables `KCORRECT_DIR` and `LD_LIBRARY_PATH` (see [instruction here](https://github.com/nirinA/kcorrect_python#usage))
+     2. Run
+        ```sh
+        pip install https://github.com/nirinA/kcorrect_python/archive/master.zip
+        ```
+   
+   
+   
 ## Example Usage
 
 See more examples at https://github.com/sagasurvey/examples/tree/master/notebooks
@@ -18,26 +58,26 @@ See more examples at https://github.com/sagasurvey/examples/tree/master/notebook
 import SAGA
 from SAGA import ObjectCuts as C
 
-saga_database = SAGA.Database('/path/to/SAGA/data/folder')
+saga_database = SAGA.Database('/path/to/saga/dropbox/folder', '/path/to/saga/local/folder')
 saga_host_catalog = SAGA.HostCatalog(saga_database)
 saga_object_catalog = SAGA.ObjectCatalog(saga_database)
 
-# load host list (no flags)
-hosts_no_flag = saga_host_catalog.load()
+# load host list (all)
+hosts = saga_host_catalog.load('all')
 
-# load host list (no SDSS flags)
-hosts_no_sdss_flags = saga_host_catalog.load('no_sdss_flags')
+# load host list (no flags, i.e. has SDSS)
+hosts_no_flag = saga_host_catalog.load('flag0')
 
-# load all specs with some basic cuts
-specs = saga_object_catalog.load(has_spec=True, cuts=C.basic_cut)
+# load all (Paper 1) specs with some basic cuts
+specs = saga_object_catalog.load(has_spec=True, cuts=C.basic_cut, version='paper1')
 
 # load base catalogs for all paper1 hosts with the same basic cuts into a list:
-base_paper1 = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='list')
+base_paper1 = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='list', version='paper1')
 
 # count number of satellites
 for base in base_paper1:
     print(base['HOST_NSAID'][0], '# of satellites', C.is_sat.count(base))
 
 # load all base catalogs with the same basic cuts into a list
-base_all = saga_object_catalog.load(cuts=C.basic_cut, return_as='list')
+base_all = saga_object_catalog.load('flag0', cuts=C.basic_cut, return_as='list', version='paper1')
 ```
