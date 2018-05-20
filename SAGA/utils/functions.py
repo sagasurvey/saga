@@ -147,8 +147,10 @@ def find_near_objid(table, objid, within_arcsec=3.0):
     return find_near_coord(table, find_objid(table, objid)['coord'], within_arcsec)
 
 
-def view_table_as_2d_array(table, cols=None, dtype=np.float64):
+def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
     """
     Convert an astropy Table to 2d ndarray with a fixed dtype.
     """
-    return np.vstack((table[c].data.astype(dtype, casting='same_kind', copy=False) for c in (cols or table.colnames))).T
+    row_mask = slice() if row_mask is None else row_mask
+    cols = table.colnames if cols is None else cols
+    return np.vstack((table[c][row_mask].data.astype(dtype, casting='same_kind', copy=False) for c in cols)).T

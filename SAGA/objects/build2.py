@@ -237,7 +237,7 @@ def merge_catalogs(**catalog_dict):
         merged_catalog['REMOVE_{}'.format(name)].fill_value = -1
         merged_catalog['is_galaxy_{}'.format(name)].fill_value = False
 
-    return merged_catalog
+    return merged_catalog.filled()
 
 
 def find_best_spec(specs):
