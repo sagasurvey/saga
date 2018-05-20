@@ -720,26 +720,33 @@ def add_stellar_mass(base, cosmology=WMAP9):
         kcorrect.load_filters()
         _HAS_KCORRECT = 'LOADED'
 
-    has_specs_mask = C.has_spec.mask(base)
-    if not has_specs_mask.any():
+    postfix = ''
+    to_calc_query = C.has_spec
+
+    if 'OBJID_sdss' in base.colnames:
+        postfix = '_sdss'
+        to_calc_query &= Query('OBJID_sdss != -1')
+
+    to_calc_mask = to_calc_query.mask(base)
+    if not to_calc_mask.any():
         return base
 
-    postfix = '_sdss' if 'r_mag_sdss' in base.colnames else ''
-    mag = view_table_as_2d_array(base[has_specs_mask], ('{}_mag{}'.format(b, postfix) for b in get_sdss_bands()), np.float32)
-    mag_err = view_table_as_2d_array(base[has_specs_mask], ('{}_err{}'.format(b, postfix) for b in get_sdss_bands()), np.float32)
-    redshift = view_table_as_2d_array(base[has_specs_mask], ['SPEC_Z'], np.float32)
+    mag = view_table_as_2d_array(base, ('{}_mag{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)
+    mag_err = view_table_as_2d_array(base, ('{}_err{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)
+    redshift = view_table_as_2d_array(base, ['SPEC_Z'], to_calc_mask, np.float32)
 
     # CONVERT SDSS MAGNITUDES INTO MAGGIES
     mgy = 10.0 ** (-0.4 * mag)
     mgy_ivar = (0.4 * np.log(10.0) * mgy * mag_err) ** -2.0
+    kcorrect_input = np.hstack((redshift, mgy, mgy_ivar))
 
     # USE ASTROPY TO CALCULATE LUMINOSITY DISTANCE
     lf_distmod = cosmology.distmod(redshift.ravel()).value
 
     # RUN KCORRECT FIT, AND CALCULATE STELLAR MASS
-    kcorrect_coeff = np.vstack((kcorrect.fit_coeffs(c) for c in np.hstack((redshift, mgy, mgy_ivar))))[:, 1:]
-    kcorrect_coeff *= np.array([0.601525, 0.941511, 0.607033, 0.523732, 0.763937], np.float32)
-    base['log_sm'][has_specs_mask] = np.log10(np.sum(kcorrect_coeff, axis=1, dtype=np.float64)) + (0.4 * lf_distmod)
+    tmremain = np.array([0.601525, 0.941511, 0.607033, 0.523732, 0.763937])
+    sm_not_normed = np.fromiter((np.dot(kcorrect.fit_coeffs(x)[1:], tmremain) for x in kcorrect_input), np.float64, len(kcorrect_input))
+    base['log_sm'][to_calc_mask] = np.log10(sm_not_normed) + (0.4 * lf_distmod)
 
     return base
 
