@@ -1,7 +1,9 @@
 import os
 import numpy as np
 from astropy.table import Table, vstack
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, EarthLocation
+from astropy.time import Time
+from astropy.io import fits
 import astropy.constants
 from easyquery import Query
 
@@ -12,10 +14,10 @@ from ..utils import get_empty_str_array, add_skycoord
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
            'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
            'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData',
-           'SPECS_COLUMNS']
+           'ensure_specs_dtype', 'SPECS_COLUMNS']
 
 
-_SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
+_SPEED_OF_LIGHT = astropy.constants.c.to_value('km/s') # pylint: disable=E1101
 
 SPECS_COLUMNS = {
     'RA': '<f8',
@@ -27,10 +29,11 @@ SPECS_COLUMNS = {
     'MASKNAME': '<U48',
     'TELNAME': '<U6',
     'EM_ABS': '<i2',
+    'HELIO_CORR': '|b1',
 }
 
-def ensure_dtype(spectra):
-    for c, t in SPECS_COLUMNS.items():
+def ensure_specs_dtype(spectra, cols_definition=SPECS_COLUMNS):
+    for c, t in cols_definition.items():
         if c not in spectra.colnames:
             if t[1] == 'f':
                 spectra[c] = np.nan
@@ -38,10 +41,24 @@ def ensure_dtype(spectra):
                 spectra[c] = -1
             elif t[1] == 'U':
                 spectra[c] = ''
+            elif t[1] == 'b':
+                spectra[c] = False
+            else:
+                raise ValueError('unknown spec type!')
         if spectra[c].dtype.str != t:
             spectra[c] = spectra[c].astype(t)
 
     return spectra
+
+
+def heliocentric_correction(fits_filepath, site_name,
+                            ra_name='RA', dec_name='DEC', time_name='MJD',
+                            ra_unit='hourangle', dec_unit='deg', time_format='mjd'):
+    hdr = fits.getheader(fits_filepath)
+    sc = SkyCoord(hdr[ra_name], hdr[dec_name], unit=(ra_unit, dec_unit))
+    obstime = Time(hdr[time_name], format=time_format)
+    helio_corr = sc.radial_velocity_correction('heliocentric', obstime=obstime, location=EarthLocation.of_site(site_name))
+    return helio_corr.to_value(astropy.constants.c) # pylint: disable=E1101
 
 
 def read_gama(file_path):
@@ -57,8 +74,9 @@ def read_gama(file_path):
     specs['SPEC_Z_ERR'] = np.float32(60)
     specs['TELNAME'] = get_empty_str_array(len(specs), 6, 'GAMA')
     specs['ZQUALITY'][Query('ZQUALITY > 4').mask(specs)] = 4
+    specs['HELIO_CORR'] = True
 
-    return ensure_dtype(specs)
+    return ensure_specs_dtype(specs)
 
 
 def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
@@ -86,7 +104,7 @@ def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
     if postprocess:
         output = postprocess(output)
 
-    return ensure_dtype(output)
+    return ensure_specs_dtype(output)
 
 
 def read_mmt(dir_path):
@@ -94,35 +112,72 @@ def read_mmt(dir_path):
     usecols = {2:'RA', 3:'DEC', 4:'mag', 5:'SPEC_Z', 6:'SPEC_Z_ERR',
                7:'ZQUALITY', 8:'SPECOBJID'}
     cuts = Query('mag != 0', 'ZQUALITY >= 1')
+
+    def midprocess(t):
+        fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
+        try:
+            corr = heliocentric_correction(fits_filepath, 'mmt', 'RA', 'DEC', 'MJD')
+        except IOError:
+            t['HELIO_CORR'] = False
+        else:
+            t['SPEC_Z'] += corr
+            t['HELIO_CORR'] = True
+        return t
+
     def postprocess(t):
         del t['mag']
         t['RA'] *= 15.0
         return t
 
-    return read_generic_spectra(dir_path, '.zlog', 'MMT', usecols, 11, cuts, postprocess)
+    return read_generic_spectra(dir_path, '.zlog', 'MMT', usecols, 11, cuts, postprocess, midprocess)
 
 
 def read_aat(dir_path):
 
     usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 7:'ZQUALITY', 8:'SPECOBJID'}
     cuts = Query('ZQUALITY >= 1')
+
+    def midprocess(t):
+        fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
+        try:
+            corr = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
+        except IOError:
+            t['HELIO_CORR'] = False
+        else:
+            t['SPEC_Z'] += corr
+            t['HELIO_CORR'] = True
+        return t
+
     def postprocess(t):
         t['SPEC_Z_ERR'] = 10.0
         return t
 
-    return read_generic_spectra(dir_path, '.zlog', 'AAT', usecols, 11, cuts, postprocess)
+    return read_generic_spectra(dir_path, '.zlog', 'AAT', usecols, 11, cuts, postprocess, midprocess)
 
 
 def read_aat_mz(dir_path):
 
     usecols = {3:'RA', 4:'DEC', 13:'SPEC_Z', 14:'ZQUALITY', 1:'SPECOBJID'}
     cuts = Query('ZQUALITY >= 1')
+
+    def midprocess(t):
+        fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
+        try:
+            corr = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
+        except IOError:
+            t['HELIO_CORR'] = False
+        else:
+            t['SPEC_Z'] += corr
+            t['HELIO_CORR'] = True
+        return t
+
     def postprocess(t):
         t['RA'] *= 180.0/np.pi
         t['DEC'] *= 180.0/np.pi
         t['SPEC_Z_ERR'] = 10.0
         return t
-    return read_generic_spectra(dir_path, '.mz', 'AAT', usecols, 15, cuts, postprocess, delimiter=',')
+
+    return read_generic_spectra(dir_path, '.mz', 'AAT', usecols, 15, cuts, postprocess, midprocess, delimiter=',')
 
 
 def read_imacs(dir_path):
@@ -159,7 +214,7 @@ def read_wiyn(dir_path):
     output['DEC'] = sc.dec.deg
     del sc
 
-    return ensure_dtype(output)
+    return ensure_specs_dtype(output)
 
 
 def read_deimos():
@@ -173,7 +228,7 @@ def read_deimos():
         'ZQUALITY'   : [4, 4, 4],
         'TELNAME'    : ['DEIMOS', 'DEIMOS', 'DEIMOS'],
     }
-    return ensure_dtype(Table(data))
+    return ensure_specs_dtype(Table(data))
 
 
 def read_palomar():
@@ -187,7 +242,7 @@ def read_palomar():
         'ZQUALITY'   : [4, 4],
         'TELNAME'    : ['MMT', 'MMT'],
     }
-    return ensure_dtype(Table(data))
+    return ensure_specs_dtype(Table(data))
 
 
 def read_6dF(file_path):
@@ -206,8 +261,9 @@ def read_6dF(file_path):
     specs.rename_column('e_cz','SPEC_Z_ERR')
     specs['TELNAME'] = '6dF'
     specs['MASKNAME'] = '6dF'
+    specs['HELIO_CORR'] = True
 
-    return ensure_dtype(specs)
+    return ensure_specs_dtype(specs)
 
 
 def read_2dF(file_path):
@@ -226,8 +282,9 @@ def read_2dF(file_path):
     specs['SPEC_Z_ERR'] = 60
     specs['TELNAME'] = '2dF'
     specs['MASKNAME'] = '2dF'
+    specs['HELIO_CORR'] = True
 
-    return ensure_dtype(specs)
+    return ensure_specs_dtype(specs)
 
 
 def extract_sdss_spectra(sdss):
@@ -236,8 +293,9 @@ def extract_sdss_spectra(sdss):
     specs['TELNAME'] = 'SDSS'
     specs['MASKNAME'] = 'SDSS'
     specs['SPECOBJID'] = ''
+    specs['HELIO_CORR'] = True
     del specs['SPEC_Z_WARN']
-    return ensure_dtype(specs)
+    return ensure_specs_dtype(specs)
 
 
 def extract_nsa_spectra(nsa):
@@ -245,10 +303,11 @@ def extract_nsa_spectra(nsa):
     specs['TELNAME'] = 'NSA'
     specs['SPEC_Z_ERR'] = 0
     specs['ZQUALITY'] = 4
+    specs['HELIO_CORR'] = True
     specs.rename_column('Z', 'SPEC_Z')
     specs.rename_column('ZSRC', 'MASKNAME')
     specs.rename_column('NSAID', 'SPECOBJID')
-    return ensure_dtype(specs)
+    return ensure_specs_dtype(specs)
 
 
 class SpectraData(object):
