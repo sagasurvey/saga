@@ -113,7 +113,7 @@ class TargetSelection(object):
             elif return_as[0] == 'l':
                 return list(output_iter)
             elif return_as[0] == 's':
-                return vstack(list(output_iter))
+                return vstack(list(output_iter), 'outer', 'error')
 
 
     def clear_target_catalogs(self):

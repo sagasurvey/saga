@@ -183,7 +183,7 @@ class ObjectCatalog(object):
             if return_as[0] == 'i':
                 return output_iterator
             elif return_as[0] == 's':
-                out = vstack(list(output_iterator), 'exact', 'error')
+                out = vstack(list(output_iterator), 'outer', 'error')
                 if need_coord:
                     out = self._slice_columns(add_skycoord(out), columns)
                 return out
