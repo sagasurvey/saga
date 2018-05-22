@@ -14,7 +14,7 @@ import astropy.units
 
 from . import build
 from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
-from ..database.spectra import extract_nsa_spectra, extract_sdss_spectra
+from ..database.spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS
 
 __all__ = ['prepare_sdss_catalog_for_merging',
            'prepare_des_catalog_for_merging',
@@ -301,17 +301,12 @@ def merge_spectra(specs):
 
 
 def add_columns_for_spectra(base):
-    base['RA_spec'] = np.nan
-    base['DEC_spec'] = np.nan
-    base['SPEC_Z'] = np.float32(-1)
-    base['SPEC_Z_ERR'] = np.float32(-1)
-    base['ZQUALITY'] = np.int16(-1)
-    base['EM_ABS'] = np.int16(-1)
-    base['TELNAME'] = get_empty_str_array(len(base), 6)
-    base['MASKNAME'] = get_empty_str_array(len(base), 48)
-    base['SPECOBJID'] = get_empty_str_array(len(base), 48)
-    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
     base['OBJ_NSAID'] = np.int32(-1)
+    cols_definition = SPECS_COLUMNS.copy()
+    for col in ('RA', 'DEC'):
+        cols_definition[col+'_spec'] = cols_definition[col]
+        del cols_definition[col]
+    base = ensure_specs_dtype(base, cols_definition)
     return base
 
 
@@ -369,9 +364,9 @@ def add_spectra(base, specs):
 
     specs.sort('matched_idx')
     start_idx = np.flatnonzero(specs['matched_idx'] > -1)[0]
-    for col in ('RA_spec', 'DEC_spec', 'SPEC_Z', 'SPEC_Z_ERR', 'ZQUALITY',
-                'TELNAME', 'MASKNAME', 'SPECOBJID', 'SPEC_REPEAT', 'OBJ_NSAID'):
-        base[col][specs['matched_idx'][start_idx:]] = specs[col.replace('_spec', '')][start_idx:]
+    for col in SPECS_COLUMNS:
+        col_base = (col + '_spec') if col in ('RA', 'DEC') else col
+        base[col_base][specs['matched_idx'][start_idx:]] = specs[col][start_idx:]
 
     specs_warn = specs[np.flatnonzero(specs['matched_idx'] > -2)[0]:start_idx]
     specs_warn = specs_warn[specs_warn['SPEC_REPEAT'] != 'GAMA']
