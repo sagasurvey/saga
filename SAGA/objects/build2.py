@@ -70,12 +70,8 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
 
     catalog['is_galaxy'] = (catalog['PHOTPTYPE'] == 3)
 
-    try:
-        catalog.rename_column('PETRORAD_R', 'radius')
-        catalog.rename_column('PETRORADERR_R', 'radius_err')
-    except KeyError:
-        pass
-
+    catalog['radius'] = catalog['PETROR50_R']
+    catalog['radius_err'] = catalog['PETRORADERR_R'] * catalog['PETROR50_R'] / catalog['PETRORAD_R']
     fill_values_by_query(catalog, Query('radius_err < 0') | (~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
 
     remove_queries = [
@@ -112,7 +108,8 @@ def prepare_des_catalog_for_merging(catalog):
         catalog.rename_column('dec', 'DEC')
         catalog.rename_column('objid', 'OBJID')
     except KeyError:
-        pass
+        if not all((col in catalog.colnames for col in ('RA', 'DEC', 'OBJID'))):
+            raise RuntimeError('Cannot rename `RA`, `DEC`, and/or `OBJID` in DES catalog')
 
     gi = catalog['g_mag'] - catalog['i_mag']
     catalog['g_mag'] += (-0.0009 + 0.055 * gi)
@@ -143,6 +140,9 @@ def prepare_decals_catalog_for_merging(catalog):
     for band in 'uiy':
         catalog['{}_mag'.format(band)] = 99.0
         catalog['{}_err'.format(band)] = 99.0
+
+    for band in 'grz':
+        catalog['{}_mag'.format(band)] += 0.1
 
     catalog['REMOVE'] = get_remove_flag(catalog, [
         'radius >= 20',
