@@ -161,7 +161,7 @@ def read_aat_mz(dir_path):
     cuts = Query('ZQUALITY >= 1')
 
     def midprocess(t):
-        fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
+        fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.mz', '.fits.gz'))
         try:
             corr = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
         except IOError:
