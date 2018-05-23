@@ -14,13 +14,13 @@ def test_create_database():
 
 def test_download_google():
     d = Database()
-    d1 = d['hosts_named'].read()
+    d1 = d['hosts'].read()
     t = tempfile.mkstemp()[1]
     try:
-        d['hosts_named'].download(t, overwrite=True)
-        d['hosts_named'].clear_cache()
-        d['hosts_named'].remote = None
-        d2 = d['hosts_named'].read()
+        d['hosts'].download(t, overwrite=True)
+        d['hosts'].clear_cache()
+        d['hosts'].remote = None
+        d2 = d['hosts'].read()
         for k in d1.columns:
             assert (d1[k]==d2[k]).all()
     finally:
@@ -28,14 +28,14 @@ def test_download_google():
 
 def test_set_local():
     d = Database()
-    d1 = d['hosts_named'].read()
+    d1 = d['hosts'].read()
     t = tempfile.mkstemp()[1]
     try:
-        d['hosts_named'].download(t, overwrite=True, set_as_local=False)
-        d['hosts_named'].clear_cache()
-        d['hosts_named'].remote = None
-        d['hosts_named'].local = t
-        d2 = d['hosts_named'].read()
+        d['hosts'].download(t, overwrite=True, set_as_local=False)
+        d['hosts'].clear_cache()
+        d['hosts'].remote = None
+        d['hosts'].local = t
+        d2 = d['hosts'].read()
         for k in d1.columns:
             assert (d1[k]==d2[k]).all()
     finally:
@@ -54,10 +54,10 @@ def test_set_base():
 
 def test_download_default():
     d = Database()
-    d1 = d['hosts_named'].read()
+    d1 = d['hosts'].read()
     t = tempfile.mkstemp()[1]
     try:
-        dobj = DataObject(d['hosts_named'].remote, CsvTable(t))
+        dobj = DataObject(d['hosts'].remote, CsvTable(t))
         dobj.download(overwrite=True)
         dobj.clear_cache()
         dobj.remote = None
