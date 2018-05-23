@@ -94,7 +94,7 @@ class TargetSelection(object):
         if return_as[0] not in 'ndsli':
             raise ValueError('`return_as` should be None, "dict", "list", "stacked", or "iter"')
 
-        host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
+        host_ids = self._host_catalog.resolve_id(hosts, 'string')
 
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:

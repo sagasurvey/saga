@@ -130,6 +130,9 @@ class HostCatalog(object):
         """
         indices = []
 
+        if hosts is None:
+            hosts = 'all'
+
         if _is_string_like(hosts):
             hosts = hosts.replace(' ', '').lower()
 
@@ -210,7 +213,7 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_host_catalog.load('no_flags')
         >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
-        cat = self._hosts[self.resolve_id(hosts or 'all', 'internal')]
+        cat = self._hosts[self.resolve_id('all' if hosts is None else hosts, 'internal')]
         return add_skycoord(cat, dec_label='Dec') if add_coord else cat
 
 

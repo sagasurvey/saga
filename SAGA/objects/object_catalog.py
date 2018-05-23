@@ -173,7 +173,7 @@ class ObjectCatalog(object):
             elif has_spec is not None:
                 q &= (~C.has_spec)
 
-            hosts = self._host_catalog.resolve_id(hosts or 'all', 'string')
+            hosts = self._host_catalog.resolve_id(hosts, 'string')
 
             need_coord = (columns is None or 'coord' in columns)
             to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
@@ -253,7 +253,7 @@ class ObjectCatalog(object):
         sdss_remove = self._database['sdss_remove'].read()
         sdss_recover = self._database['sdss_recover'].read()
 
-        host_ids = self._host_catalog.resolve_id(hosts or 'all', 'string')
+        host_ids = self._host_catalog.resolve_id(hosts, 'string')
         for i, host_id in enumerate(host_ids):
 
             if base_file_path_pattern is None:
