@@ -731,6 +731,10 @@ def add_stellar_mass(base, cosmology=WMAP9):
     if not to_calc_mask.any():
         return base
 
+    if 'r_mag' not in base.colnames:
+        for b in get_sdss_bands():
+            base['{}_mag'.format(b)] = base[b] - base['EXTINCTION_{}'.format(b.upper())]
+
     mag = view_table_as_2d_array(base, ('{}_mag{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)
     mag_err = view_table_as_2d_array(base, ('{}_err{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)
     redshift = view_table_as_2d_array(base, ['SPEC_Z'], to_calc_mask, np.float32)
