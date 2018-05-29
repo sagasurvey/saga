@@ -302,6 +302,7 @@ def merge_spectra(specs):
 
 def add_columns_for_spectra(base):
     base['OBJ_NSAID'] = np.int32(-1)
+    base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
     cols_definition = SPECS_COLUMNS.copy()
     for col in ('RA', 'DEC'):
         cols_definition[col+'_spec'] = cols_definition[col]
@@ -364,7 +365,7 @@ def add_spectra(base, specs):
 
     specs.sort('matched_idx')
     start_idx = np.flatnonzero(specs['matched_idx'] > -1)[0]
-    for col in SPECS_COLUMNS:
+    for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'OBJ_NSAID'):
         col_base = (col + '_spec') if col in ('RA', 'DEC') else col
         base[col_base][specs['matched_idx'][start_idx:]] = specs[col][start_idx:]
 

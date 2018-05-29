@@ -47,6 +47,7 @@ is_low_z = Query('SPEC_Z >= 0.0038', 'SPEC_Z <= 0.015')
 obj_is_host = Query('OBJ_NSAID==HOST_NSAID')
 
 has_sdss_spec = Query((lambda c: np.fromiter(('SDSS' in i for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
+has_sdss_nsa_spec = Query((lambda c: np.fromiter((('SDSS' in i) or ('NSA' in i) for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
 
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
