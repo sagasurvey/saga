@@ -151,6 +151,6 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
     """
     Convert an astropy Table to 2d ndarray with a fixed dtype.
     """
-    row_mask = slice() if row_mask is None else row_mask
+    row_mask = slice(None) if row_mask is None else row_mask
     cols = table.colnames if cols is None else cols
     return np.vstack((table[c][row_mask].data.astype(dtype, casting='same_kind', copy=False) for c in cols)).T
