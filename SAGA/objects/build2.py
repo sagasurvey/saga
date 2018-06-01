@@ -464,7 +464,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             continue
 
         else:
-            remove_radius = 1.25 * obj_this['radius']
+            remove_radius = 2.0 * obj_this['radius']
             nearby_obj_mask = (base['coord'].separation(obj_this['coord']).arcsec < remove_radius)
             remove_flag = 22
 
