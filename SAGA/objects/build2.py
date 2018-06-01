@@ -240,6 +240,23 @@ def merge_catalogs(**catalog_dict):
     return merged_catalog.filled()
 
 
+def replace_poor_sdss_sky_subtraction(base):
+
+    mask = Query(
+        'abs(r_mag_sdss - r_mag_decals) > 2',
+        (lambda s: s == 'sdss', 'survey'),
+        'OBJID_decals != -1',
+        'REMOVE_decals == 0',
+    ).mask(base)
+
+    base['survey'][mask] = 'decals'
+    for col in base.colnames:
+        if col.endswith('_decals'):
+            base[col.rpartition('_')[0]][mask] = base[col][mask]
+
+    return base
+
+
 def find_best_spec(specs):
     d = dict(SDSS=0, GAMA=1, NSA=2, AAT=4, MMT=5)
     rank = np.fromiter((d.get(t, 3) for t in specs['TELNAME']), np.int, len(specs))
@@ -447,7 +464,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             continue
 
         else:
-            remove_radius = 1.25 * obj_this['radius']
+            remove_radius = 2.0 * obj_this['radius']
             nearby_obj_mask = (base['coord'].separation(obj_this['coord']).arcsec < remove_radius)
             remove_flag = 22
 
@@ -509,6 +526,9 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
             all_spectra.append(spectra)
 
     base = merge_catalogs(sdss=sdss, des=des, decals=decals)
+    if sdss is not None and decals is not None:
+        base = replace_poor_sdss_sky_subtraction(base)
+
     base = build.add_host_info(base, host)
     del sdss, des, decals, spectra
 

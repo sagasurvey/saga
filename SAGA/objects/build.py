@@ -669,8 +669,8 @@ def find_satellites(base, version=1):
     if 'SATS' not in base.colnames:
         base['SATS'] = np.int16(-1)
 
-    is_galaxy = C.is_galaxy if version == 1 else Query('is_galaxy')
-    is_clean = C.is_clean if version == 1 else Query('REMOVE == 0')
+    is_galaxy = C.is_galaxy if version == 1 else C.is_galaxy2
+    is_clean = C.is_clean if version == 1 else C.is_clean2
 
     # clean objects
     clean_obj = is_galaxy & C.has_spec & is_clean
