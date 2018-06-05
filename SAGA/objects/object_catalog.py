@@ -205,7 +205,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False):
         """
         This function build base catalog and write to the database.
 
@@ -253,9 +253,10 @@ class ObjectCatalog(object):
         sdss_remove = self._database['sdss_remove'].read()
         sdss_recover = self._database['sdss_recover'].read()
 
+        catalogs_to_return = list()
         host_ids = self._host_catalog.resolve_id(hosts, 'string')
-        for i, host_id in enumerate(host_ids):
 
+        for i, host_id in enumerate(host_ids):
             if base_file_path_pattern is None:
                 data_obj = self._database['base_v{}'.format(version), host_id].remote
             else:
@@ -281,10 +282,25 @@ class ObjectCatalog(object):
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join((k for k, v in catalog_dict.items() if v is not None)), host_id))
 
-            base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
-                                                 sdss_remove=sdss_remove, sdss_recover=sdss_recover,
-                                                 **catalog_dict)
-            del catalog_dict
+            try:
+                base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
+                                                     sdss_remove=sdss_remove, sdss_recover=sdss_recover,
+                                                     **catalog_dict)
+            except Exception as e: # pylint: disable=W0703
+                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
+                base = None
+                continue
+            finally:
+                del catalog_dict
+                if return_catalogs:
+                    catalogs_to_return.append(base)
 
             print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
-            data_obj.write(base)
+            try:
+                data_obj.write(base)
+            except (IOError, OSError) as e:
+                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to write base catalog for {}\n{}'.format(host_id, e))
+                continue
+
+        if return_catalogs:
+            return catalogs_to_return

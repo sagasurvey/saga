@@ -707,33 +707,34 @@ def add_stellar_mass(base, cosmology=WMAP9):
     -------
     base : astropy.table.Table
     """
-    global _HAS_KCORRECT
-
     base['log_sm'] = np.nan
 
+    global _HAS_KCORRECT
     if not _HAS_KCORRECT:
         logging.warn('No kcorrect module. Stellar mass not calculated!')
+        return base
+
+    postfix = ''
+    to_calc_query = C.has_spec
+    if 'OBJID_sdss' in base.colnames: # version 2 base catalog with SDSS
+        postfix = '_sdss'
+        to_calc_query &= Query('OBJID_sdss != -1')
+    elif 'EXTINCTION_u' in base.colnames: # version 1 base catalog
+        for b in get_sdss_bands():
+            base['{}_mag'.format(b)] = base[b] - base['EXTINCTION_{}'.format(b.upper())]
+    else: # version 2 base catalog without SDSS
+        logging.warn('No SDSS bands! Stellar mass not calculated!')
+        return base
+
+    to_calc_mask = to_calc_query.mask(base)
+    if not to_calc_mask.any():
+        logging.warn('Stellar mass not calculated because no valid entry!')
         return base
 
     if _HAS_KCORRECT != 'LOADED':
         kcorrect.load_templates()
         kcorrect.load_filters()
         _HAS_KCORRECT = 'LOADED'
-
-    postfix = ''
-    to_calc_query = C.has_spec
-
-    if 'OBJID_sdss' in base.colnames:
-        postfix = '_sdss'
-        to_calc_query &= Query('OBJID_sdss != -1')
-
-    to_calc_mask = to_calc_query.mask(base)
-    if not to_calc_mask.any():
-        return base
-
-    if 'r_mag' not in base.colnames:
-        for b in get_sdss_bands():
-            base['{}_mag'.format(b)] = base[b] - base['EXTINCTION_{}'.format(b.upper())]
 
     mag = view_table_as_2d_array(base, ('{}_mag{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)
     mag_err = view_table_as_2d_array(base, ('{}_err{}'.format(b, postfix) for b in get_sdss_bands()), to_calc_mask, np.float32)

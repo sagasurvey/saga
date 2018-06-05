@@ -17,8 +17,8 @@ COLUMNS_USED = ['ZQUALITY', 'REMOVE', 'PHOTPTYPE', 'FIBERMAG_R', 'SPEC_Z',
                 'SPEC_REPEAT', 'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
 
 COLUMNS_USED2 = ['ZQUALITY', 'REMOVE', 'is_galaxy', 'SPEC_Z',
-                'RHOST_KPC', 'HOST_VHOST', 'SATS', 'SPEC_REPEAT',
-                'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
+                 'RHOST_KPC', 'HOST_VHOST', 'SATS', 'SPEC_REPEAT',
+                 'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
 
 has_spec = Query('ZQUALITY >= 3')
 is_clean = Query('REMOVE == -1')
@@ -44,7 +44,7 @@ is_sat = Query('SATS == 1')
 is_high_z = Query('SPEC_Z >= 0.03')
 is_low_z = Query('SPEC_Z >= 0.0038', 'SPEC_Z <= 0.015')
 
-obj_is_host = Query('OBJ_NSAID==HOST_NSAID')
+obj_is_host = Query('OBJ_NSAID == HOST_NSAID')
 
 has_sdss_spec = Query((lambda c: np.fromiter(('SDSS' in i for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
 has_sdss_nsa_spec = Query((lambda c: np.fromiter((('SDSS' in i) or ('NSA' in i) for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
