@@ -714,12 +714,12 @@ def add_stellar_mass(base, cosmology=WMAP9):
         logging.warn('No kcorrect module. Stellar mass not calculated!')
         return base
 
-    postfix = ''
-    to_calc_query = C.has_spec
     if 'OBJID_sdss' in base.colnames: # version 2 base catalog with SDSS
         postfix = '_sdss'
-        to_calc_query &= Query('OBJID_sdss != -1')
+        to_calc_query = Query(C.has_spec, 'OBJID_sdss != -1')
     elif 'EXTINCTION_u' in base.colnames: # version 1 base catalog
+        postfix = ''
+        to_calc_query = C.has_spec
         for b in get_sdss_bands():
             base['{}_mag'.format(b)] = base[b] - base['EXTINCTION_{}'.format(b.upper())]
     else: # version 2 base catalog without SDSS

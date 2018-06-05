@@ -169,9 +169,9 @@ class ObjectCatalog(object):
         else:
             q = Query(cuts)
             if has_spec:
-                q &= C.has_spec
+                q = q & C.has_spec
             elif has_spec is not None:
-                q &= (~C.has_spec)
+                q = q & (~C.has_spec)
 
             hosts = self._host_catalog.resolve_id(hosts, 'string')
 
@@ -205,37 +205,31 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False, raise_exception=False):
         """
         This function build base catalog and write to the database.
 
         !! IMPORTANT !!
         If you want to write the base catalog to an alternative location (not the database)
-        Make sure you set the base_file_path_pattern option!!
+        Make sure you set the `base_file_path_pattern` option!!
 
         Parameters
         ----------
-        hosts : int, str, list, None, optional
+        hosts : int, str, list, optional
             host names/IDs or a list of host names/IDs or short-hand names like
             "paper1" or "paper1_complete"
 
-        overwrite : bool, optional
+        overwrite : bool, optional (default: False)
             If set to True, overwrite existing base catalog
 
         base_file_path_pattern : str, optional
-
-        version : int, optional
+        version : int, optional (default: 2)
+        return_catalogs : bool, optional (default: False)
+        raise_exception : bool, optional (default: False)
 
         Examples
         --------
-        >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox')
-
-        You need to set some local paths first
-        >>> saga_database.sdss_file_path_pattern = '/path/to/sdss/nsa{}.fits.gz'
-        >>> saga_database.wise_file_path_pattern = '/path/to/wise/nsa{}.fits.gz'
-        >>> saga_database['spectra_gama'].local = '/path/to/gama/SpecObj.fits'
-        >>> saga_database['nsa_v0.1.2'].local = '/path/to/nsa_v0_1_2.fits'
-
+        >>> saga_database = SAGA.Database('/path/to/SAGA/Dropbox', '/path/to/SAGA/local')
         >>> saga_object_catalog = SAGA.ObjectCatalog(saga_database)
 
         Overwrite the database (Danger!!)
@@ -263,10 +257,8 @@ class ObjectCatalog(object):
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
             if data_obj.isfile() and not overwrite:
-                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog of {} already exists.'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
+                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists.'.format(version, host_id), '({}/{})'.format(i+1, len(host_ids)))
                 continue
-
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Start to base catalog for {}'.format(host_id), '({}/{})'.format(i+1, len(host_ids)))
 
             host = self._host_catalog.load_single(host_id)
             catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
@@ -280,7 +272,15 @@ class ObjectCatalog(object):
 
             catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Using {} to build {}'.format(', '.join((k for k, v in catalog_dict.items() if v is not None)), host_id))
+            print(
+                time.strftime('[%m/%d %H:%M:%S]'),
+                'Use {} to build base catalog v{} for {}'.format(
+                    ', '.join((k for k, v in catalog_dict.items() if v is not None)).upper(),
+                    version,
+                    host_id
+                ),
+                '({}/{})'.format(i+1, len(host_ids))
+            )
 
             try:
                 base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
@@ -289,13 +289,15 @@ class ObjectCatalog(object):
             except Exception as e: # pylint: disable=W0703
                 print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
                 base = None
+                if raise_exception:
+                    raise e
                 continue
             finally:
                 del catalog_dict
                 if return_catalogs:
                     catalogs_to_return.append(base)
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Writing base catalog to {}'.format(data_obj.path))
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'Write base catalog to {}'.format(data_obj.path))
             try:
                 data_obj.write(base)
             except (IOError, OSError) as e:
