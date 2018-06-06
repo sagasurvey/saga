@@ -9,7 +9,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog
-from .assign_targeting_score import assign_targeting_score, COLUMNS_USED
+from .assign_targeting_score import assign_targeting_score, COLUMNS_USED, COLUMNS_USED2
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog']
 
@@ -38,9 +38,6 @@ class TargetSelection(object):
                  assign_targeting_score_func=None, gmm_parameters=None,
                  manual_selected_objids=None, version=2):
         self._version = version
-        if self._version != 1:
-            raise ValueError('Only support version==1 for now!')
-
         self._database = database
         self._host_catalog = HostCatalog(self._database)
         self._object_catalog = ObjectCatalog(self._database)
@@ -63,10 +60,15 @@ class TargetSelection(object):
 
         self._cuts = cuts
         self._additional_columns = additional_columns or []
-        self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
-                                      ('PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'),
-                                      COLUMNS_USED,
-                                      self._additional_columns)))
+        if self._version == 1:
+            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
+                                          ('PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'),
+                                          COLUMNS_USED,
+                                          self._additional_columns)))
+        else:
+            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'is_galaxy', 'radius', 'radius_err'),
+                                          COLUMNS_USED2,
+                                          self._additional_columns)))
 
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,

@@ -5,13 +5,17 @@ from astropy.coordinates import search_around_sky, SkyCoord
 from astropy import units as u
 
 
-__all__ = ['get_sdss_bands', 'get_sdss_colors', 'add_skycoord',
-           'get_empty_str_array', 'get_decals_viewer_image', 'fill_values_by_query',
-           'get_remove_flag', 'view_table_as_2d_array',
+__all__ = ['get_sdss_bands', 'get_sdss_colors', 'get_des_bands', 'get_des_colors',
+           'get_decals_bands', 'get_decals_colors', 'get_all_bands', 'get_all_colors',
+           'add_skycoord', 'get_empty_str_array', 'get_decals_viewer_image',
+           'fill_values_by_query', 'get_remove_flag', 'view_table_as_2d_array',
            'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec']
 
 
 _sdss_bands = 'ugriz'
+_des_bands = 'grizy'
+_decals_bands = 'grz'
+_all_bands = 'ugrizy'
 
 
 def get_sdss_bands():
@@ -20,6 +24,30 @@ def get_sdss_bands():
 
 def get_sdss_colors():
     return list(map(''.join, zip(_sdss_bands[:-1], _sdss_bands[1:])))
+
+
+def get_des_bands():
+    return list(_des_bands)
+
+
+def get_des_colors():
+    return list(map(''.join, zip(_des_bands[:-1], _des_bands[1:])))
+
+
+def get_decals_bands():
+    return list(_decals_bands)
+
+
+def get_decals_colors():
+    return list(map(''.join, zip(_decals_bands[:-1], _decals_bands[1:])))
+
+
+def get_all_bands():
+    return list(_all_bands)
+
+
+def get_all_colors():
+    return list(map(''.join, zip(_all_bands[:-1], _all_bands[1:]))) + ['rz']
 
 
 def get_empty_str_array(array_length, string_length=48, initialize_with=''):

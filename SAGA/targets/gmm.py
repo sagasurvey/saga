@@ -42,15 +42,12 @@ class XDGMM(object):
         return dict(zip(labels, self.params)) if labels else self.params
 
 
-def get_input_data(catalog, colors=None, color_errors=None, mag_errors=None,
-                   include_covariance=True):
-    if colors is None:
-        colors = get_sdss_colors()
-    if color_errors is None:
-        color_errors = [c+'_err' for c in colors]
-    if mag_errors is None:
-        mag_errors = [b+'_err' for b in get_sdss_bands()[1:-1]]
-    assert len(mag_errors) == len(colors) - 1
+def get_input_data(catalog, bands=tuple(get_sdss_bands()),
+                   mag_err_postfix='_err', color_postfix='',
+                   color_err_postfix='_err', include_covariance=True):
+    colors = [''.join((b1, b2, color_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])]
+    color_errors = [''.join((b1, b2, color_err_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])]
+    mag_errors = [b + mag_err_postfix for b in bands[1:-1]]
     X = view_table_as_2d_array(catalog, colors)
     Xcov = np.stack((np.diag(e*e) for e in view_table_as_2d_array(catalog, color_errors)))
     if include_covariance:
@@ -93,10 +90,11 @@ def calc_model1_prob(data, data_cov, model_params, priors=None):
 
 
 def calc_gmm_satellite_probability(base, model_parameters, p_sat_prior=None,
-                                   colors=None, color_errors=None, mag_errors=None,
+                                   bands=tuple(get_sdss_bands()), mag_err_postfix='_err',
+                                   color_postfix='', color_err_postfix='_err',
                                    include_covariance=True):
-    data, data_cov = get_input_data(base, colors=colors, color_errors=color_errors,
-                                    mag_errors=mag_errors,
+    data, data_cov = get_input_data(base, bands=bands, mag_err_postfix=mag_err_postfix,
+                                    color_postfix=color_postfix, color_err_postfix=color_err_postfix,
                                     include_covariance=include_covariance)
     model_params = (
         tuple(model_parameters[k] for k in param_labels_sat),
