@@ -102,7 +102,7 @@ def prepare_des_catalog_for_merging(catalog):
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
 
-    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 2)
+    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 3)
     catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
 
     try:
