@@ -28,7 +28,7 @@ __all__ = ['prepare_sdss_catalog_for_merging',
            'NSA_COLS_USED']
 
 MERGED_CATALOG_COLUMNS = list(chain(
-    ('OBJID', 'RA', 'DEC', 'REMOVE', 'is_galaxy', 'radius', 'radius_err'),
+    ('OBJID', 'RA', 'DEC', 'REMOVE', 'is_galaxy', 'morphology_info', 'radius', 'radius_err'),
     (b+'_mag' for b in 'ugrizy'),
     (b+'_err' for b in 'ugrizy'),
 ))
