@@ -7,7 +7,7 @@ from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012
 from ..database import FitsTable, Database
 from ..hosts import HostCatalog
-from ..utils import get_sdss_bands, get_sdss_colors, add_skycoord, fill_values_by_query
+from ..utils import get_sdss_bands, get_sdss_colors, get_all_colors, add_skycoord, fill_values_by_query
 
 
 __all__ = ['ObjectCatalog']
@@ -48,7 +48,9 @@ class ObjectCatalog(object):
             for b in get_sdss_bands():
                 table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
 
-        for color in list(get_sdss_colors()) + ['rz']:
+        for color in get_all_colors():
+            if '{}_mag'.format(color[0]) not in table.colnames or '{}_mag'.format(color[1]) not in table.colnames:
+                continue
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
             table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
 
