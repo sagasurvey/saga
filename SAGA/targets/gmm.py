@@ -3,7 +3,7 @@ GMM related routines
 """
 import numpy as np
 from scipy.special import logsumexp
-from ..utils import get_sdss_bands, get_sdss_colors, view_table_as_2d_array
+from ..utils import get_sdss_bands, view_table_as_2d_array
 
 try:
     from sklearn.mixture import GaussianMixture

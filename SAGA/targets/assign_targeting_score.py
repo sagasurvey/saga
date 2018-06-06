@@ -5,7 +5,7 @@ from itertools import chain
 import numpy as np
 from easyquery import Query
 from ..objects import cuts as C
-from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_all_bands, get_all_colors
+from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_des_bands
 from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_data, param_labels_nosat
 
 __all__ = ['assign_targeting_score', 'calc_simple_satellite_probability', 'calc_gmm_satellite_probability']
@@ -16,12 +16,6 @@ COLUMNS_USED = list(set(chain(C.COLUMNS_USED, ['TELNAME'],
                               map('{}_err'.format, get_sdss_bands()),
                               get_sdss_colors(),
                               map('{}_err'.format, get_sdss_colors()))))
-
-COLUMNS_USED2 = list(set(chain(C.COLUMNS_USED2, ['TELNAME'],
-                               map('{}_mag'.format, get_all_bands()),
-                               map('{}_err'.format, get_all_bands()),
-                               get_all_colors(),
-                               map('{}_err'.format, get_all_colors()))))
 
 
 def calc_simple_satellite_probability(base,
@@ -63,7 +57,12 @@ def assign_targeting_score(base, manual_selected_objids=None,
     1400 Has spec but not a satellite
     """
     base['P_simple'] = ensure_proper_prob(calc_simple_satellite_probability(base))
-    if 'u_mag_sdss' in base.colnames:
+
+    if version==2 and 'u_mag_sdss' in base.colnames:
+        for color in get_sdss_colors():
+            base[color+'_sdss'] = base['{}_mag_sdss'.format(color[0])] - base['{}_mag_sdss'.format(color[1])]
+            base[color+'_err_sdss'] = np.hypot(base['{}_err_sdss'.format(color[0])], base['{}_err_sdss'.format(color[1])])
+
         base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
             base,
             gmm_parameters,
@@ -80,19 +79,22 @@ def assign_targeting_score(base, manual_selected_objids=None,
             ),
             *(gmm_parameters[n] for n in param_labels_nosat)
         )
+        base['GMM_valid'] = (base['OBJID_sdss'] != -1)
     else:
+        bands = get_des_bands() if version > 1 else get_sdss_bands()
         base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
             base,
             gmm_parameters,
-            bands=get_sdss_bands()[1:],
+            bands=bands,
         ))
         base['log_L_GMM'] = calc_log_likelihood(
             *get_input_data(
                 base,
-                bands=get_sdss_bands()[1:],
+                bands=bands,
             ),
             *(gmm_parameters[n] for n in param_labels_nosat)
         )
+        base['GMM_valid'] = True
 
     if version == 1:
         is_galaxy = C.is_galaxy
@@ -101,15 +103,15 @@ def assign_targeting_score(base, manual_selected_objids=None,
     else:
         is_galaxy = C.is_galaxy2
         is_clean = C.is_clean2
-        basic_cut = C.gri_cut & C.is_clean2 & C.is_galaxy2 & (~C.has_spec)
+        basic_cut = C.gri_cut & C.is_clean2 & C.is_galaxy2 & (~C.has_spec) & Query('r_mag < 21.25')
 
-    within_host =  basic_cut & C.faint_end_limit & C.sat_rcut
+    within_host = basic_cut & C.faint_end_limit & C.sat_rcut
     outwith_host = basic_cut & C.faint_end_limit & (~C.sat_rcut)
 
-    veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7')
-    high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
+    veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7', 'GMM_valid')
+    high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7', 'GMM_valid') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
     median_p = Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6')
-    if 'ug' in base:
+    if 'ug' in base.colnames:
         median_p &= Query('-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08',
                           '-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5')
 

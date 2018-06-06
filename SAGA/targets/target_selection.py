@@ -9,7 +9,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog
-from .assign_targeting_score import assign_targeting_score, COLUMNS_USED, COLUMNS_USED2
+from .assign_targeting_score import assign_targeting_score, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog']
 
@@ -59,16 +59,15 @@ class TargetSelection(object):
             self._gmm_parameters = gmm_parameters
 
         self._cuts = cuts
-        self._additional_columns = additional_columns or []
         if self._version == 1:
             self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
                                           ('PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'),
                                           COLUMNS_USED,
-                                          self._additional_columns)))
+                                          additional_columns or [])))
         else:
-            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'is_galaxy', 'sb_r', 'radius', 'radius_err'),
-                                          COLUMNS_USED2,
-                                          self._additional_columns)))
+            self.columns = None
+            if additional_columns is not None:
+                raise ValueError('`additional_columns` is not supported for version > 1')
 
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
@@ -102,6 +101,8 @@ class TargetSelection(object):
             if reload_base or host_id not in self.target_catalogs:
                 self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
                         cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
+                if 'coord' in self.target_catalogs[host_id].colnames:
+                    del self.target_catalogs[host_id]['coord']
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters, version=self._version)
