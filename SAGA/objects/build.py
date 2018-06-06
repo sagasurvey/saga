@@ -127,7 +127,8 @@ def add_host_info(base, host, overwrite_if_different_host=False):
     base['HOST_MR'] = np.float32(host['M_r'])
     base['HOST_MG'] = np.float32(host['M_g'])
     base['HOST_SAGA_NAME'] = get_empty_str_array(len(base), 48, host['SAGA_name'] or '')
-    base['HOST_NGC_NAME'] = np.int32(host['NGC'])
+    base['HOST_NGC'] = np.int32(host['NGC'])
+    base['HOST_PGC'] = np.int32(host['PGC'])
 
     host_sc = SkyCoord(host['RA'], host['Dec'], unit='deg')
     base = add_skycoord(base)
