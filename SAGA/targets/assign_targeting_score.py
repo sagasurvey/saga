@@ -62,13 +62,37 @@ def assign_targeting_score(base, manual_selected_objids=None,
     1300 Not clean
     1400 Has spec but not a satellite
     """
-    bands = get_sdss_bands()
-    if 'u_mag' not in base.colnames:
-        bands = bands[1:]
-
     base['P_simple'] = ensure_proper_prob(calc_simple_satellite_probability(base))
-    base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(base, gmm_parameters, bands=bands))
-    base['log_L_GMM'] = calc_log_likelihood(*get_input_data(base, bands=bands), *(gmm_parameters[n] for n in param_labels_nosat))
+    if 'u_mag_sdss' in base.colnames:
+        base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
+            base,
+            gmm_parameters,
+            mag_err_postfix='_err_sdss',
+            color_postfix='_sdss',
+            color_err_postfix='_err_sdss',
+        ))
+        base['log_L_GMM'] = calc_log_likelihood(
+            *get_input_data(
+                base,
+                mag_err_postfix='_err_sdss',
+                color_postfix='_sdss',
+                color_err_postfix='_err_sdss',
+            ),
+            *(gmm_parameters[n] for n in param_labels_nosat)
+        )
+    else:
+        base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
+            base,
+            gmm_parameters,
+            bands=get_sdss_bands()[1:],
+        ))
+        base['log_L_GMM'] = calc_log_likelihood(
+            *get_input_data(
+                base,
+                bands=get_sdss_bands()[1:],
+            ),
+            *(gmm_parameters[n] for n in param_labels_nosat)
+        )
 
     if version == 1:
         is_galaxy = C.is_galaxy
