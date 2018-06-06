@@ -7,11 +7,18 @@ See the [SAGA Survey website](http://sagasurvey.org/) for details about SAGA.
 
 ## Installation
 
+To install the code, run:
 ```sh
 pip install https://github.com/sagasurvey/saga/archive/master.zip
 ```
 
+To force an update, run
+```sh
+pip install --upgrade --no-deps --force-reinstall https://github.com/sagasurvey/saga/archive/master.zip
+```
+
 The code is designed to be 2-3 compatible, but has mainly been tested with Python 3.6. 
+
 
 ### Dependencies
 
