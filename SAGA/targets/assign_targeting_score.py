@@ -11,13 +11,13 @@ from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_
 __all__ = ['assign_targeting_score', 'calc_simple_satellite_probability', 'calc_gmm_satellite_probability']
 
 
-COLUMNS_USED = list(set(chain(C.COLUMNS_USED,
+COLUMNS_USED = list(set(chain(C.COLUMNS_USED, ['TELNAME'],
                               map('{}_mag'.format, get_sdss_bands()),
                               map('{}_err'.format, get_sdss_bands()),
                               get_sdss_colors(),
                               map('{}_err'.format, get_sdss_colors()))))
 
-COLUMNS_USED2 = list(set(chain(C.COLUMNS_USED2,
+COLUMNS_USED2 = list(set(chain(C.COLUMNS_USED2, ['TELNAME'],
                                map('{}_mag'.format, get_all_bands()),
                                map('{}_err'.format, get_all_bands()),
                                get_all_colors(),
