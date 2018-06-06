@@ -99,6 +99,7 @@ class ObjectCatalog(object):
             If set to 'list' (default when `has_spec` is None), return a list that contains all tables
             If set to 'stacked' (default when `has_spec` is True), return a stacked table
             If set to 'iter', return an iterator for looping over hosts
+            If set to 'dict', return a dictionary with host ids being the keys
 
         columns : list, optional
             If set, only load a subset of columns
@@ -136,8 +137,8 @@ class ObjectCatalog(object):
         if return_as is None:
             return_as = 'stacked' if has_spec else 'list'
         return_as = return_as.lower()
-        if return_as[0] not in 'sli':
-            raise ValueError('`return_as` should be "list", "stacked", or "iter"')
+        if return_as[0] not in 'slid':
+            raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
 
         if str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
             base_key = 'base_v0p1'
@@ -162,7 +163,11 @@ class ObjectCatalog(object):
                 if hosts is None:
                     host_ids = np.unique(t['HOST_NSAID'])
                 output_iterator = (self._slice_columns(Query('HOST_NSAID == {}'.format(i)).filter(t), columns) for i in host_ids)
-                return output_iterator if return_as[0] == 'i' else list(output_iterator)
+                if return_as[0] == 'i':
+                    return output_iterator
+                if return_as[0] == 'd':
+                    return dict(zip(host_ids, output_iterator))
+                return list(output_iterator)
 
             return self._slice_columns(t, columns)
 
@@ -182,13 +187,14 @@ class ObjectCatalog(object):
 
             if return_as[0] == 'i':
                 return output_iterator
-            elif return_as[0] == 's':
+            if return_as[0] == 's':
                 out = vstack(list(output_iterator), 'outer', 'error')
                 if need_coord:
                     out = self._slice_columns(add_skycoord(out), columns)
                 return out
-            else:
-                return list(output_iterator)
+            if return_as[0] == 'd':
+                return dict(zip(hosts, output_iterator))
+            return list(output_iterator)
 
 
     def load_nsa(self, version='0.1.2'):
