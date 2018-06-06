@@ -60,10 +60,6 @@ class Database(object):
             raise ValueError('cannot locate {}'.format(self._local_dir))
 
         self._tables = {
-            'gmm_parameters': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters.npz'))),
-            'gmm_parameters_decals': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_decals.npz'))),
-            'gmm_parameters_no_outlier': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_no_outlier.npz'))),
-            'gmm_parameters_201708': DataObject(NumpyBinary(os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm', 'gmm_parameters_201708.npz'))),
             'saga_spectra_May2017': DataObject(FitsTable(os.path.join(self._shared_dir, 'Products', 'saga_spectra_May2017.fits.gz'))),
             'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'),
                                      FitsTable(os.path.join(self._local_dir, 'external_catalogs', 'nsa', 'nsa_v1_0_1.fits')),
@@ -85,6 +81,11 @@ class Database(object):
                                                                  {'gama': self._tables['spectra_gama_dr3'],
                                                                   '2dF': self._tables['spectra_2dF'],
                                                                   '6dF': self._tables['spectra_6dF']}))
+
+        gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
+        for fname in os.listdir(gmm_dir):
+            if fname.startswith('gmm_parameters') and fname.endswith('.npz'):
+                self._tables[fname[:-4]] = DataObject(NumpyBinary(os.path.join(gmm_dir, fname)))
 
         for k, v in known_google_sheets.items():
             if k == 'hosts':

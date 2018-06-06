@@ -28,7 +28,7 @@ __all__ = ['prepare_sdss_catalog_for_merging',
            'NSA_COLS_USED']
 
 MERGED_CATALOG_COLUMNS = list(chain(
-    ('OBJID', 'RA', 'DEC', 'REMOVE', 'is_galaxy', 'radius', 'radius_err'),
+    ('OBJID', 'RA', 'DEC', 'REMOVE', 'is_galaxy', 'morphology_info', 'radius', 'radius_err'),
     (b+'_mag' for b in 'ugrizy'),
     (b+'_err' for b in 'ugrizy'),
 ))
@@ -69,6 +69,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     catalog['y_err'] = 99.0
 
     catalog['is_galaxy'] = (catalog['PHOTPTYPE'] == 3)
+    catalog['morphology_info'] = catalog['PHOTPTYPE'].astype(np.int32)
 
     catalog['radius'] = catalog['PETROR50_R']
     catalog['radius_err'] = catalog['PETRORADERR_R'] * catalog['PETROR50_R'] / catalog['PETRORAD_R']
@@ -101,7 +102,8 @@ def prepare_des_catalog_for_merging(catalog):
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
 
-    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 1)
+    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 2)
+    catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
 
     try:
         catalog.rename_column('ra', 'RA')
@@ -132,6 +134,7 @@ def prepare_des_catalog_for_merging(catalog):
 def prepare_decals_catalog_for_merging(catalog):
     catalog['OBJID'] = np.array(catalog['BRICKID'], dtype=np.int64) * int(1e13) + np.array(catalog['OBJID'], dtype=np.int64)
     catalog['is_galaxy'] = (catalog['TYPE'] != 'PSF')
+    catalog['morphology_info'] = catalog['TYPE'].getfield('<U1').view(np.int32)
     catalog['radius'] = catalog['FRACDEV'] * catalog['SHAPEDEV_R'] + (1.0 - catalog['FRACDEV']) * catalog['SHAPEEXP_R']
     catalog['radius_err'] = np.hypot(catalog['FRACDEV']**2.0 / catalog['SHAPEDEV_R_IVAR'], (1.0 - catalog['FRACDEV'])**2.0 / catalog['SHAPEEXP_R_IVAR'])
 
