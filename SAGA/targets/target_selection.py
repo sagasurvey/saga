@@ -66,7 +66,7 @@ class TargetSelection(object):
                                           COLUMNS_USED,
                                           self._additional_columns)))
         else:
-            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'is_galaxy', 'radius', 'radius_err'),
+            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'is_galaxy', 'sb_r', 'radius', 'radius_err'),
                                           COLUMNS_USED2,
                                           self._additional_columns)))
 
