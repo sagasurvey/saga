@@ -104,7 +104,7 @@ class TargetSelection(object):
                         cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
-                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
+                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters, version=self._version)
 
         if return_as[0] != 'n':
             output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)

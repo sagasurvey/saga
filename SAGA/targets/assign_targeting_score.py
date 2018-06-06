@@ -43,7 +43,7 @@ def ensure_proper_prob(p):
 
 
 def assign_targeting_score(base, manual_selected_objids=None,
-                           gmm_parameters=None):
+                           gmm_parameters=None, version=2):
     """
     Last updated: 05/07/2018
      100 Human selection and Special targets
@@ -70,7 +70,15 @@ def assign_targeting_score(base, manual_selected_objids=None,
     base['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(base, gmm_parameters, bands=bands))
     base['log_L_GMM'] = calc_log_likelihood(*get_input_data(base, bands=bands), *(gmm_parameters[n] for n in param_labels_nosat))
 
-    basic_cut = C.gri_cut & C.fibermag_r_cut & C.is_clean & C.is_galaxy & (~C.has_spec)
+    if version == 1:
+        is_galaxy = C.is_galaxy
+        is_clean = C.is_clean
+        basic_cut = C.gri_cut & C.fibermag_r_cut & C.is_clean & C.is_galaxy & (~C.has_spec)
+    else:
+        is_galaxy = C.is_galaxy2
+        is_clean = C.is_clean2
+        basic_cut = C.gri_cut & C.is_clean2 & C.is_galaxy2 & (~C.has_spec)
+
     within_host =  basic_cut & C.faint_end_limit & C.sat_rcut
     outwith_host = basic_cut & C.faint_end_limit & (~C.sat_rcut)
 
@@ -83,8 +91,8 @@ def assign_targeting_score(base, manual_selected_objids=None,
 
     base['TARGETING_SCORE'] = 1000
     fill_values_by_query(base, ~basic_cut, {'TARGETING_SCORE': 1100})
-    fill_values_by_query(base, ~C.is_galaxy, {'TARGETING_SCORE': 1200})
-    fill_values_by_query(base, ~C.is_clean, {'TARGETING_SCORE': 1300})
+    fill_values_by_query(base, ~is_galaxy, {'TARGETING_SCORE': 1200})
+    fill_values_by_query(base, ~is_clean, {'TARGETING_SCORE': 1300})
     fill_values_by_query(base, C.has_spec, {'TARGETING_SCORE': 1400})
 
     fill_values_by_query(base, outwith_host, {'TARGETING_SCORE': 900})
@@ -103,7 +111,7 @@ def assign_targeting_score(base, manual_selected_objids=None,
         need_random_selection = need_random_selection[random_mask]
     base['TARGETING_SCORE'][need_random_selection] = 600
 
-    base['TARGETING_SCORE'] += (np.round((1.0 - base['P_GMM_sdss'])*80.0).astype(np.int) + 10)
+    base['TARGETING_SCORE'] += (np.round((1.0 - base['P_GMM'])*80.0).astype(np.int) + 10)
 
     fill_values_by_query(base,
                          Query(C.is_sat, (lambda x: (x != 'AAT') & (x != 'MMT'), 'TELNAME')),
