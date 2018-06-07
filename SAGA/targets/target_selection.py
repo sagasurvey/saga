@@ -11,7 +11,7 @@ from ..hosts import HostCatalog
 from ..objects import ObjectCatalog
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
-__all__ = ['TargetSelection', 'prepare_mmt_catalog']
+__all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
 
 
 class TargetSelection(object):
@@ -240,5 +240,61 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                                      'mag': '%.2f',
                                      'rank': lambda x: '' if x == 99 else '{:d}'.format(x),
                                  })
+
+    return target_catalog
+
+
+def prepare_aat_catalog(target_catalog, write_to=None, verbose=True):
+    """
+    Prepare AAT target catalog.
+
+    Format needed:
+
+    # TargetName(unique for header) RA(h m s) Dec(d m s) TargetType(Program,Fiducial,Sky) Priority(9 is highest) Magnitude 0 Notes
+    1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
+    1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
+    """
+
+    if 'TARGETING_SCORE' not in target_catalog.colnames:
+        return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
+                        'Have you run `compile_target_list` or `assign_targeting_score`?')
+
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 800')
+
+    # TODO: add sky objects
+
+    target_catalog = (is_target).filter(target_catalog)
+    target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['TargetType'] = 'P'
+    target_catalog['0'] = 0
+    target_catalog['Notes'] = ''
+
+    target_catalog.rename_column('DEC', 'Dec')
+    target_catalog.rename_column('OBJID', 'TargetName')
+    target_catalog.rename_column('r_mag', 'Magnitude')
+
+    if verbose:
+        for rank in range(1, 9):
+            print('# of Priority={} targets ='.format(rank),
+                Query('Priority == {}'.format(rank)).count(target_catalog))
+
+    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
+    target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
+
+    if write_to:
+        if verbose:
+            print('Writing to {}'.format(write_to))
+
+        with open(write_to, 'w') as fh:
+            target_catalog.write(fh,
+                                 delimiter=' ',
+                                 format='ascii.fast_commented_header',
+                                 formats={
+                                     'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
+                                     'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
+                                     'Magnitude': '%.2f',
+                                 })
+
+            # TODO: remove quotes
 
     return target_catalog
