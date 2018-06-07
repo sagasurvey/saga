@@ -9,9 +9,10 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog
-from .assign_targeting_score import assign_targeting_score, COLUMNS_USED
+from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog']
+
 
 class TargetSelection(object):
     """
@@ -44,19 +45,22 @@ class TargetSelection(object):
 
         self.target_catalogs = dict()
 
-        self._assign_targeting_score = assign_targeting_score_func or assign_targeting_score
-        if not callable(self._assign_targeting_score):
-            raise TypeError('*assign_targeting_score_func* must be callable')
+        if assign_targeting_score_func is None:
+            self._assign_targeting_score = assign_targeting_score_v1 if self._version == 1 else assign_targeting_score_v2
+        else:
+            self._assign_targeting_score = assign_targeting_score_func
+            if not callable(self._assign_targeting_score):
+                raise TypeError('*assign_targeting_score_func* must be callable')
+
+        if isinstance(gmm_parameters, dict):
+            self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
+        else:
+            self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
             self._manual_selected_objids = self._database[manual_selected_objids or 'manual_targets'].read()
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
-
-        try:
-            self._gmm_parameters = self._database[gmm_parameters or 'gmm_parameters'].read()
-        except (TypeError, KeyError):
-            self._gmm_parameters = gmm_parameters
 
         self._cuts = cuts
         if self._version == 1:
@@ -68,6 +72,13 @@ class TargetSelection(object):
             self.columns = None
             if additional_columns is not None:
                 raise ValueError('`additional_columns` is not supported for version > 1')
+
+
+    def _load_gmm_parameters(self, gmm_parameters):
+        try:
+            return self._database[gmm_parameters].read()
+        except (TypeError, KeyError):
+            return gmm_parameters
 
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
@@ -105,7 +116,7 @@ class TargetSelection(object):
                     del self.target_catalogs[host_id]['coord']
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
-                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters, version=self._version)
+                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
 
         if return_as[0] != 'n':
             output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
