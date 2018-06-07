@@ -58,7 +58,7 @@ def assign_targeting_score(base, manual_selected_objids=None,
     """
     base['P_simple'] = ensure_proper_prob(calc_simple_satellite_probability(base))
 
-    if version==2 and 'u_mag_sdss' in base.colnames:
+    if version == 2 and 'u_mag_sdss' in base.colnames:
         for color in get_sdss_colors():
             base[color+'_sdss'] = base['{}_mag_sdss'.format(color[0])] - base['{}_mag_sdss'.format(color[1])]
             base[color+'_err_sdss'] = np.hypot(base['{}_err_sdss'.format(color[0])], base['{}_err_sdss'.format(color[1])])
@@ -109,11 +109,18 @@ def assign_targeting_score(base, manual_selected_objids=None,
     outwith_host = basic_cut & C.faint_end_limit & (~C.sat_rcut)
 
     veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7', 'GMM_valid')
-    high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7', 'GMM_valid') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
-    median_p = Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6')
-    if 'ug' in base.colnames:
-        median_p &= Query('-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08',
-                          '-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5')
+    high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7', 'GMM_valid') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25', 'GMM_valid')
+    if 'u_mag_sdss' in base.colnames:
+        # TODO: need to implement some grz cut for decals
+        median_p = Query('(gr_sdss-abs(gr_err_sdss))*0.65+(ri_sdss-abs(ri_err_sdss)) < 0.6',
+                         '-(ug_sdss+abs(ug_err_sdss))*0.15+(ri_sdss-abs(ri_err_sdss)) < 0.08',
+                         '-(ug_sdss+abs(ug_err_sdss))*0.1+(gr_sdss-abs(gr_err_sdss)) < 0.5')
+    elif version == 1:
+        median_p = Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6',
+                         '-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08',
+                         '-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5')
+    else:
+        median_p = Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6')
 
     base['TARGETING_SCORE'] = 1000
     fill_values_by_query(base, ~basic_cut, {'TARGETING_SCORE': 1100})
