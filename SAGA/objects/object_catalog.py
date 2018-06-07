@@ -7,7 +7,7 @@ from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012
 from ..database import FitsTable, Database
 from ..hosts import HostCatalog
-from ..utils import get_sdss_bands, get_sdss_colors, get_all_colors, add_skycoord, fill_values_by_query
+from ..utils import get_sdss_bands, get_all_colors, add_skycoord, fill_values_by_query
 
 
 __all__ = ['ObjectCatalog']

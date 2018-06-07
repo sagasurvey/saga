@@ -9,9 +9,10 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog
-from .assign_targeting_score import assign_targeting_score, COLUMNS_USED, COLUMNS_USED2
+from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
-__all__ = ['TargetSelection', 'prepare_mmt_catalog']
+__all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
+
 
 class TargetSelection(object):
     """
@@ -44,31 +45,40 @@ class TargetSelection(object):
 
         self.target_catalogs = dict()
 
-        self._assign_targeting_score = assign_targeting_score_func or assign_targeting_score
-        if not callable(self._assign_targeting_score):
-            raise TypeError('*assign_targeting_score_func* must be callable')
+        if assign_targeting_score_func is None:
+            self._assign_targeting_score = assign_targeting_score_v1 if self._version == 1 else assign_targeting_score_v2
+        else:
+            self._assign_targeting_score = assign_targeting_score_func
+            if not callable(self._assign_targeting_score):
+                raise TypeError('*assign_targeting_score_func* must be callable')
+
+        if isinstance(gmm_parameters, dict):
+            self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
+        else:
+            self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
             self._manual_selected_objids = self._database[manual_selected_objids or 'manual_targets'].read()
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
 
-        try:
-            self._gmm_parameters = self._database[gmm_parameters or 'gmm_parameters'].read()
-        except (TypeError, KeyError):
-            self._gmm_parameters = gmm_parameters
-
         self._cuts = cuts
-        self._additional_columns = additional_columns or []
         if self._version == 1:
             self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
                                           ('PHOTPTYPE', 'PSFMAG_U', 'PSFMAG_G', 'PSFMAG_R'),
                                           COLUMNS_USED,
-                                          self._additional_columns)))
+                                          additional_columns or [])))
         else:
-            self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'is_galaxy', 'sb_r', 'radius', 'radius_err'),
-                                          COLUMNS_USED2,
-                                          self._additional_columns)))
+            self.columns = None
+            if additional_columns is not None:
+                raise ValueError('`additional_columns` is not supported for version > 1')
+
+
+    def _load_gmm_parameters(self, gmm_parameters):
+        try:
+            return self._database[gmm_parameters].read()
+        except (TypeError, KeyError):
+            return gmm_parameters
 
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
@@ -102,9 +112,11 @@ class TargetSelection(object):
             if reload_base or host_id not in self.target_catalogs:
                 self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
                         cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
+                if 'coord' in self.target_catalogs[host_id].colnames:
+                    del self.target_catalogs[host_id]['coord']
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
-                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters, version=self._version)
+                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
 
         if return_as[0] != 'n':
             output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
@@ -228,5 +240,61 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                                      'mag': '%.2f',
                                      'rank': lambda x: '' if x == 99 else '{:d}'.format(x),
                                  })
+
+    return target_catalog
+
+
+def prepare_aat_catalog(target_catalog, write_to=None, verbose=True):
+    """
+    Prepare AAT target catalog.
+
+    Format needed:
+
+    # TargetName(unique for header) RA(h m s) Dec(d m s) TargetType(Program,Fiducial,Sky) Priority(9 is highest) Magnitude 0 Notes
+    1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
+    1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
+    """
+
+    if 'TARGETING_SCORE' not in target_catalog.colnames:
+        return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
+                        'Have you run `compile_target_list` or `assign_targeting_score`?')
+
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 800')
+
+    # TODO: add sky objects
+
+    target_catalog = (is_target).filter(target_catalog)
+    target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['TargetType'] = 'P'
+    target_catalog['0'] = 0
+    target_catalog['Notes'] = ''
+
+    target_catalog.rename_column('DEC', 'Dec')
+    target_catalog.rename_column('OBJID', 'TargetName')
+    target_catalog.rename_column('r_mag', 'Magnitude')
+
+    if verbose:
+        for rank in range(1, 9):
+            print('# of Priority={} targets ='.format(rank),
+                Query('Priority == {}'.format(rank)).count(target_catalog))
+
+    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
+    target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
+
+    if write_to:
+        if verbose:
+            print('Writing to {}'.format(write_to))
+
+        with open(write_to, 'w') as fh:
+            target_catalog.write(fh,
+                                 delimiter=' ',
+                                 format='ascii.fast_commented_header',
+                                 formats={
+                                     'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
+                                     'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
+                                     'Magnitude': '%.2f',
+                                 })
+
+            # TODO: remove quotes
 
     return target_catalog
