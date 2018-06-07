@@ -194,11 +194,12 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         base_this['TARGETING_SCORE'] = 900
         fill_values_by_query(base_this, C.sat_rcut, {'TARGETING_SCORE': 800})
         fill_values_by_query(base_this, C.sdss_limit | high_p, {'TARGETING_SCORE': 700})
-        fill_values_by_query(base_this, veryhigh_p, {'TARGETING_SCORE': 500})
+        fill_values_by_query(base_this, veryhigh_p, {'TARGETING_SCORE': 600})
         fill_values_by_query(base_this, C.sat_rcut & priority_cut & C.faint_end_limit, {'TARGETING_SCORE': 400})
-        fill_values_by_query(base_this, C.sat_rcut & (high_p | des_sb_cut) & C.faint_end_limit, {'TARGETING_SCORE': 300})
+        fill_values_by_query(base_this, C.sat_rcut & high_p & C.faint_end_limit, {'TARGETING_SCORE': 300})
         fill_values_by_query(base_this, C.sat_rcut & C.sdss_limit, {'TARGETING_SCORE': 200})
         base_this['TARGETING_SCORE'] += (np.round((1.0 - base_this['P_GMM'])*80.0).astype(np.int) + 10)
+        fill_values_by_query(base_this, C.sat_rcut & des_sb_cut, {'TARGETING_SCORE': 291})
 
         to_update_mask = base_this['TARGETING_SCORE'] < base['TARGETING_SCORE'][base_this['index']]
         to_update_idx = base_this['index'][to_update_mask]
@@ -210,7 +211,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         random_mask[:50] = True
         np.random.RandomState(123).shuffle(random_mask)
         need_random_selection = need_random_selection[random_mask]
-    base['TARGETING_SCORE'][need_random_selection] -= 200
+    base['TARGETING_SCORE'][need_random_selection] -= 300
 
     fill_values_by_query(base, ~basic_cut, {'TARGETING_SCORE': 1100}) #pylint: disable=E1130
     fill_values_by_query(base, ~C.is_galaxy2, {'TARGETING_SCORE': 1200})
