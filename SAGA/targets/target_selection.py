@@ -338,6 +338,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                              delimiter=' ',
                              quotechar='"',
                              format='ascii.fast_commented_header',
+                             overwrite=True,
                              formats={
                                 'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
                                 'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
