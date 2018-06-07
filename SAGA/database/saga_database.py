@@ -9,6 +9,9 @@ known_google_sheets = {
     'sdss_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1379081675, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'sdss_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 286645731, header_start=1, include_names=['SDSS ID', 'Targ_RA', 'Targ_Dec']),
     'satellites_named': GoogleSheets('1GJYuhqfKeuJr-IyyGF_NDLb_ezL6zBiX2aeZFHHPr_s', 1),
+    'des_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 124397139, include_names=['DES_OBJID']),
+    'des_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 797095192, include_names=['DES_OBJID']),
+    'manual_targets_aat2018a': GoogleSheets('1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w', 0, include_names=['OBJID']),
 }
 
 class Database(object):

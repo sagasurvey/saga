@@ -85,19 +85,19 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     ]
 
     if to_remove:
-        ids_to_remove = build._get_unique_objids(to_remove['SDSS ID'])
+        ids_to_remove = build.get_unique_objids(to_remove['SDSS ID'])
         remove_queries.append((lambda x: np.in1d(x, ids_to_remove), 'OBJID'))
 
     catalog['REMOVE'] = get_remove_flag(catalog, remove_queries)
 
     if to_recover:
-        catalog = build.recover_whitelisted_objects(catalog, to_recover)
-        fill_values_by_query(catalog, 'REMOVE == -1', {'REMOVE': 0})
+        ids_to_recover = build.get_unique_objids(to_recover['SDSS ID'])
+        fill_values_by_query(catalog, Query((lambda x: np.in1d(x, ids_to_recover), 'OBJID')), {'REMOVE': 0})
 
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_des_catalog_for_merging(catalog):
+def prepare_des_catalog_for_merging(catalog, to_remove, to_recover):
 
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
@@ -122,11 +122,21 @@ def prepare_des_catalog_for_merging(catalog):
     catalog['u_mag'] = 99.0
     catalog['u_err'] = 99.0
 
-    catalog['REMOVE'] = get_remove_flag(catalog, [
+    remove_queries = [
         'imaflags_iso_r != 0',
         'flags_r >= 4',
         'r_mag >= 25',
-    ])
+    ]
+
+    if to_remove:
+        ids_to_remove = build.get_unique_objids(to_remove['DES_OBJID'])
+        remove_queries.append((lambda x: np.in1d(x, ids_to_remove), 'OBJID'))
+
+    catalog['REMOVE'] = get_remove_flag(catalog, remove_queries)
+
+    if to_recover:
+        ids_to_recover = build.get_unique_objids(to_recover['DES_OBJID'])
+        fill_values_by_query(catalog, Query((lambda x: np.in1d(x, ids_to_recover), 'OBJID')), {'REMOVE': 0})
 
     return catalog[MERGED_CATALOG_COLUMNS]
 
@@ -491,8 +501,9 @@ def add_surface_brightness(base):
 
 
 def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
-                     sdss_remove=None, sdss_recover=None, spectra=None,
-                     debug=None, **kwargs):
+                     sdss_remove=None, sdss_recover=None,
+                     des_remove=None, des_recover=None,
+                     spectra=None, debug=None, **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
@@ -511,7 +522,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
 
     if des is not None:
-        des = prepare_des_catalog_for_merging(des)
+        des = prepare_des_catalog_for_merging(des, des_remove, des_recover)
 
     if decals is not None:
         decals = prepare_decals_catalog_for_merging(decals)

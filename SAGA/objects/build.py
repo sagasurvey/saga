@@ -45,7 +45,7 @@ def _join_spec_repeat(*repeats):
     return '+'.join(out)
 
 
-def _get_unique_objids(objid_col):
+def get_unique_objids(objid_col):
     try:
         objid_col = objid_col.compressed()
     except AttributeError:
@@ -202,7 +202,7 @@ def remove_human_inspected(base, objects_to_remove):
     -------
     base : astropy.table.Table
     """
-    ids_to_remove = _get_unique_objids(objects_to_remove['SDSS ID'])
+    ids_to_remove = get_unique_objids(objects_to_remove['SDSS ID'])
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_remove), 'OBJID')), {'REMOVE': 1})
     return base
 
@@ -373,7 +373,7 @@ def recover_whitelisted_objects(base, objects_to_recover):
     -------
     base : astropy.table.Table
     """
-    ids_to_add = _get_unique_objids(objects_to_recover['SDSS ID'])
+    ids_to_add = get_unique_objids(objects_to_recover['SDSS ID'])
     fill_values_by_query(base, Query((lambda x: np.in1d(x, ids_to_add), 'OBJID')), {'REMOVE': -1})
     return base
 
