@@ -4,7 +4,7 @@ TargetSelection class
 from itertools import chain
 import numpy as np
 from easyquery import Query
-from astropy.table import vstack
+from astropy.table import vstack, Table
 from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
@@ -244,7 +244,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     return target_catalog
 
 
-def prepare_aat_catalog(target_catalog, write_to=None, verbose=True):
+def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
     """
     Prepare AAT target catalog.
 
@@ -259,42 +259,95 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True):
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
+    ra_min = target_catalog['RA'].min()
+    ra_max = target_catalog['RA'].max()
+    sin_dec_min = np.sin(np.deg2rad(target_catalog['DEC'].min()))
+    sin_dec_max = np.sin(np.deg2rad(target_catalog['DEC'].max()))
+
+    n_needed = 100
+    ra_sky = []
+    dec_sky = []
+    base_sc = SkyCoord(target_catalog['RA'], target_catalog['DEC'], unit='deg')
+    seed = 12
+    while n_needed > 0:
+        ra_rand = np.random.RandomState(seed).uniform(ra_min, ra_max, size=n_needed)
+        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
+        sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
+        sep = sky_sc.match_to_catalog_sky(base_sc)[1]
+        ok_mask = (sep.arcsec > 10.0)
+        n_needed -= np.count_nonzero(ok_mask)
+        ra_sky.append(ra_rand[ok_mask])
+        dec_sky.append(dec_rand[ok_mask])
+        seed += np.random.RandomState(seed).randint(100, 200)
+        del ra_rand, dec_rand, sky_sc, sep, ok_mask
+    del base_sc
+    ra_sky = np.concatenate(ra_sky)
+    dec_sky = np.concatenate(dec_sky)
+
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 800')
+    is_des = Query((lambda s: s == 'des', 'survey'))
+    is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
+    is_flux_star = Query(is_star, 'r_mag > 16', 'r_mag < 17')
 
-    # TODO: add sky objects
-
-    target_catalog = (is_target).filter(target_catalog)
+    target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['Priority'][is_flux_star.mask(target_catalog)] = 9
+
+    flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
+    flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
+    target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
+    sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
+    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = -1
+    target_catalog = Query('Priority >= 0').filter(target_catalog)
+    del flux_star_indices, flux_star_sc, target_sc, sep
+
     target_catalog['TargetType'] = 'P'
     target_catalog['0'] = 0
-    target_catalog['Notes'] = ''
+    target_catalog['Notes'] = 'targets'
 
     target_catalog.rename_column('DEC', 'Dec')
     target_catalog.rename_column('OBJID', 'TargetName')
     target_catalog.rename_column('r_mag', 'Magnitude')
+
+    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
+    target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
+
+    sky_catalog = Table({
+        'TargetName': np.arange(len(ra_sky)),
+        'RA': ra_sky,
+        'Dec': dec_sky,
+        'TargetType': np.repeat('S', len(ra_sky)),
+        'Priority': np.repeat(9, len(ra_sky)),
+        'Magnitude': np.repeat(99.0, len(ra_sky)),
+        '0': np.repeat(0, len(ra_sky)),
+        'Notes': np.repeat('sky', len(ra_sky)),
+    })
+
+    target_catalog = vstack([target_catalog, sky_catalog])
 
     if verbose:
         for rank in range(1, 9):
             print('# of Priority={} targets ='.format(rank),
                 Query('Priority == {}'.format(rank)).count(target_catalog))
 
-    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
-    target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
-
     if write_to:
         if verbose:
             print('Writing to {}'.format(write_to))
 
-        with open(write_to, 'w') as fh:
-            target_catalog.write(fh,
-                                 delimiter=' ',
-                                 format='ascii.fast_commented_header',
-                                 formats={
-                                     'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
-                                     'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
-                                     'Magnitude': '%.2f',
-                                 })
+        target_catalog.write(write_to,
+                             delimiter=' ',
+                             quotechar='"',
+                             format='ascii.fast_commented_header',
+                             formats={
+                                'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
+                                'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
+                                'Magnitude': '%.2f',
+                             })
 
-            # TODO: remove quotes
+        with open(write_to) as fh:
+            content = fh.read()
+
+        with open(write_to, 'w') as fh:
+            fh.write(content.replace('"', ''))
 
     return target_catalog
