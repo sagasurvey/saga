@@ -169,15 +169,15 @@ class DataObject(object):
             try:
                 table = self._get_local().read()
             except (IOError, OSError):
-                warnings.warn("Failed to read local file, try reading the remote file")
-                table = self.remote().read()
+                warnings.warn("Failed to read local file, will try reading the remote file")
+                table = self.remote.read()
         else:
             try:
                 table = self.remote.read()
             except Exception as read_exception: #pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception
-                warnings.warn("Failed to read data, fall back to read local file")
+                warnings.warn("Failed to read data, falling back to try to read local file")
                 table = self._get_local().read()
 
         if self.cache_in_memory:
