@@ -284,7 +284,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     ra_sky = np.concatenate(ra_sky)
     dec_sky = np.concatenate(dec_sky)
 
-    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 800')
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
     is_des = Query((lambda s: s == 'des', 'survey'))
     is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
     is_flux_star = Query(is_star, 'r_mag > 16', 'r_mag < 17')

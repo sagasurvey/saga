@@ -99,7 +99,7 @@ def assign_targeting_score_v1(base, manual_selected_objids=None,
 
     fill_values_by_query(base, C.is_sat, {'TARGETING_SCORE': 150})
 
-    if manual_selected_objids:
+    if manual_selected_objids is not None:
         fill_values_by_query(base, \
                 Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID')), \
                 {'TARGETING_SCORE': 100})
@@ -117,9 +117,9 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
      200 within host,  r < 17.77, gri cuts
      300 within host,  r < 20.75, high p_GMM or GMM outliers, gri cuts
      400 within host,  r < 20.75, high-proirity + gri cuts
-     500 very high p_GMM
-     600 within host,  r < 20.75, gri cuts, random selection of 50
-     700 outwith host, r < 17.77 or high p_GMM
+     500 within host,  r < 20.75, gri cuts, random selection of 50
+     600 very high p_GMM
+     700 outwith host, r < 17.77
      800 within host,  r < 20.75, gri cuts, everything else
      900 outwith host, r < 20.75, gri cuts
     1000 everything else
@@ -191,9 +191,10 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
         des_sb_cut = Query('sb_r > 0.6 * r_mag + 12.75', (lambda s: s == 'des', 'survey'))
 
-        base_this['TARGETING_SCORE'] = 900
-        fill_values_by_query(base_this, C.sat_rcut, {'TARGETING_SCORE': 800})
-        fill_values_by_query(base_this, C.sdss_limit | high_p, {'TARGETING_SCORE': 700})
+        base_this['TARGETING_SCORE'] = 1000
+        fill_values_by_query(base_this, C.faint_end_limit, {'TARGETING_SCORE': 900})
+        fill_values_by_query(base_this, C.sat_rcut & C.faint_end_limit, {'TARGETING_SCORE': 800})
+        fill_values_by_query(base_this, C.sdss_limit, {'TARGETING_SCORE': 700})
         fill_values_by_query(base_this, veryhigh_p, {'TARGETING_SCORE': 600})
         fill_values_by_query(base_this, C.sat_rcut & priority_cut & C.faint_end_limit, {'TARGETING_SCORE': 400})
         fill_values_by_query(base_this, C.sat_rcut & high_p & C.faint_end_limit, {'TARGETING_SCORE': 300})
@@ -223,7 +224,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
                          Query(C.is_sat, (lambda x: (x != 'AAT') & (x != 'MMT'), 'TELNAME')),
                          {'TARGETING_SCORE': 150})
 
-    if manual_selected_objids:
+    if manual_selected_objids is not None:
         fill_values_by_query(base, \
                 Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID')), \
                 {'TARGETING_SCORE': 100})
