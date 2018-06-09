@@ -11,6 +11,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
 from .core import FitsTable
+from ..utils import makedirs_if_needed
 
 _HAS_CASJOBS_ = True
 try:
@@ -400,6 +401,7 @@ class DecalsPrebuilt(object):
         r = requests.get('http://www.slac.stanford.edu/~yymao/saga/base-catalogs-non-sdss/{}_decals_{}.fits.gz'.format(self.host_id, self.data_release),
                          headers={'Content-Type': 'application/gzip'},
                          stream=True)
+        makedirs_if_needed(file_path)
         with open(file_path, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
 
