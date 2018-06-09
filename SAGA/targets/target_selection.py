@@ -271,7 +271,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     seed = 12
     while n_needed > 0:
         ra_rand = np.random.RandomState(seed).uniform(ra_min, ra_max, size=n_needed)
-        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
+        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed+2).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
         ok_mask = (sep.arcsec > 10.0)
