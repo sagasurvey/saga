@@ -37,7 +37,13 @@ class FileObject(object):
         return Table.read(self.path, **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         return table.write(self.path)
+
+    def _makedirs_if_needed(self, path):
+        dirs, fn = os.path.split(path)
+        if not os.path.exists(dirs):
+            os.makedirs(dirs)
 
     def download_as_file(self, file_path, overwrite=False, compress=False):
         if overwrite or not os.path.isfile(file_path):
@@ -67,6 +73,7 @@ class CsvTable(FileObject):
         return Table.read(self.path, format='ascii.csv', **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         return table.write(self.path, format='ascii.csv')
 
 
@@ -92,6 +99,7 @@ class FitsTable(FileObject):
             table = table.copy()
             del table['coord']
         file_open = gzip.open if self.compress_after_write else open
+        self._makedirs_if_needed(self.path)
         with file_open(self.path, 'wb') as f_out:
             table.write(f_out, format='fits')
 
@@ -101,6 +109,7 @@ class NumpyBinary(FileObject):
         return np.load(self.path, **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         np.savez(self.path, **table)
 
 
