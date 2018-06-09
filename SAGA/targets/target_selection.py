@@ -249,8 +249,10 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         flux_star_r_range=(17, 17.7),
                         flux_star_gr_range=(0.1, 0.4),
                         sky_fiber_void_radius=10.0,
-                        targeting_score_threshold=900
-                        ):
+                        sky_fiber_needed=100,
+                        sky_fiber_radial_adjustment=0.1,
+                        targeting_score_threshold=900,
+                       ):
     """
     Prepare AAT target catalog.
 
@@ -265,30 +267,35 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    ra_min = target_catalog['RA'].min()
-    ra_max = target_catalog['RA'].max()
-    sin_dec_min = np.sin(np.deg2rad(target_catalog['DEC'].min()))
-    sin_dec_max = np.sin(np.deg2rad(target_catalog['DEC'].max()))
+    host_idx = target_catalog['RHOST_KPC'].argmin()
+    host_ra = target_catalog['RA'][host_idx]
+    host_dec = target_catalog['DEC'][host_idx]
 
-    n_needed = 100
+    n_needed = sky_fiber_needed
     ra_sky = []
     dec_sky = []
     base_sc = SkyCoord(target_catalog['RA'], target_catalog['DEC'], unit='deg')
-    seed = 12
+    seed = 123
     while n_needed > 0:
-        ra_rand = np.random.RandomState(seed).uniform(ra_min, ra_max, size=n_needed)
-        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed+2).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
+        n_rand = int(np.ceil(n_needed*1.1))
+        dist_rand = np.random.RandomState(seed).rand(n_rand) ** (2.0 * sky_fiber_radial_adjustment)
+        theta_rand = np.random.RandomState(seed+1).rand(n_rand) * (2.0 * np.pi)
+        ra_rand = np.remainder(host_ra + dist_rand * np.cos(theta_rand), 360.0)
+        dec_rand = host_dec + dist_rand * np.sin(theta_rand)
+        ok_mask = (dec_rand >= -90.0) & (dec_rand <= 90.0)
+        ra_rand = ra_rand[ok_mask]
+        dec_rand = dec_rand[ok_mask]
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
         ok_mask = (sep.arcsec > sky_fiber_void_radius)
         n_needed -= np.count_nonzero(ok_mask)
         ra_sky.append(ra_rand[ok_mask])
         dec_sky.append(dec_rand[ok_mask])
-        seed += np.random.RandomState(seed).randint(100, 200)
+        seed += np.random.RandomState(seed+2).randint(100, 200)
         del ra_rand, dec_rand, sky_sc, sep, ok_mask
     del base_sc
-    ra_sky = np.concatenate(ra_sky)
-    dec_sky = np.concatenate(dec_sky)
+    ra_sky = np.concatenate(ra_sky)[:sky_fiber_needed]
+    dec_sky = np.concatenate(dec_sky)[:sky_fiber_needed]
 
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
     is_des = Query((lambda s: s == 'des', 'survey'))
