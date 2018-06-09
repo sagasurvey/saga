@@ -326,14 +326,17 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
 
     target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['Priority'][Query('Priority < 1').mask(target_catalog)] = 1
+    target_catalog['Priority'][Query('Priority > 8').mask(target_catalog)] = 8
+    target_catalog['Priority'] = 9 - target_catalog['Priority']
     target_catalog['Priority'][is_flux_star.mask(target_catalog)] = 9
 
     flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = -1
-    target_catalog = Query('Priority >= 0').filter(target_catalog)
+    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
+    target_catalog = Query('Priority').filter(target_catalog)
     del flux_star_indices, flux_star_sc, target_sc, sep
 
     target_catalog['TargetType'] = 'P'
