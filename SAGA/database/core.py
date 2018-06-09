@@ -37,9 +37,17 @@ class FileObject(object):
         return Table.read(self.path, **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         return table.write(self.path)
 
+    @staticmethod
+    def _makedirs_if_needed(path):
+        dirs, fn = os.path.split(path)
+        if not os.path.exists(dirs):
+            os.makedirs(dirs)
+
     def download_as_file(self, file_path, overwrite=False, compress=False):
+        self._makedirs_if_needed(file_path)
         if overwrite or not os.path.isfile(file_path):
             try:
                 r = requests.get(self.path, stream=True)
@@ -51,10 +59,10 @@ class FileObject(object):
                 try:
                     with file_open(file_path, 'wb') as f:
                         shutil.copyfileobj(r.raw, f)
-                except Exception as e:
-                    if os.path.isfile(f):
-                        os.unlink(f)
-                    raise e
+                except:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                    raise
 
     def isfile(self):
         if self.path:
@@ -67,6 +75,7 @@ class CsvTable(FileObject):
         return Table.read(self.path, format='ascii.csv', **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         return table.write(self.path, format='ascii.csv')
 
 
@@ -92,6 +101,7 @@ class FitsTable(FileObject):
             table = table.copy()
             del table['coord']
         file_open = gzip.open if self.compress_after_write else open
+        self._makedirs_if_needed(self.path)
         with file_open(self.path, 'wb') as f_out:
             table.write(f_out, format='fits')
 
@@ -101,6 +111,7 @@ class NumpyBinary(FileObject):
         return np.load(self.path, **self.kwargs)
 
     def write(self, table):
+        self._makedirs_if_needed(self.path)
         np.savez(self.path, **table)
 
 
@@ -169,15 +180,15 @@ class DataObject(object):
             try:
                 table = self._get_local().read()
             except (IOError, OSError):
-                warnings.warn("Failed to read local file, try reading the remote file")
-                table = self.remote().read()
+                warnings.warn("Failed to read local file, will try reading the remote file")
+                table = self.remote.read()
         else:
             try:
                 table = self.remote.read()
             except Exception as read_exception: #pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception
-                warnings.warn("Failed to read data, fall back to read local file")
+                warnings.warn("Failed to read data, falling back to try to read local file")
                 table = self._get_local().read()
 
         if self.cache_in_memory:
