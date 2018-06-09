@@ -40,7 +40,8 @@ class FileObject(object):
         self._makedirs_if_needed(self.path)
         return table.write(self.path)
 
-    def _makedirs_if_needed(self, path):
+    @staticmethod
+    def _makedirs_if_needed(path):
         dirs, fn = os.path.split(path)
         if not os.path.exists(dirs):
             os.makedirs(dirs)
