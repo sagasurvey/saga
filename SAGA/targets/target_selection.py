@@ -271,7 +271,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     seed = 12
     while n_needed > 0:
         ra_rand = np.random.RandomState(seed).uniform(ra_min, ra_max, size=n_needed)
-        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
+        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed+2).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
         ok_mask = (sep.arcsec > 10.0)
@@ -287,7 +287,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
     is_des = Query((lambda s: s == 'des', 'survey'))
     is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
-    is_flux_star = Query(is_star, 'r_mag > 16', 'r_mag < 17')
+    is_flux_star = Query(is_star, 'r_mag >= 17', 'r_mag < 17.7')
+    is_flux_star &= Query('gr >= 0.1', 'gr < 0.4')
 
     target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
