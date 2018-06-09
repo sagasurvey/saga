@@ -259,8 +259,13 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     """
     Prepare AAT target catalog.
 
-    Format needed:
+    If the host's radius (in degree) is less than `sky_fiber_host_rvir_threshold_deg`,
+    all sky fiber will be distributed between `sky_fiber_max_deg` and  `sky_fiber_host_rvir_threshold_deg`.
 
+    Otherwise, it will first fill the outer annulus, then distribute the rest
+    within the host (but prefer outer region, as controlled by `sky_fiber_radial_adjustment`)
+
+    Format needed:
     # TargetName(unique for header) RA(h m s) Dec(d m s) TargetType(Program,Fiducial,Sky) Priority(9 is highest) Magnitude 0 Notes
     1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
     1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
