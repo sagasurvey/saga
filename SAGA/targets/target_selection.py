@@ -252,6 +252,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         sky_fiber_needed=100,
                         sky_fiber_radial_adjustment=3.0,
                         targeting_score_threshold=900,
+                        seed=123,
                        ):
     """
     Prepare AAT target catalog.
@@ -275,7 +276,6 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     ra_sky = []
     dec_sky = []
     base_sc = SkyCoord(target_catalog['RA'], target_catalog['DEC'], unit='deg')
-    seed = 123
     while n_needed > 0:
         n_rand = int(np.ceil(n_needed*1.1))
         dist_rand = np.random.RandomState(seed).rand(n_rand) ** (1.0 / (sky_fiber_radial_adjustment + 2.0))
