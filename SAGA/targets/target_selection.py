@@ -250,7 +250,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         flux_star_gr_range=(0.1, 0.4),
                         sky_fiber_void_radius=10.0,
                         sky_fiber_needed=100,
-                        sky_fiber_radial_adjustment=0.1,
+                        sky_fiber_radial_adjustment=3.0,
                         targeting_score_threshold=900,
                        ):
     """
@@ -278,7 +278,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     seed = 123
     while n_needed > 0:
         n_rand = int(np.ceil(n_needed*1.1))
-        dist_rand = np.random.RandomState(seed).rand(n_rand) ** (2.0 * sky_fiber_radial_adjustment)
+        dist_rand = np.random.RandomState(seed).rand(n_rand) ** (1.0 / (sky_fiber_radial_adjustment + 2.0))
         theta_rand = np.random.RandomState(seed+1).rand(n_rand) * (2.0 * np.pi)
         ra_rand = np.remainder(host_ra + dist_rand * np.cos(theta_rand), 360.0)
         dec_rand = host_dec + dist_rand * np.sin(theta_rand)
