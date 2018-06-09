@@ -1,3 +1,4 @@
+import os
 import requests
 import numpy as np
 from easyquery import Query
@@ -9,7 +10,8 @@ __all__ = ['get_sdss_bands', 'get_sdss_colors', 'get_des_bands', 'get_des_colors
            'get_decals_bands', 'get_decals_colors', 'get_all_bands', 'get_all_colors',
            'add_skycoord', 'get_empty_str_array', 'get_decals_viewer_image',
            'fill_values_by_query', 'get_remove_flag', 'view_table_as_2d_array',
-           'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec']
+           'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec',
+           'makedirs_if_needed']
 
 
 _sdss_bands = 'ugriz'
@@ -182,3 +184,12 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
     row_mask = slice(None) if row_mask is None else row_mask
     cols = table.colnames if cols is None else cols
     return np.vstack((table[c][row_mask].data.astype(dtype, casting='same_kind', copy=False) for c in cols)).T
+
+def makedirs_if_needed(path):
+    """
+    Makes the directories in the path specified, if they don't exist. If they
+    already exist, this returns without doing anything.
+    """
+    dirs, fn = os.path.split(path)
+    if not os.path.exists(dirs):
+        os.makedirs(dirs)
