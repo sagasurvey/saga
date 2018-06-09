@@ -46,6 +46,7 @@ class FileObject(object):
             os.makedirs(dirs)
 
     def download_as_file(self, file_path, overwrite=False, compress=False):
+        self._makedirs_if_needed(file_path)
         if overwrite or not os.path.isfile(file_path):
             try:
                 r = requests.get(self.path, stream=True)
@@ -57,10 +58,10 @@ class FileObject(object):
                 try:
                     with file_open(file_path, 'wb') as f:
                         shutil.copyfileobj(r.raw, f)
-                except Exception as e:
-                    if os.path.isfile(f):
-                        os.unlink(f)
-                    raise e
+                except:
+                    if os.path.isfile(file_path):
+                        os.unlink(file_path)
+                    raise
 
     def isfile(self):
         if self.path:
