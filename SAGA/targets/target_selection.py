@@ -244,7 +244,13 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     return target_catalog
 
 
-def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
+def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
+                        flux_star_removal_threshold=20.0,
+                        flux_star_r_range=(17, 17.7),
+                        flux_star_gr_range=(0.1, 0.4),
+                        sky_fiber_void_radius=10.0,
+                        targeting_score_threshold=900
+                        ):
     """
     Prepare AAT target catalog.
 
@@ -274,7 +280,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
         dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed+2).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
-        ok_mask = (sep.arcsec > 10.0)
+        ok_mask = (sep.arcsec > sky_fiber_void_radius)
         n_needed -= np.count_nonzero(ok_mask)
         ra_sky.append(ra_rand[ok_mask])
         dec_sky.append(dec_rand[ok_mask])
@@ -284,11 +290,11 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     ra_sky = np.concatenate(ra_sky)
     dec_sky = np.concatenate(dec_sky)
 
-    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
     is_des = Query((lambda s: s == 'des', 'survey'))
     is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
-    is_flux_star = Query(is_star, 'r_mag >= 17', 'r_mag < 17.7')
-    is_flux_star &= Query('gr >= 0.1', 'gr < 0.4')
+    is_flux_star = Query(is_star, 'r_mag >= {}'.format(flux_star_r_range[0]), 'r_mag < {}'.format(flux_star_r_range[1]))
+    is_flux_star &= Query('gr >= {}'.format(flux_star_gr_range[0]), 'gr < {}'.format(flux_star_gr_range[1]))
 
     target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
