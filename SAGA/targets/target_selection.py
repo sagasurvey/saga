@@ -336,7 +336,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
     target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
-    target_catalog = Query('Priority').filter(target_catalog)
+    target_catalog = Query('Priority > 0').filter(target_catalog)
+    n_flux_star = Query('Priority == 9').count(target_catalog)
     del flux_star_indices, flux_star_sc, target_sc, sep
 
     target_catalog['TargetType'] = 'P'
@@ -347,7 +348,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     target_catalog.rename_column('OBJID', 'TargetName')
     target_catalog.rename_column('r_mag', 'Magnitude')
 
-    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
+    target_catalog.sort(['TARGETING_SCORE', 'Magnitude'])
     target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
 
     sky_catalog = Table({
@@ -364,9 +365,11 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     target_catalog = vstack([target_catalog, sky_catalog])
 
     if verbose:
-        for rank in range(1, 9):
+        print('# of flux stars =', n_flux_star)
+        print('# of sky fibers =', len(sky_catalog))
+        for rank in range(1, 10):
             print('# of Priority={} targets ='.format(rank),
-                Query('Priority == {}'.format(rank)).count(target_catalog))
+                  Query('Priority == {}'.format(rank)).count(target_catalog))
 
     if write_to:
         if verbose:
@@ -378,9 +381,9 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                              format='ascii.fast_commented_header',
                              overwrite=True,
                              formats={
-                                'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
-                                'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
-                                'Magnitude': '%.2f',
+                                 'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
+                                 'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
+                                 'Magnitude': '%.2f',
                              })
 
         with open(write_to) as fh:
