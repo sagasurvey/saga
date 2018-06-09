@@ -185,11 +185,12 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
     cols = table.colnames if cols is None else cols
     return np.vstack((table[c][row_mask].data.astype(dtype, casting='same_kind', copy=False) for c in cols)).T
 
+
 def makedirs_if_needed(path):
     """
     Makes the directories in the path specified, if they don't exist. If they
     already exist, this returns without doing anything.
     """
-    dirs, fn = os.path.split(path)
+    dirs = os.path.dirname(path)
     if not os.path.exists(dirs):
         os.makedirs(dirs)
