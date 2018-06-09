@@ -287,8 +287,9 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
     is_des = Query((lambda s: s == 'des', 'survey'))
     is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
-    is_flux_star = Query(is_star, 'r_mag > 16', 'r_mag < 17')
-
+    is_flux_star = Query(is_star, 'r_mag > 17', 'r_mag < 18')
+    is_flux_star &= Query('gr >= 0', 'gr < 0.6')
+    
     target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
     target_catalog['Priority'][is_flux_star.mask(target_catalog)] = 9
