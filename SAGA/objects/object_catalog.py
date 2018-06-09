@@ -275,6 +275,7 @@ class ObjectCatalog(object):
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
+                    print(time.strftime('[%m/%d %H:%M:%S]'), '[WARNING] Not found: {} catalog for {}.'.format(catalog_name, host_id))
                     return None
                 return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
 
