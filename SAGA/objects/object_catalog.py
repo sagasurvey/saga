@@ -215,7 +215,7 @@ class ObjectCatalog(object):
 
     def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False, raise_exception=False):
         """
-        This function build base catalog and write to the database.
+        This function builds the base catalog and writes it to the database.
 
         !! IMPORTANT !!
         If you want to write the base catalog to an alternative location (not the database)
