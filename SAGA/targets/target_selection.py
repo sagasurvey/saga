@@ -259,21 +259,35 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     """
     Prepare AAT target catalog.
 
-    If the host's radius (in degree) is less than `sky_fiber_host_rvir_threshold`,
-    all sky fiber will be distributed between `sky_fiber_max` and  `sky_fiber_host_rvir_threshold`.
+    If the host's radius is less than `sky_fiber_host_rvir_threshold`,
+    all sky fiber will be distributed between `sky_fiber_max` and  host's radius.
 
-    Otherwise, it will first fill the outer annulus, then distribute the rest
-    within the host (but prefer outer region, as controlled by `sky_fiber_radial_adjustment`)
+    Otherwise, first fill the annulus between `sky_fiber_max` and host's radius,
+    then distribute the rest within the host (but prefer outer region,
+    as controlled by `sky_fiber_radial_adjustment`)
 
     Format needed:
     # TargetName(unique for header) RA(h m s) Dec(d m s) TargetType(Program,Fiducial,Sky) Priority(9 is highest) Magnitude 0 Notes
     1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
     1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
     """
+    # pylint: disable=no-member
 
     if 'TARGETING_SCORE' not in target_catalog.colnames:
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
+
+    if not isinstance(flux_star_removal_threshold, u.Quantity):
+        flux_star_removal_threshold = flux_star_removal_threshold * u.arcsec
+
+    if not isinstance(sky_fiber_void_radius, u.Quantity):
+        sky_fiber_void_radius = sky_fiber_void_radius * u.arcsec
+
+    if not isinstance(sky_fiber_max, u.Quantity):
+        sky_fiber_max = sky_fiber_max * u.deg
+
+    if not isinstance(sky_fiber_host_rvir_threshold, u.Quantity):
+        sky_fiber_host_rvir_threshold = sky_fiber_host_rvir_threshold * u.deg
 
     host_ra = target_catalog['HOST_RA'][0]*u.deg
     host_dec = target_catalog['HOST_DEC'][0]*u.deg
@@ -283,9 +297,15 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     annulus_actual = (sky_fiber_max ** 2.0 - host_rvir ** 2.0)
     annulus_wanted = (sky_fiber_max ** 2.0 - sky_fiber_host_rvir_threshold ** 2.0)
 
+    if annulus_actual < 0:
+        raise ValueError('`sky_fiber_max` too small, this host is larger than that!')
+
+    if annulus_wanted < 0:
+        raise ValueError('`sky_fiber_max` must be larger than `sky_fiber_host_rvir_threshold`!')
+
     def _gen_dist_rand(seed_this, size):
         U = np.random.RandomState(seed_this).rand(size)
-        return np.sqrt(U * annulus_actual + host_rvir ** 2.0).to(u.deg)
+        return np.sqrt(U * annulus_actual + host_rvir ** 2.0)
 
     if annulus_actual < annulus_wanted:
         def gen_dist_rand(seed_this, size):
@@ -294,7 +314,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
             dist_rand_out = _gen_dist_rand(seed_this, size_out)
             index = (1.0 / (sky_fiber_radial_adjustment + 2.0))
             dist_rand_in = (np.random.RandomState(seed_this+1).rand(size_in) ** index) * host_rvir
-            return np.concatenate([dist_rand_out, dist_rand_in]).to(u.deg)
+            return np.concatenate([dist_rand_out.to_value("deg"), dist_rand_in.to_value("deg")]) * u.deg
     else:
         gen_dist_rand = _gen_dist_rand
 
@@ -311,12 +331,12 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
         ok_mask = (dec_rand >= -90.0*u.deg) & (dec_rand <= 90.0*u.deg)
         ra_rand = ra_rand[ok_mask]
         dec_rand = dec_rand[ok_mask]
-        sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
+        sky_sc = SkyCoord(ra_rand, dec_rand)
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
         ok_mask = (sep > sky_fiber_void_radius)
         n_needed -= np.count_nonzero(ok_mask)
-        ra_sky.append(ra_rand[ok_mask])
-        dec_sky.append(dec_rand[ok_mask])
+        ra_sky.append(ra_rand[ok_mask].to_value("deg"))
+        dec_sky.append(dec_rand[ok_mask].to_value("deg"))
         seed += np.random.RandomState(seed+2).randint(100, 200)
         del ra_rand, dec_rand, sky_sc, sep, ok_mask
     del base_sc
