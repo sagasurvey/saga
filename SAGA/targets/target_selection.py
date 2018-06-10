@@ -348,6 +348,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     target_catalog['TargetType'] = 'P'
     target_catalog['0'] = 0
     target_catalog['Notes'] = 'targets'
+    target_catalog['Notes'][is_flux_star.mask(target_catalog)] = 'flux'
 
     target_catalog.rename_column('DEC', 'Dec')
     target_catalog.rename_column('OBJID', 'TargetName')
