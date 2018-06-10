@@ -244,12 +244,28 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     return target_catalog
 
 
-def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
+def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
+                        flux_star_removal_threshold=20.0,
+                        flux_star_r_range=(17, 17.7),
+                        flux_star_gr_range=(0.1, 0.4),
+                        sky_fiber_void_radius=10.0,
+                        sky_fiber_needed=100,
+                        sky_fiber_max_deg=1.1,
+                        sky_fiber_host_rvir_threshold_deg=0.7,
+                        sky_fiber_radial_adjustment=2.0,
+                        targeting_score_threshold=900,
+                        seed=123,
+                       ):
     """
     Prepare AAT target catalog.
 
-    Format needed:
+    If the host's radius (in degree) is less than `sky_fiber_host_rvir_threshold_deg`,
+    all sky fiber will be distributed between `sky_fiber_max_deg` and  `sky_fiber_host_rvir_threshold_deg`.
 
+    Otherwise, it will first fill the outer annulus, then distribute the rest
+    within the host (but prefer outer region, as controlled by `sky_fiber_radial_adjustment`)
+
+    Format needed:
     # TargetName(unique for header) RA(h m s) Dec(d m s) TargetType(Program,Fiducial,Sky) Priority(9 is highest) Magnitude 0 Notes
     1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
     1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
@@ -259,47 +275,74 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    ra_min = target_catalog['RA'].min()
-    ra_max = target_catalog['RA'].max()
-    sin_dec_min = np.sin(np.deg2rad(target_catalog['DEC'].min()))
-    sin_dec_max = np.sin(np.deg2rad(target_catalog['DEC'].max()))
+    host_ra = target_catalog['HOST_RA'][0]
+    host_dec = target_catalog['HOST_DEC'][0]
+    host_dist = target_catalog['HOST_DIST'][0]
+    host_rvir_deg = np.rad2deg(np.arcsin(0.3 / host_dist))
 
-    n_needed = 100
+    annulus_actual = (sky_fiber_max_deg ** 2.0 - host_rvir_deg ** 2.0)
+    annulus_wanted = (sky_fiber_max_deg ** 2.0 - sky_fiber_host_rvir_threshold_deg ** 2.0)
+
+    def _gen_dist_rand(seed_this, size):
+        U = np.random.RandomState(seed_this).rand(size)
+        return np.sqrt(U * annulus_actual + host_rvir_deg ** 2.0)
+
+    if annulus_actual < annulus_wanted:
+        def gen_dist_rand(seed_this, size):
+            size_out = int(np.around(size * annulus_actual / annulus_wanted))
+            size_in = size - size_out
+            dist_rand_out = _gen_dist_rand(seed_this, size_out)
+            index = (1.0 / (sky_fiber_radial_adjustment + 2.0))
+            dist_rand_in = (np.random.RandomState(seed_this+1).rand(size_in) ** index) * host_rvir_deg
+            return np.concatenate([dist_rand_out, dist_rand_in])
+    else:
+        gen_dist_rand = _gen_dist_rand
+
+    n_needed = sky_fiber_needed
     ra_sky = []
     dec_sky = []
     base_sc = SkyCoord(target_catalog['RA'], target_catalog['DEC'], unit='deg')
-    seed = 12
     while n_needed > 0:
-        ra_rand = np.random.RandomState(seed).uniform(ra_min, ra_max, size=n_needed)
-        dec_rand = np.rad2deg(np.arcsin(np.random.RandomState(seed+2).uniform(sin_dec_min, sin_dec_max, size=n_needed)))
+        n_rand = int(np.ceil(n_needed*1.1))
+        dist_rand = gen_dist_rand(seed, n_rand)
+        theta_rand = np.random.RandomState(seed+1).rand(n_rand) * (2.0 * np.pi)
+        ra_rand = np.remainder(host_ra + dist_rand * np.cos(theta_rand), 360.0)
+        dec_rand = host_dec + dist_rand * np.sin(theta_rand)
+        ok_mask = (dec_rand >= -90.0) & (dec_rand <= 90.0)
+        ra_rand = ra_rand[ok_mask]
+        dec_rand = dec_rand[ok_mask]
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
-        ok_mask = (sep.arcsec > 10.0)
+        ok_mask = (sep.arcsec > sky_fiber_void_radius)
         n_needed -= np.count_nonzero(ok_mask)
         ra_sky.append(ra_rand[ok_mask])
         dec_sky.append(dec_rand[ok_mask])
-        seed += np.random.RandomState(seed).randint(100, 200)
+        seed += np.random.RandomState(seed+2).randint(100, 200)
         del ra_rand, dec_rand, sky_sc, sep, ok_mask
     del base_sc
-    ra_sky = np.concatenate(ra_sky)
-    dec_sky = np.concatenate(dec_sky)
+    ra_sky = np.concatenate(ra_sky)[:sky_fiber_needed]
+    dec_sky = np.concatenate(dec_sky)[:sky_fiber_needed]
 
-    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
     is_des = Query((lambda s: s == 'des', 'survey'))
     is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
-    is_flux_star = Query(is_star, 'r_mag >= 17', 'r_mag < 17.7')
-    is_flux_star &= Query('gr >= 0.1', 'gr < 0.4')
+    is_flux_star = Query(is_star, 'r_mag >= {}'.format(flux_star_r_range[0]), 'r_mag < {}'.format(flux_star_r_range[1]))
+    is_flux_star &= Query('gr >= {}'.format(flux_star_gr_range[0]), 'gr < {}'.format(flux_star_gr_range[1]))
 
     target_catalog = (is_target | is_flux_star).filter(target_catalog)
     target_catalog['Priority'] = target_catalog['TARGETING_SCORE'] // 100
+    target_catalog['Priority'][Query('Priority < 1').mask(target_catalog)] = 1
+    target_catalog['Priority'][Query('Priority > 8').mask(target_catalog)] = 8
+    target_catalog['Priority'] = 9 - target_catalog['Priority']
     target_catalog['Priority'][is_flux_star.mask(target_catalog)] = 9
 
     flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = -1
-    target_catalog = Query('Priority >= 0').filter(target_catalog)
+    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
+    target_catalog = Query('Priority > 0').filter(target_catalog)
+    n_flux_star = Query('Priority == 9').count(target_catalog)
     del flux_star_indices, flux_star_sc, target_sc, sep
 
     target_catalog['TargetType'] = 'P'
@@ -310,7 +353,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog.rename_column('OBJID', 'TargetName')
     target_catalog.rename_column('r_mag', 'Magnitude')
 
-    target_catalog.sort(['Priority', 'TARGETING_SCORE', 'Magnitude'])
+    target_catalog.sort(['TARGETING_SCORE', 'Magnitude'])
     target_catalog = target_catalog[['TargetName', 'RA', 'Dec', 'TargetType', 'Priority', 'Magnitude', '0', 'Notes']]
 
     sky_catalog = Table({
@@ -327,9 +370,11 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
     target_catalog = vstack([target_catalog, sky_catalog])
 
     if verbose:
-        for rank in range(1, 9):
+        print('# of flux stars =', n_flux_star)
+        print('# of sky fibers =', len(sky_catalog))
+        for rank in range(1, 10):
             print('# of Priority={} targets ='.format(rank),
-                Query('Priority == {}'.format(rank)).count(target_catalog))
+                  Query('Priority == {}'.format(rank)).count(target_catalog))
 
     if write_to:
         if verbose:
@@ -341,9 +386,9 @@ def prepare_aat_catalog(target_catalog, write_to=None, flux_star_removal_thresho
                              format='ascii.fast_commented_header',
                              overwrite=True,
                              formats={
-                                'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
-                                'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
-                                'Magnitude': '%.2f',
+                                 'RA': lambda x: Angle(x, 'deg').wrap_at(360*u.deg).to_string('hr', sep=' ', precision=2), # pylint: disable=E1101
+                                 'Dec': lambda x: Angle(x, 'deg').to_string('deg', sep=' ', precision=2),
+                                 'Magnitude': '%.2f',
                              })
 
         with open(write_to) as fh:
