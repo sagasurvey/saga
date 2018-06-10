@@ -248,10 +248,10 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         flux_star_removal_threshold=20.0,
                         flux_star_r_range=(17, 17.7),
                         flux_star_gr_range=(0.1, 0.4),
-                        sky_fiber_void_radius=10.0,
+                        sky_fiber_void_radius=10.0*u.arcsec,
                         sky_fiber_needed=100,
-                        sky_fiber_max_deg=1.1,
-                        sky_fiber_host_rvir_threshold_deg=0.7,
+                        sky_fiber_max=1.1*u.deg,
+                        sky_fiber_host_rvir_threshold=0.7*u.deg,
                         sky_fiber_radial_adjustment=2.0,
                         targeting_score_threshold=900,
                         seed=123,
@@ -259,8 +259,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     """
     Prepare AAT target catalog.
 
-    If the host's radius (in degree) is less than `sky_fiber_host_rvir_threshold_deg`,
-    all sky fiber will be distributed between `sky_fiber_max_deg` and  `sky_fiber_host_rvir_threshold_deg`.
+    If the host's radius (in degree) is less than `sky_fiber_host_rvir_threshold`,
+    all sky fiber will be distributed between `sky_fiber_max` and  `sky_fiber_host_rvir_threshold`.
 
     Otherwise, it will first fill the outer annulus, then distribute the rest
     within the host (but prefer outer region, as controlled by `sky_fiber_radial_adjustment`)
@@ -275,17 +275,17 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    host_ra = target_catalog['HOST_RA'][0]
-    host_dec = target_catalog['HOST_DEC'][0]
+    host_ra = target_catalog['HOST_RA'][0]*u.deg
+    host_dec = target_catalog['HOST_DEC'][0]*u.deg
     host_dist = target_catalog['HOST_DIST'][0]
-    host_rvir_deg = np.rad2deg(np.arcsin(0.3 / host_dist))
+    host_rvir = np.arcsin(0.3 / host_dist)*u.rad
 
-    annulus_actual = (sky_fiber_max_deg ** 2.0 - host_rvir_deg ** 2.0)
-    annulus_wanted = (sky_fiber_max_deg ** 2.0 - sky_fiber_host_rvir_threshold_deg ** 2.0)
+    annulus_actual = (sky_fiber_max ** 2.0 - host_rvir ** 2.0)
+    annulus_wanted = (sky_fiber_max ** 2.0 - sky_fiber_host_rvir_threshold ** 2.0)
 
     def _gen_dist_rand(seed_this, size):
         U = np.random.RandomState(seed_this).rand(size)
-        return np.sqrt(U * annulus_actual + host_rvir_deg ** 2.0)
+        return np.sqrt(U * annulus_actual + host_rvir ** 2.0).to(u.deg)
 
     if annulus_actual < annulus_wanted:
         def gen_dist_rand(seed_this, size):
@@ -293,8 +293,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
             size_in = size - size_out
             dist_rand_out = _gen_dist_rand(seed_this, size_out)
             index = (1.0 / (sky_fiber_radial_adjustment + 2.0))
-            dist_rand_in = (np.random.RandomState(seed_this+1).rand(size_in) ** index) * host_rvir_deg
-            return np.concatenate([dist_rand_out, dist_rand_in])
+            dist_rand_in = (np.random.RandomState(seed_this+1).rand(size_in) ** index) * host_rvir
+            return np.concatenate([dist_rand_out, dist_rand_in]).to(u.deg)
     else:
         gen_dist_rand = _gen_dist_rand
 
@@ -306,14 +306,14 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
         n_rand = int(np.ceil(n_needed*1.1))
         dist_rand = gen_dist_rand(seed, n_rand)
         theta_rand = np.random.RandomState(seed+1).rand(n_rand) * (2.0 * np.pi)
-        ra_rand = np.remainder(host_ra + dist_rand * np.cos(theta_rand), 360.0)
+        ra_rand = np.remainder(host_ra + dist_rand * np.cos(theta_rand), 360.0*u.deg)
         dec_rand = host_dec + dist_rand * np.sin(theta_rand)
-        ok_mask = (dec_rand >= -90.0) & (dec_rand <= 90.0)
+        ok_mask = (dec_rand >= -90.0*u.deg) & (dec_rand <= 90.0*u.deg)
         ra_rand = ra_rand[ok_mask]
         dec_rand = dec_rand[ok_mask]
         sky_sc = SkyCoord(ra_rand, dec_rand, unit='deg')
         sep = sky_sc.match_to_catalog_sky(base_sc)[1]
-        ok_mask = (sep.arcsec > sky_fiber_void_radius)
+        ok_mask = (sep > sky_fiber_void_radius)
         n_needed -= np.count_nonzero(ok_mask)
         ra_sky.append(ra_rand[ok_mask])
         dec_sky.append(dec_rand[ok_mask])
