@@ -245,7 +245,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
 
 
 def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
-                        flux_star_removal_threshold=20.0,
+                        flux_star_removal_threshold=20.0*u.arcsec,
                         flux_star_r_range=(17, 17.7),
                         flux_star_gr_range=(0.1, 0.4),
                         sky_fiber_void_radius=10.0*u.arcsec,
@@ -340,7 +340,7 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog['Priority'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
+    target_catalog['Priority'][flux_star_indices[sep < flux_star_removal_threshold]] = 0
     target_catalog = Query('Priority > 0').filter(target_catalog)
     n_flux_star = Query('Priority == 9').count(target_catalog)
     del flux_star_indices, flux_star_sc, target_sc, sep
