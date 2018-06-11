@@ -127,7 +127,7 @@ def read_mmt(dir_path, before_time=None):
         except IOError:
             t['HELIO_CORR'] = False
         else:
-            if obstime > before_time:
+            if before_time is not None and obstime > before_time:
                 return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
@@ -153,7 +153,7 @@ def read_aat(dir_path, before_time=None):
         except IOError:
             t['HELIO_CORR'] = False
         else:
-            if obstime > before_time:
+            if before_time is not None and obstime > before_time:
                 return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
@@ -178,7 +178,7 @@ def read_aat_mz(dir_path, before_time=None):
         except IOError:
             t['HELIO_CORR'] = False
         else:
-            if obstime > before_time:
+            if before_time is not None and obstime > before_time:
                 return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
