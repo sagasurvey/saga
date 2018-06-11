@@ -60,7 +60,7 @@ def heliocentric_correction(fits_filepath, site_name,
     sc = SkyCoord(hdr[ra_name], hdr[dec_name], unit=(ra_unit, dec_unit))
     obstime = Time(hdr[time_name], format=time_format)
     helio_corr = sc.radial_velocity_correction('heliocentric', obstime=obstime, location=EarthLocation.of_site(site_name))
-    return helio_corr.to_value(astropy.constants.c) # pylint: disable=E1101
+    return helio_corr.to_value(astropy.constants.c), obstime # pylint: disable=E1101
 
 
 def read_gama(file_path):
@@ -97,12 +97,14 @@ def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
                               guess=False, names=names, exclude_names=exclude_names, **kwargs)
         except (IOError, CParserError) as e:
             logging.warning("SKIPPING spectra file {}/{} - could not read or parse\n{}".format(dir_path, f, e))
+            continue
         this = Query(cuts).filter(this)
         if 'MASKNAME' not in this.colnames:
             this['MASKNAME'] = f
         if midprocess:
             this = midprocess(this)
-        output.append(this)
+        if this is not None:
+            output.append(this)
 
     output = vstack(output, 'exact', 'error')
     output['TELNAME'] = telname
@@ -112,7 +114,7 @@ def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
     return ensure_specs_dtype(output)
 
 
-def read_mmt(dir_path):
+def read_mmt(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 4:'mag', 5:'SPEC_Z', 6:'SPEC_Z_ERR',
                7:'ZQUALITY', 8:'SPECOBJID'}
@@ -121,10 +123,12 @@ def read_mmt(dir_path):
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
         try:
-            corr = heliocentric_correction(fits_filepath, 'mmt', 'RA', 'DEC', 'MJD')
+            corr, obstime = heliocentric_correction(fits_filepath, 'mmt', 'RA', 'DEC', 'MJD')
         except IOError:
             t['HELIO_CORR'] = False
         else:
+            if obstime > before_time:
+                return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
         return t
@@ -137,7 +141,7 @@ def read_mmt(dir_path):
     return read_generic_spectra(dir_path, '.zlog', 'MMT', usecols, 11, cuts, postprocess, midprocess)
 
 
-def read_aat(dir_path):
+def read_aat(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 7:'ZQUALITY', 8:'SPECOBJID'}
     cuts = Query('ZQUALITY >= 1')
@@ -145,10 +149,12 @@ def read_aat(dir_path):
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
         try:
-            corr = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
+            corr, obstime = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
         except IOError:
             t['HELIO_CORR'] = False
         else:
+            if obstime > before_time:
+                return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
         return t
@@ -160,7 +166,7 @@ def read_aat(dir_path):
     return read_generic_spectra(dir_path, '.zlog', 'AAT', usecols, 11, cuts, postprocess, midprocess)
 
 
-def read_aat_mz(dir_path):
+def read_aat_mz(dir_path, before_time=None):
 
     usecols = {3:'RA', 4:'DEC', 13:'SPEC_Z', 14:'ZQUALITY', 1:'SPECOBJID'}
     cuts = Query('ZQUALITY >= 1')
@@ -168,10 +174,12 @@ def read_aat_mz(dir_path):
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.mz', '.fits.gz'))
         try:
-            corr = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
+            corr, obstime = heliocentric_correction(fits_filepath, 'sso', 'MEANRA', 'MEANDEC', 'UTMJD')
         except IOError:
             t['HELIO_CORR'] = False
         else:
+            if obstime > before_time:
+                return
             t['SPEC_Z'] += corr
             t['HELIO_CORR'] = True
         return t
@@ -316,9 +324,10 @@ def extract_nsa_spectra(nsa):
 
 
 class SpectraData(object):
-    def __init__(self, spectra_dir_path=None, external_specs_dict=None):
+    def __init__(self, spectra_dir_path=None, external_specs_dict=None, before_time=None):
         self.spectra_dir_path = spectra_dir_path
         self._external_specs_dict = external_specs_dict or {}
+        self.before_time = before_time
 
     def read(self, add_coord=True):
         all_specs = []
@@ -328,9 +337,9 @@ class SpectraData(object):
 
         if self.spectra_dir_path is not None:
             all_specs.extend([
-                read_mmt(os.path.join(self.spectra_dir_path, 'MMT')),
-                read_aat(os.path.join(self.spectra_dir_path, 'AAT')),
-                read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT')),
+                read_mmt(os.path.join(self.spectra_dir_path, 'MMT'), before_time=self.before_time),
+                read_aat(os.path.join(self.spectra_dir_path, 'AAT'), before_time=self.before_time),
+                read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT'), before_time=self.before_time),
                 read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
                 read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
             ])
