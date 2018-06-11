@@ -1,9 +1,11 @@
 import os
+import logging
 import numpy as np
 from astropy.table import Table, vstack
 from astropy.coordinates import SkyCoord, EarthLocation
 from astropy.time import Time
 from astropy.io import fits
+from astropy.io.ascii.cparser import CParserError # pylint: disable=E0611
 import astropy.constants
 from easyquery import Query
 
@@ -90,8 +92,11 @@ def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
     for f in os.listdir(dir_path):
         if not f.endswith(extension):
             continue
-        this = Table.read(os.path.join(dir_path, f), format='ascii.fast_no_header',
-                          guess=False, names=names, exclude_names=exclude_names, **kwargs)
+        try:
+            this = Table.read(os.path.join(dir_path, f), format='ascii.fast_no_header',
+                              guess=False, names=names, exclude_names=exclude_names, **kwargs)
+        except (IOError, CParserError) as e:
+            logging.warning("SKIPPING spectra file {}/{} - could not read or parse\n{}".format(dir_path, f, e))
         this = Query(cuts).filter(this)
         if 'MASKNAME' not in this.colnames:
             this['MASKNAME'] = f
