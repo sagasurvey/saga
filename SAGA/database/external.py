@@ -207,8 +207,6 @@ class SdssQuery(object):
 
         # ``**locals()`` means "use the local variable names to fill the template"
         q = cls._query_template.format(**locals())
-        q = re.sub(r'\s+', ' ', q).strip()
-        q = re.sub(', ', ',', q)
         if not select_into_mydb:
             q = q.replace('INTO mydb.{} '.format(db_table_name), '')
         return q
