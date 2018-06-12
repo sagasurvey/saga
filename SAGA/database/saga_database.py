@@ -86,7 +86,8 @@ class Database(object):
         self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._shared_dir, 'Spectra', 'Final'),
                                                                  {'gama': self._tables['spectra_gama_dr3'],
                                                                   '2dF': self._tables['spectra_2dF'],
-                                                                  '6dF': self._tables['spectra_6dF']}))
+                                                                  '6dF': self._tables['spectra_6dF'],
+                                                                  'ozdes': self._tables['spectra_ozdes_dr1']}))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
         for fname in os.listdir(gmm_dir):
