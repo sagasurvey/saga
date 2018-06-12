@@ -213,7 +213,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False, raise_exception=False):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -251,7 +251,7 @@ class ObjectCatalog(object):
             raise ValueError('`version` must be 1 or 2.')
         build_module = build if version == 1 else build2
         nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
-        spectra = self._database['spectra_raw_all'].read()
+        spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
         sdss_remove = self._database['sdss_remove'].read()
         sdss_recover = self._database['sdss_recover'].read()
 
