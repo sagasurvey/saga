@@ -73,7 +73,7 @@ def read_gama(file_path):
     specs.rename_column('CATAID', 'MASKNAME')
     specs.rename_column('NQ', 'ZQUALITY')
     specs.rename_column('Z', 'SPEC_Z')
-    specs['SPEC_Z_ERR'] = np.float32(60)
+    specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
     specs['TELNAME'] = get_empty_str_array(len(specs), 6, 'GAMA')
     specs['ZQUALITY'][Query('ZQUALITY > 4').mask(specs)] = 4
     specs['HELIO_CORR'] = True
@@ -155,7 +155,7 @@ def read_aat(dir_path):
         return t
 
     def postprocess(t):
-        t['SPEC_Z_ERR'] = 10.0
+        t['SPEC_Z_ERR'] = 10 / _SPEED_OF_LIGHT
         return t
 
     return read_generic_spectra(dir_path, '.zlog', 'AAT', usecols, 11, cuts, postprocess, midprocess)
@@ -180,7 +180,7 @@ def read_aat_mz(dir_path):
     def postprocess(t):
         t['RA'] *= 180.0/np.pi
         t['DEC'] *= 180.0/np.pi
-        t['SPEC_Z_ERR'] = 10.0
+        t['SPEC_Z_ERR'] = 10 / _SPEED_OF_LIGHT
         return t
 
     return read_generic_spectra(dir_path, '.mz', 'AAT', usecols, 15, cuts, postprocess, midprocess, delimiter=',')
@@ -229,7 +229,7 @@ def read_deimos():
         'DEC'        : [20.210825313885, -0.28144459, 32.561687],
         'MASKNAME'   : ['deimos2014', 'deimos2016-DN1', 'deimos2016-MD1'],
         'SPECOBJID'  : [0, 0, 0],
-        'SPEC_Z'     : [2375.0/3.0e5, 0.056, 1.08],
+        'SPEC_Z'     : [2375/_SPEED_OF_LIGHT, 0.056, 1.08],
         'SPEC_Z_ERR' : [0.001, 0.001, 0.001],
         'ZQUALITY'   : [4, 4, 4],
         'TELNAME'    : ['DEIMOS', 'DEIMOS', 'DEIMOS'],
@@ -259,12 +259,12 @@ def read_6dF(file_path):
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
     specs = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(specs)
     specs['SPEC_Z'] = specs['cz'] / _SPEED_OF_LIGHT
+    specs['SPEC_Z_ERR'] = specs['e_cz'] / _SPEED_OF_LIGHT
     del specs['cz']
     specs.rename_column('_6dFGS', 'SPECOBJID')
     specs.rename_column('RAJ2000', 'RA')
     specs.rename_column('DEJ2000', 'DEC')
     specs.rename_column('q_cz', 'ZQUALITY')
-    specs.rename_column('e_cz','SPEC_Z_ERR')
     specs['TELNAME'] = '6dF'
     specs['MASKNAME'] = '6dF'
     specs['HELIO_CORR'] = True
@@ -285,9 +285,27 @@ def read_2dF(file_path):
     specs.rename_column('q_z', 'ZQUALITY')
     specs.rename_column('z', 'SPEC_Z')
     specs.rename_column('n_z', 'EM_ABS')
-    specs['SPEC_Z_ERR'] = 60
+    specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
     specs['TELNAME'] = '2dF'
     specs['MASKNAME'] = '2dF'
+    specs['HELIO_CORR'] = True
+
+    return ensure_specs_dtype(specs)
+
+
+def read_ozdes(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()['OzDES_ID''RA', 'DEC', 'z', 'flag', 'types']
+
+    # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    specs = Query('q_z >= 3').filter(specs)
+    specs.rename_column('OzDES_ID', 'SPECOBJID')
+    specs.rename_column('z', 'SPEC_Z')
+    specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
+    specs['ZQUALITY'] = 4
+    specs['TELNAME'] = 'OzDES'
+    specs['MASKNAME'] = 'OzDES'
     specs['HELIO_CORR'] = True
 
     return ensure_specs_dtype(specs)
