@@ -296,10 +296,7 @@ def read_2dF(file_path):
 def read_ozdes(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    specs = file_path.read()['OzDES_ID', 'RA', 'DEC', 'z', 'flag', 'types']
-
-    # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
-    specs = Query('q_z >= 3').filter(specs)
+    specs = file_path.read()['OzDES_ID', 'RA', 'DEC', 'z']
     specs.rename_column('OzDES_ID', 'SPECOBJID')
     specs.rename_column('z', 'SPEC_Z')
     specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
