@@ -260,7 +260,7 @@ def read_6dF(file_path):
     specs = (Query('q_cz == 3') | Query('q_cz == 4') | Query('q_cz == 6')).filter(specs)
     specs['SPEC_Z'] = specs['cz'] / _SPEED_OF_LIGHT
     specs['SPEC_Z_ERR'] = specs['e_cz'] / _SPEED_OF_LIGHT
-    del specs['cz']
+    del specs['cz'], specs['e_cz']
     specs.rename_column('_6dFGS', 'SPECOBJID')
     specs.rename_column('RAJ2000', 'RA')
     specs.rename_column('DEJ2000', 'DEC')
@@ -296,11 +296,12 @@ def read_2dF(file_path):
 def read_ozdes(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    specs = file_path.read()['OzDES_ID', 'RA', 'DEC', 'z']
+    specs = file_path.read()['OzDES_ID', 'RA', 'DEC', 'z', 'flag']
     specs.rename_column('OzDES_ID', 'SPECOBJID')
     specs.rename_column('z', 'SPEC_Z')
+    # flag 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    specs.rename_column('flag', 'ZQUALITY')
     specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
-    specs['ZQUALITY'] = 4
     specs['TELNAME'] = 'OzDES'
     specs['MASKNAME'] = 'OzDES'
     specs['HELIO_CORR'] = True
