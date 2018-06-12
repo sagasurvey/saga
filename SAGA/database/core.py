@@ -154,7 +154,7 @@ class DataObject(object):
         return self.local
 
 
-    def read(self, reload=False):
+    def read(self, reload=False, **kwargs):
         """
         Read in the data
 
@@ -177,10 +177,10 @@ class DataObject(object):
                 table = self._get_local().read()
             except (IOError, OSError):
                 warnings.warn("Failed to read local file, will try reading the remote file")
-                table = self.remote.read()
+                table = self.remote.read(**kwargs)
         else:
             try:
-                table = self.remote.read()
+                table = self.remote.read(**kwargs)
             except Exception as read_exception: #pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception

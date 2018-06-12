@@ -37,7 +37,7 @@ class TargetSelection(object):
     """
     def __init__(self, database, cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
-                 manual_selected_objids=None, version=2):
+                 manual_selected_objids=None, version=None):
         self._version = version
         self._database = database
         self._host_catalog = HostCatalog(self._database)
