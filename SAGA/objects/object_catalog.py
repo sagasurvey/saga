@@ -234,6 +234,7 @@ class ObjectCatalog(object):
         version : int, optional (default: 2)
         return_catalogs : bool, optional (default: False)
         raise_exception : bool, optional (default: False)
+        add_specs_only_before_time : astropy.time.Time, optional (default: None)
 
         Examples
         --------
