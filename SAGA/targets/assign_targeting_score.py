@@ -158,7 +158,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
                 base_this[''.join((b2, '_err', postfix))],
             )
 
-        if survey in gmm_parameters:
+        if survey in (gmm_parameters or {}):
             gmm_parameters_this = gmm_parameters[survey]
             bands = get_sdss_bands() if survey == 'sdss' else get_des_bands()
             base_this['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
