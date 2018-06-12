@@ -340,22 +340,23 @@ def extract_nsa_spectra(nsa):
 
 
 class SpectraData(object):
-    def __init__(self, spectra_dir_path=None, external_specs_dict=None, before_time=None):
+    def __init__(self, spectra_dir_path=None, external_specs_dict=None):
         self.spectra_dir_path = spectra_dir_path
         self._external_specs_dict = external_specs_dict or {}
-        self.before_time = before_time
 
-    def read(self, add_coord=True):
+    def read(self, add_coord=True, before_time=None):
         all_specs = []
 
         all_specs.extend((globals()['read_{}'.format(k)](v) \
                 for k, v in self._external_specs_dict.items()))
 
         if self.spectra_dir_path is not None:
+            if before_time is not None and not isinstance(before_time, Time):
+                before_time = Time(before_time)
             all_specs.extend([
-                read_mmt(os.path.join(self.spectra_dir_path, 'MMT'), before_time=self.before_time),
-                read_aat(os.path.join(self.spectra_dir_path, 'AAT'), before_time=self.before_time),
-                read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT'), before_time=self.before_time),
+                read_mmt(os.path.join(self.spectra_dir_path, 'MMT'), before_time=before_time),
+                read_aat(os.path.join(self.spectra_dir_path, 'AAT'), before_time=before_time),
+                read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT'), before_time=before_time),
                 read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
                 read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
             ])
