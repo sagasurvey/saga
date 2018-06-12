@@ -4,7 +4,7 @@ from astropy.table import vstack
 from easyquery import Query
 from . import cuts as C
 from . import build, build2
-from .manual_fixes import fixes_to_nsa_v012
+from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 from ..database import FitsTable, Database
 from ..hosts import HostCatalog
 from ..utils import get_sdss_bands, get_all_colors, add_skycoord, fill_values_by_query
@@ -211,6 +211,8 @@ class ObjectCatalog(object):
             nsa = Query('NSAID != 64408').filter(nsa)
         elif version == '1.0.1':
             nsa = nsa[build2.NSA_COLS_USED]
+            for nsaid, fixes in fixes_to_nsa_v101.items():
+                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
         nsa = add_skycoord(nsa)
         return nsa
 
