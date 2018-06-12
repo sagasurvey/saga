@@ -76,6 +76,9 @@ class Database(object):
             'spectra_gama_dr3': DataObject(FitsTable('http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits'),
                                            FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'GAMA', 'GAMA_SpecObj_dr3.fits')),
                                            use_local_first=True),
+            'spectra_ozdes_dr1': DataObject(FitsTable('http://www.mso.anu.edu.au/ozdes/OzDES-DR1.fits'),
+                                            FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'OzDES', 'OzDES-DR1.fits')),
+                                            use_local_first=True),
             'spectra_2dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
             'spectra_6dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
         }
@@ -83,7 +86,8 @@ class Database(object):
         self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._shared_dir, 'Spectra', 'Final'),
                                                                  {'gama': self._tables['spectra_gama_dr3'],
                                                                   '2dF': self._tables['spectra_2dF'],
-                                                                  '6dF': self._tables['spectra_6dF']}))
+                                                                  '6dF': self._tables['spectra_6dF'],
+                                                                  'ozdes': self._tables['spectra_ozdes_dr1']}))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
         for fname in os.listdir(gmm_dir):
