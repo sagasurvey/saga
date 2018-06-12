@@ -81,7 +81,7 @@ class ObjectCatalog(object):
         return table[columns]
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=2):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None):
         """
         load object catalogs (aka "base catalogs")
 
@@ -142,12 +142,14 @@ class ObjectCatalog(object):
         if return_as[0] not in 'slid':
             raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
 
-        if str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
+        if version is None:
+            base_key = 'base'
+        elif str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
             base_key = 'base_v0p1'
         elif version in (1, 2):
             base_key = 'base_v{}'.format(version)
         else:
-            raise ValueError('`version` must be \'paper1\', 1 or 2.')
+            raise ValueError('`version` must be None, \'paper1\', 1 or 2.')
 
         if has_spec and base_key == 'base_v0p1':
             t = self._database['saga_spectra_May2017'].read()
