@@ -222,27 +222,27 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     fill_values_by_query(base, ~basic_cut, {'TARGETING_SCORE': 1100}) #pylint: disable=E1130
     fill_values_by_query(base, ~C.is_galaxy2, {'TARGETING_SCORE': 1200})
     fill_values_by_query(base, ~C.is_clean2, {'TARGETING_SCORE': 1300})
+
     if not testing:
         fill_values_by_query(base, C.has_spec, {'TARGETING_SCORE': 1400})
 
-    fill_values_by_query(
-        base,
-        Query('ZQUALITY == 2', 'SPEC_Z < 0.05'),
-        {'TARGETING_SCORE': 180}
-    )
-
-    fill_values_by_query(
-        base,
-        Query(C.is_sat, (lambda x: (x != 'AAT') & (x != 'MMT'), 'TELNAME')),
-        {'TARGETING_SCORE': 150}
-    )
-
-    if manual_selected_objids is not None:
         fill_values_by_query(
             base,
-            Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID'), ~C.has_spec),
-            {'TARGETING_SCORE': 100}
+            Query('ZQUALITY == 2', 'SPEC_Z < 0.05'),
+            {'TARGETING_SCORE': 180}
         )
+
+        fill_values_by_query(
+            base,
+            Query(C.is_sat, (lambda x: (x != 'AAT') & (x != 'MMT'), 'TELNAME')),
+            {'TARGETING_SCORE': 150}
+        )
+
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID'))
+        if not testing:
+            q &= (~C.has_spec)
+        fill_values_by_query(base, q, {'TARGETING_SCORE': 100})
 
     base.sort('TARGETING_SCORE')
     return base
