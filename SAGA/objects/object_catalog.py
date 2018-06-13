@@ -217,7 +217,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=2, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -252,8 +252,8 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
-        if version not in (1, 2):
-            raise ValueError('`version` must be 1 or 2.')
+        if version not in (None, 1, 2):
+            raise ValueError('`version` must be None, 1 or 2.')
         build_module = build if version == 1 else build2
         nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
         spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
@@ -267,7 +267,8 @@ class ObjectCatalog(object):
 
         for i, host_id in enumerate(host_ids):
             if base_file_path_pattern is None:
-                data_obj = self._database['base_v{}'.format(version), host_id].remote
+                base_key = 'base' if version is None else 'base_v{}'.format(version)
+                data_obj = self._database[base_key, host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
