@@ -259,6 +259,8 @@ class ObjectCatalog(object):
         spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
         sdss_remove = self._database['sdss_remove'].read()
         sdss_recover = self._database['sdss_recover'].read()
+        des_remove = self._database['des_remove'].read()
+        des_recover = self._database['des_recover'].read()
 
         catalogs_to_return = list()
         host_ids = self._host_catalog.resolve_id(hosts, 'string')
@@ -299,6 +301,7 @@ class ObjectCatalog(object):
             try:
                 base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
                                                      sdss_remove=sdss_remove, sdss_recover=sdss_recover,
+                                                     des_remove=des_remove, des_recover=des_recover,
                                                      **catalog_dict)
             except Exception as e: # pylint: disable=W0703
                 print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
