@@ -371,6 +371,8 @@ class DesQuery(object):
                          {'sql': self.query, 'ofmt': 'fits', 'async': False},
                          headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
                          stream=True)
+        if not r.ok:
+            raise requests.RequestException('DES query failed: "{}"'.format(r.text))
 
         r.raw.decode_content = True
         file_open = gzip.open if compress else open
@@ -400,6 +402,10 @@ class DecalsPrebuilt(object):
         r = requests.get('http://www.slac.stanford.edu/~yymao/saga/base-catalogs-non-sdss/{}_decals_{}.fits.gz'.format(self.host_id, self.data_release),
                          headers={'Content-Type': 'application/gzip'},
                          stream=True)
+
+        if not r.ok:
+            raise requests.RequestException('Decals-prebuilt download failed: "{}"'.format(r.text))
+
         makedirs_if_needed(file_path)
         with open(file_path, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
