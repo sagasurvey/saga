@@ -440,8 +440,8 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                                           local_dict=ellipse_calculation, global_dict={})
 
             no_spec_z_or_close = Query('ZQUALITY < 3')
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 150.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 150.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
             nearby_obj_mask &= no_spec_z_or_close.mask(base)
 
             remove_flag = 21
