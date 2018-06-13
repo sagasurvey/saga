@@ -206,6 +206,11 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         to_update_idx = base_this['index'][to_update_mask]
         base['TARGETING_SCORE'][to_update_idx] = base_this['TARGETING_SCORE'][to_update_mask]
 
+        if testing:
+            for col in ('P_GMM', 'log_L_GMM', 'TARGETING_SCORE'):
+                base[col+postfix] = -1 if col == 'TARGETING_SCORE' else np.nan
+                base[col+postfix][base_this['index']] = base_this[col]
+
     need_random_selection = np.flatnonzero(Query('TARGETING_SCORE >= 800', 'TARGETING_SCORE < 900').mask(base))
     if len(need_random_selection) > 50:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
