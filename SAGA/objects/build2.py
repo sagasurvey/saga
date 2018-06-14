@@ -377,9 +377,13 @@ def add_spectra(base, specs):
 
         larger_search_r = build._get_spec_search_radius(specs['SPEC_Z'][spec_idx_this])
         for q, sorter in (
+                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
                 (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
+                (Query('REMOVE == 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
                 (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
+                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
                 (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
+                (Query('REMOVE > 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
                 (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
         ):
             mask = q.mask(possible_match)
