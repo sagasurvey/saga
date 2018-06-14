@@ -273,7 +273,7 @@ class ObjectCatalog(object):
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
             if data_obj.isfile() and not overwrite:
-                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
+                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version or 2, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
                 continue
 
             host = self._host_catalog.load_single(host_id)
@@ -283,7 +283,7 @@ class ObjectCatalog(object):
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
-                    print(time.strftime('[%m/%d %H:%M:%S]'), '[WARNING] Not found: {} catalog for {}.'.format(catalog_name, host_id))
+                    print(time.strftime('[%m/%d %H:%M:%S]'), '[WARNING] Not found: {} catalog for {}.'.format(catalog_name.upper(), host_id))
                     return None
                 return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
 

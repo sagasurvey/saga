@@ -364,29 +364,32 @@ def add_spectra(base, specs):
     specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
     for i, j in zip(specs_idx_edges[:-1], specs_idx_edges[1:]):
         spec_idx_this = specs_idx[i]
-        possible_match = base['REMOVE', 'is_galaxy', 'r_mag', 'no_spec_yet', 'index'][base_idx[i:j]]
+        possible_match = base['REMOVE', 'is_galaxy', 'r_mag', 'radius', 'no_spec_yet', 'index'][base_idx[i:j]]
         possible_match['sep'] = sep[i:j]
+        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius']
 
         if Query('sep < 1', ~Query('no_spec_yet')).count(possible_match) > 0:
-            specs['matched_idx'][spec_idx_this] = -2
+            specs['matched_idx'][spec_idx_this] = -2 # duplicated specs
 
         possible_match = possible_match[possible_match['no_spec_yet']]
         if not len(possible_match):
             continue
-        possible_match.sort('sep')
 
         larger_search_r = build._get_spec_search_radius(specs['SPEC_Z'][spec_idx_this])
-        for q in (
-                Query('REMOVE == 0', 'sep < 1'),
-                Query('REMOVE == 0', 'is_galaxy', 'sep < 3'),
-                Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 3'),
-                Query('REMOVE == 0', 'is_galaxy', 'r_mag < 17', 'sep < {:g}'.format(larger_search_r)),
-                Query('REMOVE > 0', 'sep < 3'),
-                Query('sep >= 3', 'sep < 4'),
+        for q, sorter in (
+                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
+                (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
+                (Query('REMOVE == 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
+                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
+                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
+                (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
+                (Query('REMOVE > 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
+                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
         ):
             mask = q.mask(possible_match)
             if mask.any():
-                matched_base_idx = possible_match['index'][np.flatnonzero(mask)[0]]
+                possible_match_this = possible_match[mask]
+                matched_base_idx = possible_match_this['index'][possible_match_this[sorter].argmin()]
                 specs['matched_idx'][spec_idx_this] = matched_base_idx
                 base['no_spec_yet'][matched_base_idx] = False
                 break
