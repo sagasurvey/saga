@@ -293,7 +293,7 @@ class ObjectCatalog(object):
                 time.strftime('[%m/%d %H:%M:%S]'),
                 'Use {} to build base catalog v{} for {}'.format(
                     ', '.join((k for k, v in catalog_dict.items() if v is not None)).upper(),
-                    version,
+                    (version or 2),
                     host_id
                 ),
                 '({}/{})'.format(i+1, len(host_ids))
