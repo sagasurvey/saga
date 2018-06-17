@@ -180,12 +180,20 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
 
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
 
-    is_star = Query('PHOTPTYPE == 6')
-    is_guide_star = is_star & Query('PSFMAG_R >= 14', 'PSFMAG_R < 15')
-    is_flux_star = is_star & Query('PSFMAG_R >= 17', 'PSFMAG_R < 18')
-    is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6', 'PSFMAG_U - PSFMAG_G < 1.2')
-    is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
-    is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
+    if 'PHOTPTYPE' in target_catalog.colnames:
+        is_star = Query('PHOTPTYPE == 6')
+        is_guide_star = is_star & Query('PSFMAG_R >= 14', 'PSFMAG_R < 15')
+        is_flux_star = is_star & Query('PSFMAG_R >= 17', 'PSFMAG_R < 18')
+        is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6', 'PSFMAG_U - PSFMAG_G < 1.2')
+        is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
+        is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
+    else:
+        is_star = Query((lambda x: x == 'sdss', 'survey'), 'morphology_info == 6')
+        is_guide_star = is_star & Query('r_mag >= 14', 'r_mag < 15')
+        is_flux_star = is_star & Query('r_mag >= 17', 'r_mag < 18')
+        is_flux_star &= Query('ug >= 0.6', 'ug < 1.2')
+        is_flux_star &= Query('gr >= 0', 'gr < 0.6')
+        is_flux_star &= Query('gr > 0.75 * ug - 0.45')
 
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
 
