@@ -13,6 +13,14 @@ from ..utils import get_sdss_bands, get_all_colors, add_skycoord, fill_values_by
 __all__ = ['ObjectCatalog']
 
 
+def _get_unique_objids(objid_col):
+    try:
+        objid_col = objid_col.compressed()
+    except AttributeError:
+        pass
+    return np.unique(np.asarray(objid_col, dtype=np.int64))
+
+
 class ObjectCatalog(object):
     """
     This class provides a high-level interface to access object catalogs
@@ -255,12 +263,18 @@ class ObjectCatalog(object):
         if version not in (None, 1, 2):
             raise ValueError('`version` must be None, 1 or 2.')
         build_module = build if version == 1 else build2
+
         nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
         spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
-        sdss_remove = self._database['sdss_remove'].read()
-        sdss_recover = self._database['sdss_recover'].read()
-        des_remove = self._database['des_remove'].read()
-        des_recover = self._database['des_recover'].read()
+
+        manual_lists = {}
+        for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
+            for list_type in ('remove', 'recover'):
+                key = '{}_{}'.format(survey, list_type)
+                val = _get_unique_objids(self._database[key].read()[col])
+                if not len(val):
+                    val = None
+                manual_lists[key] = val
 
         catalogs_to_return = list()
         host_ids = self._host_catalog.resolve_id(hosts, 'string')
@@ -301,9 +315,7 @@ class ObjectCatalog(object):
 
             try:
                 base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
-                                                     sdss_remove=sdss_remove, sdss_recover=sdss_recover,
-                                                     des_remove=des_remove, des_recover=des_recover,
-                                                     **catalog_dict)
+                                                     **manual_lists, **catalog_dict)
             except Exception as e: # pylint: disable=W0703
                 print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
                 base = None
