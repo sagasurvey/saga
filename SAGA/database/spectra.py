@@ -14,7 +14,7 @@ from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
-           'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
+           'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF', 'read_2dflens'
            'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData',
            'ensure_specs_dtype', 'SPECS_COLUMNS']
 
@@ -298,6 +298,27 @@ def read_2dF(file_path):
     specs['HELIO_CORR'] = True
 
     return ensure_specs_dtype(specs)
+
+def read_2dFlens(file_path):
+    usecols = {1:'R.A.', 2:'Dec.', 3:'z', 4:'qual'}
+
+    # 2dF LENS DOESN"T PROVIDE A TARGET NAME
+    name =[]
+    for i,l in enumerate(lens):
+        name.append('2dflen_'+str(i))
+    
+    specs.rename_column(name, 'SPECOBJID')
+    specs.rename_column('R.A.', 'RA')
+    specs.rename_column('Dec.', 'DEC')
+    specs.rename_column('qual', 'ZQUALITY')
+    specs.rename_column('z', 'SPEC_Z')
+    specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
+    specs['TELNAME'] = '2dFlen'
+    specs['MASKNAME'] = '2dFlen'
+    specs['HELIO_CORR'] = True
+
+    return ensure_specs_dtype(specs)
+
 
 
 def read_ozdes(file_path):
