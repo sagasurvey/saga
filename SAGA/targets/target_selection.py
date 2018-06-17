@@ -8,7 +8,7 @@ from astropy.table import vstack, Table
 from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
-from ..objects import ObjectCatalog, build
+from ..objects import ObjectCatalog, get_unique_objids
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -58,7 +58,7 @@ class TargetSelection(object):
             self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
-            self._manual_selected_objids = build.get_unique_objids(self._database[manual_selected_objids or 'manual_targets'].read()['OBJID'])
+            self._manual_selected_objids = get_unique_objids(self._database[manual_selected_objids or 'manual_targets'].read()['OBJID'])
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
 
@@ -137,7 +137,9 @@ class TargetSelection(object):
         self.target_catalogs = dict()
 
 
-def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
+def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
+                        flux_star_removal_threshold=20.0,
+                        targeting_score_threshold=900):
     """
     Prepare MMT target catalog.
 
@@ -178,19 +180,28 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
 
-    is_star = Query('PHOTPTYPE == 6')
-    is_guide_star = is_star & Query('PSFMAG_R >= 14', 'PSFMAG_R < 15')
-    is_flux_star = is_star & Query('PSFMAG_R >= 17', 'PSFMAG_R < 18')
-    is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6', 'PSFMAG_U - PSFMAG_G < 1.2')
-    is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
-    is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
+    if 'PHOTPTYPE' in target_catalog.colnames:
+        is_star = Query('PHOTPTYPE == 6')
+        is_guide_star = is_star & Query('PSFMAG_R >= 14', 'PSFMAG_R < 15')
+        is_flux_star = is_star & Query('PSFMAG_R >= 17', 'PSFMAG_R < 18')
+        is_flux_star &= Query('PSFMAG_U - PSFMAG_G >= 0.6', 'PSFMAG_U - PSFMAG_G < 1.2')
+        is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
+        is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
+    else:
+        is_star = Query((lambda x: x == 'sdss', 'survey'), 'morphology_info == 6')
+        is_guide_star = is_star & Query('r_mag >= 14', 'r_mag < 15')
+        is_flux_star = is_star & Query('r_mag >= 17', 'r_mag < 18')
+        is_flux_star &= Query('ug >= 0.6', 'ug < 1.2')
+        is_flux_star &= Query('gr >= 0', 'gr < 0.6')
+        is_flux_star &= Query('gr > 0.75 * ug - 0.45')
 
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
 
     target_catalog['rank'] = target_catalog['TARGETING_SCORE'] // 100
     target_catalog['rank'][Query('rank < 2').mask(target_catalog)] = 2 # regular targets start at rank 2
+    target_catalog['rank'][Query('rank > 8').mask(target_catalog)] = 8 # regular targets max rank = 8
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
     target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
