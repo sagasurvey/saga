@@ -1,5 +1,5 @@
 import os
-from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary
+from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary, FileObject
 from .spectra import SpectraData
 
 __all__ = ['known_google_sheets', 'Database']
@@ -81,18 +81,25 @@ class Database(object):
             'spectra_ozdes_dr1': DataObject(FitsTable('http://www.mso.anu.edu.au/ozdes/OzDES-DR1.fits'),
                                             FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'OzDES', 'OzDES-DR1.fits')),
                                             use_local_first=True),
-            'spectra_2dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
-            'spectra_6dF': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
-            'spectra_2dflen': DataObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat')),
-
+            'spectra_2df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
+            'spectra_6df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
+            'spectra_2dflens': DataObject(
+                FileObject('http://2dflens.swin.edu.au/2dflens_bestredshifts_goodz_withtypesandmags_final.dat.gz', format='ascii.fast_commented_header'),
+                FileObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat'), format='ascii.fast_commented_header'),
+                use_local_first=True
+            ),
         }
 
-        self._tables['spectra_raw_all'] = DataObject(SpectraData(os.path.join(self._shared_dir, 'Spectra', 'Final'),
-                                                                 {'gama': self._tables['spectra_gama_dr3'],
-                                                                  '2dF': self._tables['spectra_2dF'],
-                                                                  '2dflen': self._table['spectra_2dflen'],
-                                                                  '6dF': self._tables['spectra_6dF'],
-                                                                  'ozdes': self._tables['spectra_ozdes_dr1']}))
+        self._tables['spectra_raw_all'] = DataObject(SpectraData(
+            os.path.join(self._shared_dir, 'Spectra', 'Final'),
+            {
+                'gama': self._tables['spectra_gama_dr3'],
+                '2df': self._tables['spectra_2df'],
+                '2dflens': self._tables['spectra_2dflens'],
+                '6df': self._tables['spectra_6df'],
+                'ozdes': self._tables['spectra_ozdes_dr1'],
+            },
+        ))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
         for fname in os.listdir(gmm_dir):
