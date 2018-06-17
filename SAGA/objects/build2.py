@@ -62,6 +62,21 @@ def get_fof_group_id(catalog, linking_length_arcsec, reassign_group_indices=Fals
                                    reassign_group_indices=reassign_group_indices)
 
 
+def set_remove_flag(catalog, remove_queries=None, manual_remove=None, manual_recover=None):
+
+    remove_queries = [] if remove_queries is None else list(remove_queries)
+
+    if manual_remove is not None:
+        remove_queries.append((lambda x: np.in1d(x, manual_remove), 'OBJID'))
+
+    catalog['REMOVE'] = get_remove_flag(catalog, remove_queries)
+
+    if manual_recover is not None:
+        fill_values_by_query(catalog, Query((lambda x: np.in1d(x, manual_recover), 'OBJID')), {'REMOVE': 0})
+
+    return catalog
+
+
 def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     for b in get_sdss_bands():
         catalog['{}_mag'.format(b)] = np.where(catalog['PHOTPTYPE'] == 6, catalog['PSFMAG_{}'.format(b.upper())], catalog[b]) - catalog['EXTINCTION_{}'.format(b.upper())]
@@ -84,20 +99,11 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         'abs(g_mag - r_mag) > 10',
     ]
 
-    if to_remove:
-        ids_to_remove = build.get_unique_objids(to_remove['SDSS ID'])
-        remove_queries.append((lambda x: np.in1d(x, ids_to_remove), 'OBJID'))
-
-    catalog['REMOVE'] = get_remove_flag(catalog, remove_queries)
-
-    if to_recover:
-        ids_to_recover = build.get_unique_objids(to_recover['SDSS ID'])
-        fill_values_by_query(catalog, Query((lambda x: np.in1d(x, ids_to_recover), 'OBJID')), {'REMOVE': 0})
-
+    catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_des_catalog_for_merging(catalog, to_remove, to_recover):
+def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None):
 
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
@@ -128,20 +134,11 @@ def prepare_des_catalog_for_merging(catalog, to_remove, to_recover):
         'r_mag >= 25',
     ]
 
-    if to_remove:
-        ids_to_remove = build.get_unique_objids(to_remove['DES_OBJID'])
-        remove_queries.append((lambda x: np.in1d(x, ids_to_remove), 'OBJID'))
-
-    catalog['REMOVE'] = get_remove_flag(catalog, remove_queries)
-
-    if to_recover:
-        ids_to_recover = build.get_unique_objids(to_recover['DES_OBJID'])
-        fill_values_by_query(catalog, Query((lambda x: np.in1d(x, ids_to_recover), 'OBJID')), {'REMOVE': 0})
-
+    catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_decals_catalog_for_merging(catalog):
+def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
     catalog['OBJID'] = np.array(catalog['BRICKID'], dtype=np.int64) * int(1e13) + np.array(catalog['OBJID'], dtype=np.int64)
     catalog['is_galaxy'] = (catalog['TYPE'] != 'PSF')
     catalog['morphology_info'] = catalog['TYPE'].getfield('<U1').view(np.int32)
@@ -157,7 +154,7 @@ def prepare_decals_catalog_for_merging(catalog):
     for band in 'grz':
         catalog['{}_mag'.format(band)] += 0.1
 
-    catalog['REMOVE'] = get_remove_flag(catalog, [
+    remove_queries = [
         'radius >= 20',
         'FRACMASKED_G >= 0.35',
         'FRACMASKED_R >= 0.35',
@@ -170,8 +167,9 @@ def prepare_decals_catalog_for_merging(catalog):
         'r_err >= 0.2',
         Query('NOBS_G == 0', 'NOBS_R == 0'),
         'r_mag >= 25',
-    ])
+    ]
 
+    catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
@@ -506,6 +504,7 @@ def add_surface_brightness(base):
 def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
                      sdss_remove=None, sdss_recover=None,
                      des_remove=None, des_recover=None,
+                     decals_remove=None, decals_recover=None,
                      spectra=None, debug=None, **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
@@ -528,7 +527,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         des = prepare_des_catalog_for_merging(des, des_remove, des_recover)
 
     if decals is not None:
-        decals = prepare_decals_catalog_for_merging(decals)
+        decals = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
 
     if nsa is not None:
         nsa = filter_nearby_object(nsa, host)
