@@ -137,7 +137,9 @@ class TargetSelection(object):
         self.target_catalogs = dict()
 
 
-def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_threshold=20.0, verbose=True):
+def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
+                        flux_star_removal_threshold=20.0,
+                        targeting_score_threshold=900):
     """
     Prepare MMT target catalog.
 
@@ -178,7 +180,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
 
-    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < 900')
+    is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
 
     if 'PHOTPTYPE' in target_catalog.colnames:
         is_star = Query('PHOTPTYPE == 6')
@@ -199,6 +201,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, flux_star_removal_thresho
 
     target_catalog['rank'] = target_catalog['TARGETING_SCORE'] // 100
     target_catalog['rank'][Query('rank < 2').mask(target_catalog)] = 2 # regular targets start at rank 2
+    target_catalog['rank'][Query('rank > 8').mask(target_catalog)] = 8 # regular targets max rank = 8
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
     target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
