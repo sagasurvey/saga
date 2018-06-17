@@ -9,12 +9,13 @@ from astropy.io.ascii.cparser import CParserError # pylint: disable=E0611
 import astropy.constants
 from easyquery import Query
 
-from .core import FitsTable
+from .core import FitsTable, FileObject
 from ..utils import get_empty_str_array, add_skycoord
 
 
 __all__ = ['read_gama', 'read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs',
-           'read_wiyn', 'read_deimos', 'read_palomar', 'read_2dF', 'read_6dF',
+           'read_wiyn', 'read_deimos', 'read_palomar', 'read_2df', 'read_6df',
+           'read_ozdes', 'read_2dflens',
            'extract_sdss_spectra', 'extract_nsa_spectra', 'SpectraData',
            'ensure_specs_dtype', 'SPECS_COLUMNS']
 
@@ -258,7 +259,7 @@ def read_palomar():
     return ensure_specs_dtype(Table(data))
 
 
-def read_6dF(file_path):
+def read_6df(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
     specs = file_path.read()['RAJ2000', 'DEJ2000', '_6dFGS', 'cz', 'e_cz', 'q_cz']
@@ -279,7 +280,7 @@ def read_6dF(file_path):
     return ensure_specs_dtype(specs)
 
 
-def read_2dF(file_path):
+def read_2df(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
     specs = file_path.read()['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z', 'n_z']
@@ -295,6 +296,24 @@ def read_2dF(file_path):
     specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
     specs['TELNAME'] = '2dF'
     specs['MASKNAME'] = '2dF'
+    specs['HELIO_CORR'] = True
+
+    return ensure_specs_dtype(specs)
+
+
+def read_2dflens(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FileObject(file_path, format='ascii.fast_commented_header')
+    specs = file_path.read()['R.A.', 'Dec.', 'z', 'qual']
+
+    specs.rename_column('R.A.', 'RA')
+    specs.rename_column('Dec.', 'DEC')
+    specs.rename_column('qual', 'ZQUALITY')
+    specs.rename_column('z', 'SPEC_Z')
+    specs['SPECOBJID'] = ['2dFLenS_{}'.format(i) for i in range(len(specs))]
+    specs['SPEC_Z_ERR'] = 60 / _SPEED_OF_LIGHT
+    specs['TELNAME'] = '2dFLen' # max # of char is 6
+    specs['MASKNAME'] = '2dFLenS'
     specs['HELIO_CORR'] = True
 
     return ensure_specs_dtype(specs)
