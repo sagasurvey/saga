@@ -336,3 +336,32 @@ class ObjectCatalog(object):
 
         if return_catalogs:
             return catalogs_to_return
+
+
+    def generate_clean_specs(self, version=None):
+        """
+        gather spectra from all base catalogs
+        """
+        surveys = ('sdss', 'des', 'decals')
+        base_key = 'base' if version is None else 'base_v{}'.format(version)
+        out = []
+
+        for host in self._host_catalog.resolve_id('all', 'string'):
+            try:
+                base = self._database[base_key, host].read()
+            except IOError:
+                print('[WARNING] cannot find base catalog for', host)
+
+            base = C.has_spec.filter(base)
+
+            if version != 1:
+                cols = [col for col in base.colnames if col.startswith('OBJID_') or not any(col.endswith('_'+s) for s in surveys)]
+                base = base[cols]
+                for s in surveys:
+                    key = 'OBJID_' + s
+                    if key not in base.colnames:
+                        base[key] = -1
+
+            out.append(base)
+
+        return vstack(out, 'exact', 'error')
