@@ -8,7 +8,7 @@ from astropy.table import vstack, Table
 from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
-from ..objects import ObjectCatalog, build
+from ..objects import ObjectCatalog, get_unique_objids
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -58,7 +58,7 @@ class TargetSelection(object):
             self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
-            self._manual_selected_objids = build.get_unique_objids(self._database[manual_selected_objids or 'manual_targets'].read()['OBJID'])
+            self._manual_selected_objids = get_unique_objids(self._database[manual_selected_objids or 'manual_targets'].read()['OBJID'])
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
 

@@ -10,10 +10,10 @@ from ..hosts import HostCatalog
 from ..utils import get_sdss_bands, get_all_colors, add_skycoord, fill_values_by_query
 
 
-__all__ = ['ObjectCatalog']
+__all__ = ['ObjectCatalog', 'get_unique_objids']
 
 
-def _get_unique_objids(objid_col):
+def get_unique_objids(objid_col):
     try:
         objid_col = objid_col.compressed()
     except AttributeError:
@@ -271,7 +271,7 @@ class ObjectCatalog(object):
         for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
             for list_type in ('remove', 'recover'):
                 key = '{}_{}'.format(survey, list_type)
-                val = _get_unique_objids(self._database[key].read()[col])
+                val = get_unique_objids(self._database[key].read()[col])
                 if not len(val):
                     val = None
                 manual_lists[key] = val
