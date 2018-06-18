@@ -201,6 +201,13 @@ class ObjectCatalog(object):
                 return output_iterator
             if return_as[0] == 's':
                 out = vstack(list(output_iterator), 'outer', 'error')
+                if out.masked:
+                    for name, (dtype, _) in out.dtype.fields.items():
+                        if dtype.kind == 'i':
+                            out[name].fill_value = -1
+                        if dtype.kind == 'b':
+                            out[name].fill_value = False
+                out = out.filled()
                 if need_coord:
                     out = self._slice_columns(add_skycoord(out), columns)
                 return out
