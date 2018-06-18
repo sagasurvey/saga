@@ -188,7 +188,7 @@ def assign_choice(surveys):
     return choice
 
 
-def merge_catalogs(**catalog_dict):
+def merge_catalogs(debug=None, **catalog_dict):
 
     catalog_dict = {k: v for k, v in catalog_dict.items() if v is not None}
     n_catalogs = len(catalog_dict)
@@ -230,6 +230,9 @@ def merge_catalogs(**catalog_dict):
             stacked_catalog['chosen'][i] = 2
         else:
             stacked_catalog['chosen'][i:j] = assign_choice(stacked_catalog['survey'][i:j])
+
+    if debug is not None:
+        debug['stacked_catalog'] = stacked_catalog.copy()
 
     merged_catalog = Query('chosen == 2').filter(stacked_catalog)
     for name in catalog_dict:
@@ -284,7 +287,7 @@ def find_best_spec(specs):
     return rank.argmax(), spec_repeat, nsa_id
 
 
-def merge_spectra(specs):
+def merge_spectra(specs, debug=None):
     if 'coord' in specs.colnames:
         del specs['coord']
 
@@ -321,6 +324,9 @@ def merge_spectra(specs):
         specs['chosen'][k] = True
         specs['SPEC_REPEAT'][k] = spec_repeat
         specs['OBJ_NSAID'][k] = nsa_id
+
+    if debug is not None:
+        debug['merged_specs'] = specs.copy()
 
     specs = Query('chosen').filter(specs)
     del specs['chosen'], specs['group_id']
@@ -541,7 +547,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         if len(spectra):
             all_spectra.append(spectra)
 
-    base = merge_catalogs(sdss=sdss, des=des, decals=decals)
+    base = merge_catalogs(sdss=sdss, des=des, decals=decals, debug=debug)
     if sdss is not None and decals is not None:
         base = replace_poor_sdss_sky_subtraction(base)
 
@@ -551,9 +557,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
-        all_spectra = merge_spectra(all_spectra)
-        if debug is not None:
-            debug['all_spectra'] = all_spectra.copy()
+        all_spectra = merge_spectra(all_spectra, debug=debug)
         base = add_spectra(base, all_spectra)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa)
