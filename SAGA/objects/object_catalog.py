@@ -232,7 +232,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, debug=None):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -320,8 +320,14 @@ class ObjectCatalog(object):
                 '({}/{})'.format(i+1, len(host_ids))
             )
 
+            if debug is None:
+                debug_this = None
+            else:
+                debug[host_id] = dict()
+                debug_this = debug[host_id]
+
             try:
-                base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra,
+                base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra, debug=debug_this,
                                                      **manual_lists, **catalog_dict)
             except Exception as e: # pylint: disable=W0703
                 print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
