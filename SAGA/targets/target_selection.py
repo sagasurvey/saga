@@ -118,16 +118,25 @@ class TargetSelection(object):
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
 
-        if return_as[0] != 'n':
-            output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
-            if return_as[0] == 'd':
-                return dict(zip(host_ids, output_iter))
-            elif return_as[0] == 'i':
-                return output_iter
-            elif return_as[0] == 'l':
-                return list(output_iter)
-            elif return_as[0] == 's':
-                return vstack(list(output_iter), 'outer', 'error')
+        if return_as[0] == 'n':
+            return
+
+        output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
+        if return_as[0] == 'd':
+            return dict(zip(host_ids, output_iter))
+        elif return_as[0] == 'i':
+            return output_iter
+        elif return_as[0] == 'l':
+            return list(output_iter)
+        elif return_as[0] == 's':
+            out = vstack(list(output_iter), 'outer', 'error')
+            if out.masked:
+                for name, (dtype, _) in out.dtype.fields.items():
+                    if dtype.kind == 'i':
+                        out[name].fill_value = -1
+                    if dtype.kind == 'b':
+                        out[name].fill_value = False
+            return out.filled()
 
 
     def clear_target_catalogs(self):
