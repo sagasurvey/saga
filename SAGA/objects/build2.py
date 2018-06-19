@@ -97,6 +97,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'),
         'abs(r_mag - i_mag) > 10',
         'abs(g_mag - r_mag) > 10',
+        'FIBERMAG_R > 23',
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
@@ -155,17 +156,26 @@ def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
         catalog['{}_mag'.format(band)] += 0.1
 
     remove_queries = [
-        'radius >= 20',
         'FRACMASKED_G >= 0.35',
         'FRACMASKED_R >= 0.35',
+        'FRACMASKED_Z >= 0.35',
+        'FRACFLUX_G >= 4',
+        'FRACFLUX_R >= 4',
+        'FRACFLUX_Z >= 4',
         'RCHISQ_G >= 10',
         'RCHISQ_R >= 10',
         'RCHISQ_Z >= 10',
+        Query('RCHISQ_G > 4', 'RCHISQ_R > 4', 'RCHISQ_Z > 4'),
         'ALLMASK_G > 0',
         'ALLMASK_R > 0',
+        'ALLMASK_Z > 0',
+        'NOBS_G == 0',
+        'NOBS_R == 0',
+        'radius >= 10',
         'g_err >= 0.2',
         'r_err >= 0.2',
-        Query('NOBS_G == 0', 'NOBS_R == 0'),
+        'z_err >= 0.2',
+        'g_mag - r_mag < -0.5',
         'r_mag >= 25',
     ]
 
