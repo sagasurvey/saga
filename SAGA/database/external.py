@@ -413,8 +413,6 @@ class DecalsPrebuilt(object):
 
 class DecalsQuery(object):
 
-    columns_needed = "RELEASE BRICKID OBJID TYPE RA DEC FLUX_G FLUX_R FLUX_Z FLUX_IVAR_G FLUX_IVAR_R FLUX_IVAR_Z MW_TRANSMISSION_G MW_TRANSMISSION_R MW_TRANSMISSION_Z NOBS_G NOBS_R NOBS_Z RCHISQ_G RCHISQ_R RCHISQ_Z FRACMASKED_G FRACMASKED_R FRACMASKED_Z ALLMASK_G ALLMASK_R ALLMASK_Z FRACDEV FRACDEV_IVAR SHAPEDEV_R SHAPEDEV_R_IVAR SHAPEEXP_R SHAPEEXP_R_IVAR".split()
-
     def __init__(self, ra, dec, radius=1.0, decals_dr='dr5',
                  decals_base_dir='/global/project/projectdirs/cosmo/data/legacysurvey'):
 
@@ -462,7 +460,7 @@ class DecalsQuery(object):
                                   margin_dec=self.radius*1.01):
                 continue
 
-            d = FitsTable(os.path.join(self.sweep_dir, filename)).read()[self.columns_needed]
+            d = FitsTable(os.path.join(self.sweep_dir, filename)).read()
             sep = SkyCoord(d['RA'], d['DEC'], unit='deg').separation(SkyCoord(self.ra, self.dec, unit='deg')).deg
             d = d[sep <= self.radius]
             if len(d):
