@@ -144,9 +144,26 @@ def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
     catalog['is_galaxy'] = (catalog['TYPE'] != 'PSF')
     catalog['morphology_info'] = catalog['TYPE'].getfield('<U1').view(np.int32)
     catalog['radius'] = catalog['FRACDEV'] * catalog['SHAPEDEV_R'] + (1.0 - catalog['FRACDEV']) * catalog['SHAPEEXP_R']
-    catalog['radius_err'] = np.hypot(catalog['FRACDEV']**2.0 / catalog['SHAPEDEV_R_IVAR'], (1.0 - catalog['FRACDEV'])**2.0 / catalog['SHAPEEXP_R_IVAR'])
-
-    fill_values_by_query(catalog, Query('radius_err < 0') | (~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
+    catalog['radius_err'] = np.float32(0)
+    mask = (catalog['TYPE'] == 'DEV')
+    catalog['radius_err'][mask] = 1.0 / np.sqrt(catalog['SHAPEDEV_R_IVAR'][mask])
+    mask = (catalog['TYPE'] == 'EXP')
+    catalog['radius_err'][mask] = 1.0 / np.sqrt(catalog['SHAPEEXP_R_IVAR'][mask])
+    mask = (catalog['TYPE'] == 'COMP')
+    catalog['radius_err'][mask] = ne.evaluate(
+        'sqrt(f**2.0 / dev_ivar + (1.0-f)**2.0 / exp_ivar + (r_dev - r_exp)**2.0 / f_ivar)',
+        {
+            'f': catalog['FRACDEV'][mask],
+            'r_dev': catalog['SHAPEDEV_R'][mask],
+            'r_exp': catalog['SHAPEEXP_R'][mask],
+            'f_ivar': catalog['FRACDEV_IVAR'][mask],
+            'dev_ivar': catalog['SHAPEDEV_R_IVAR'][mask],
+            'exp_ivar': catalog['SHAPEEXP_R_IVAR'][mask],
+        },
+        {},
+    )
+    del mask
+    fill_values_by_query(catalog, Query('radius > 0', ~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
 
     for band in 'uiy':
         catalog['{}_mag'.format(band)] = 99.0
