@@ -195,7 +195,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
         'z_err >= 0.2',
         'g_mag - r_mag < -0.5',
         'radius > 10.0**(-0.2 * (r_mag - 23.5))',
-        'radius < 10.0**(-0.2 * (r_mag - 17))',
+        Query('is_galaxy', 'radius < 10.0**(-0.2 * (r_mag - 17))'),
         'r_mag >= 25',
     ]
 
