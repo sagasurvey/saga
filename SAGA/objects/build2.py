@@ -460,15 +460,15 @@ def add_spectra(base, specs, debug=None):
 def remove_shreds_near_spec_obj(base, nsa=None):
 
     has_nsa = Query('OBJ_NSAID > -1')
-    is_high_z = Query('SPEC_Z > 0', 'ZQUALITY >= 3', 'is_galaxy', 'radius > abs(radius_err) * 2.0', ~has_nsa)
+    has_spec_z = Query('SPEC_Z > 0', 'ZQUALITY >= 3', 'is_galaxy', 'radius > abs(radius_err) * 2.0', ~has_nsa)
 
     has_nsa_indices = np.flatnonzero(has_nsa.mask(base))
     has_nsa_indices = has_nsa_indices[base['r_mag'][has_nsa_indices].argsort()]
 
-    is_high_z_indices = np.flatnonzero(is_high_z.mask(base))
-    is_high_z_indices = is_high_z_indices[base['r_mag'][is_high_z_indices].argsort()]
+    has_spec_z_indices = np.flatnonzero(has_spec_z.mask(base))
+    has_spec_z_indices = has_spec_z_indices[base['r_mag'][has_spec_z_indices].argsort()]
 
-    for idx in chain(has_nsa_indices, is_high_z_indices):
+    for idx in chain(has_nsa_indices, has_spec_z_indices):
         obj_this = base[idx]
 
         if nsa is not None and obj_this['OBJ_NSAID'] > -1:
