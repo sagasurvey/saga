@@ -2,7 +2,7 @@
 base catalog building pipeline 2.0
 """
 import logging
-from itertools import chain
+from itertools import chain, count
 import numpy as np
 import numexpr as ne
 from easyquery import Query
@@ -311,7 +311,7 @@ def add_columns_for_spectra(base):
     return base
 
 
-def match_spectra_to_base(specs, base):
+def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
     if 'coord' in specs.colnames:
         del specs['coord']
@@ -337,15 +337,15 @@ def match_spectra_to_base(specs, base):
         spec_idx_this = specs_idx[i]
         possible_match = base[base_idx[i:j]]
         possible_match['sep'] = sep[i:j]
-        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius']
+        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
 
         for q, sorter in (
                 (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
                 (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
                 (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
-                (Query('REMOVE == 0'), 'sep'),
+                (Query('REMOVE == 0', 'sep < 5.0'), 'sep'),
                 (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
-                (Query('REMOVE > 0'), 'sep'),
+                (Query('REMOVE > 0', 'sep < 5.0'), 'sep'),
         ):
             mask = q.mask(possible_match)
             if mask.any():
@@ -353,11 +353,6 @@ def match_spectra_to_base(specs, base):
                 matched_base_idx = possible_match_this['index'][possible_match_this[sorter].argmin()]
                 specs['matched_idx'][spec_idx_this] = matched_base_idx
                 break
-
-    return specs
-
-
-def merge_duplicated_specs(specs, debug=None):
 
     if 'coord' in specs.colnames:
         del specs['coord']
@@ -414,11 +409,15 @@ def merge_duplicated_specs(specs, debug=None):
         specs['OBJ_NSAID'][best_spec['index']] = nsa_id
         specs['chosen'][best_spec['index']] = True
 
-    for spec in Query('matched_idx == -1').filter(specs):
-        logging.warning('No photo obj matched to {} spec {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
+    for spec in Query('matched_idx == -1', 'ZQUALITY >= 3').filter(specs):
+        logging.warning('No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
 
     if debug is not None:
-        debug['specs_matching'] = specs.copy()
+        for i in count():
+            key = 'specs_matching_{}'.format(i)
+            if key not in debug:
+                debug[key] = specs.copy()
+                break
 
     return Query('chosen').filter(specs), Query('matched_idx == -2').filter(specs)
 
@@ -431,12 +430,16 @@ def add_spectra(base, specs, debug=None):
 
     base_this = base['REMOVE', 'is_galaxy', 'r_mag', 'coord']
     base_this['index'] = np.arange(len(base))
-    base_this['radius_for_match'] = base['radius'] # TODO: check if radius is valid
+    base_this['radius_for_match'] = np.where(
+        Query('is_galaxy', 'radius_err >= radius*2.0').mask(base),
+        10.0**(-0.2 * (base['r_mag'] - 20)),
+        base['radius'],
+    )
+    fill_values_by_query(base_this, ~Query((np.isfinite, 'radius_for_match'), 'radius_for_match > 0'), {'radius_for_match': 0.1})
 
     needs_rematch_count = 0
     for _ in range(5):
-        specs = match_spectra_to_base(specs, base_this)
-        specs_matched, specs_need_rematch = merge_duplicated_specs(specs, debug=debug)
+        specs_matched, specs_need_rematch = match_spectra_to_base_and_merge_duplicates(specs, base_this, debug=debug)
 
         for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'OBJ_NSAID'):
             col_base = (col + '_spec') if col in ('RA', 'DEC') else col
@@ -448,8 +451,8 @@ def add_spectra(base, specs, debug=None):
         specs = specs_need_rematch
         base_this = base_this[np.in1d(base_this['index'], specs_matched['matched_idx'], True, True)]
     else:
-        for spec in specs:
-            logging.warning('Still no photo obj matched to {} spec {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
+        for spec in Query('ZQUALITY >= 3').filter(specs):
+            logging.warning('Still no photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
 
     return base
 
