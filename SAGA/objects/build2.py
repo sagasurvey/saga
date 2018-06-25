@@ -20,7 +20,6 @@ __all__ = ['prepare_sdss_catalog_for_merging',
            'prepare_des_catalog_for_merging',
            'prepare_decals_catalog_for_merging',
            'merge_catalogs',
-           'merge_spectra',
            'add_spectra',
            'remove_shreds_near_spec_obj',
            'add_surface_brightness',
@@ -415,6 +414,9 @@ def merge_duplicated_specs(specs, debug=None):
         specs['OBJ_NSAID'][best_spec['index']] = nsa_id
         specs['chosen'][best_spec['index']] = True
 
+    for spec in Query('matched_idx == -1').filter(specs):
+        logging.warning('No photo obj matched to {} spec {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
+
     if debug is not None:
         debug['specs_matching'] = specs.copy()
 
@@ -445,6 +447,9 @@ def add_spectra(base, specs, debug=None):
         needs_rematch_count = len(specs_need_rematch)
         specs = specs_need_rematch
         base_this = base_this[np.in1d(base_this['index'], specs_matched['matched_idx'], True, True)]
+    else:
+        for spec in specs:
+            logging.warning('Still no photo obj matched to {} spec {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
 
     return base
 
