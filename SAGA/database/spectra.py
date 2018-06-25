@@ -349,7 +349,7 @@ def extract_sdss_spectra(sdss):
 def extract_nsa_spectra(nsa):
     specs = nsa['RA', 'DEC', 'Z', 'ZSRC', 'NSAID']
     specs['TELNAME'] = 'NSA'
-    specs['SPEC_Z_ERR'] = 0
+    specs['SPEC_Z_ERR'] = 20 / _SPEED_OF_LIGHT
     specs['ZQUALITY'] = 4
     specs['HELIO_CORR'] = True
     specs.rename_column('Z', 'SPEC_Z')
