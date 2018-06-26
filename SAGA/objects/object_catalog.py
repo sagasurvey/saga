@@ -228,6 +228,7 @@ class ObjectCatalog(object):
             nsa = nsa[build2.NSA_COLS_USED]
             for nsaid, fixes in fixes_to_nsa_v101.items():
                 fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
+            nsa = Query('NSAID != 632725').filter(nsa) # wrong NSA redshift
         nsa = add_skycoord(nsa)
         return nsa
 
