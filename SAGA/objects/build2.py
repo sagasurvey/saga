@@ -410,7 +410,8 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         specs['chosen'][best_spec['index']] = True
 
     for spec in Query('matched_idx == -1', 'ZQUALITY >= 3').filter(specs):
-        logging.warning('No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
+        if spec['TELNAME'] in ('AAT', 'MMT', 'IMACS', 'WIYN', 'SDSS', 'NSA'):
+            logging.warning('No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
 
     if debug is not None:
         for i in count():
@@ -452,7 +453,8 @@ def add_spectra(base, specs, debug=None):
         base_this = base_this[np.in1d(base_this['index'], specs_matched['matched_idx'], True, True)]
     else:
         for spec in Query('ZQUALITY >= 3').filter(specs):
-            logging.warning('Still no photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
+            if spec['TELNAME'] in ('AAT', 'MMT', 'IMACS', 'WIYN', 'SDSS', 'NSA'):
+                logging.warning('Still no photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
 
     return base
 
