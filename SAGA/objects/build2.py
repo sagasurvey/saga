@@ -97,6 +97,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, 'g_err', 'r_err', 'i_err'),
         'abs(r_mag - i_mag) > 10',
         'abs(g_mag - r_mag) > 10',
+        'FIBERMAG_R > 23',
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
@@ -172,17 +173,29 @@ def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
         catalog['{}_mag'.format(band)] += 0.1
 
     remove_queries = [
-        'radius >= 20',
         'FRACMASKED_G >= 0.35',
         'FRACMASKED_R >= 0.35',
+        'FRACMASKED_Z >= 0.35',
+        'FRACFLUX_G >= 4',
+        'FRACFLUX_R >= 4',
+        'FRACFLUX_Z >= 4',
         'RCHISQ_G >= 10',
         'RCHISQ_R >= 10',
         'RCHISQ_Z >= 10',
+        Query('RCHISQ_G > 4', 'RCHISQ_R > 4', 'RCHISQ_Z > 4'),
+        Query('FRACIN_G < 0.7', 'FRACIN_R < 0.7', 'FRACIN_Z < 0.7'),
         'ALLMASK_G > 0',
         'ALLMASK_R > 0',
+        'ALLMASK_Z > 0',
+        'NOBS_G == 0',
+        'NOBS_R == 0',
+        'radius >= 15',
         'g_err >= 0.2',
         'r_err >= 0.2',
-        Query('NOBS_G == 0', 'NOBS_R == 0'),
+        'z_err >= 0.2',
+        'g_mag - r_mag < -0.5',
+        'radius > 10.0**(-0.2 * (r_mag - 23.5))',
+        Query('is_galaxy', 'radius < 10.0**(-0.2 * (r_mag - 17))'),
         'r_mag >= 25',
     ]
 
@@ -468,7 +481,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
             nearby_obj_mask &= no_spec_z_or_close.mask(base)
 
-            remove_flag = 21
+            remove_flag = 28
 
             values_to_rewrite = {
                 'OBJID': nsa_obj['NSAID'],
@@ -503,7 +516,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
         else:
             remove_radius = 2.0 * obj_this['radius']
             nearby_obj_mask = (base['coord'].separation(obj_this['coord']).arcsec < remove_radius)
-            remove_flag = 22
+            remove_flag = 29
 
         nearby_obj_mask[idx] = False
         nearby_obj_count = np.count_nonzero(nearby_obj_mask)
@@ -511,7 +524,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
         if not nearby_obj_count:
             continue
 
-        if nearby_obj_count > 25 and remove_flag == 22:
+        if nearby_obj_count > 25 and remove_flag == 29:
             logging.warning('More than 25 photo obj within ~ {:.3f}" of {} spec obj {} ({}, {})'.format(remove_radius, obj_this['TELNAME'], obj_this['OBJID'], obj_this['RA'], obj_this['DEC']))
 
         base['REMOVE'][nearby_obj_mask] += (1 << remove_flag)
