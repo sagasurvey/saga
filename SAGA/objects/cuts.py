@@ -33,11 +33,15 @@ sdss_limit = Query('r_mag < 17.77')
 sat_vcut = Query('abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0')
 sat_rcut = Query('RHOST_KPC < 300.0')
 
-gr_cut = Query('gr-gr_err*2.0 < 0.85')
-ri_cut = Query('ri-ri_err*2.0 < 0.55')
-ug_cut = Query('(ug+ug_err*2.0) > (gr-gr_err*2.0)*1.5')
+gr_cut = Query('gr-abs(gr_err)*2.0 < 0.85')
+ri_cut = Query('ri-abs(ri_err)*2.0 < 0.55')
+rz_cut = Query('rz-abs(rz_err) < 1.0')
+ug_cut = Query('(ug+abs(ug_err)*2.0) > (gr-abs(gr_err)*2.0)*1.5')
 gri_cut = (gr_cut & ri_cut)
 ugri_cut = (gri_cut & ug_cut)
+valid_i_mag = Query('i_mag > 0', 'i_mag < 30')
+grz_cut = (gr_cut & rz_cut)
+gri_or_grz_cut = (gr_cut & ((valid_i_mag & ri_cut) | (~valid_i_mag & rz_cut)))
 
 is_sat = Query('SATS == 1')
 
