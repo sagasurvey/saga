@@ -303,6 +303,7 @@ def replace_poor_sdss_sky_subtraction(base):
 def add_columns_for_spectra(base):
     base['OBJ_NSAID'] = np.int32(-1)
     base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
+    base['SPEC_REPEAT_ALL'] = get_empty_str_array(len(base), 48)
     cols_definition = SPECS_COLUMNS.copy()
     for col in ('RA', 'DEC'):
         cols_definition[col+'_spec'] = cols_definition[col]
@@ -312,9 +313,13 @@ def add_columns_for_spectra(base):
 
 
 def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
+    """
+    This function first match unmerged spectra to base catalog,
+    and then merge the spectra that are assigned to the same photo obj.
+    """
 
     if 'coord' in specs.colnames:
-        del specs['coord']
+        del specs['coord'] # because "coord" breaks "sort"
     specs.sort(['ZQUALITY_sort_key', 'SPEC_Z'])
 
     specs = add_skycoord(specs)
@@ -330,6 +335,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         sep = sep[sorter]
         del sorter
 
+    # matched_idx will store the index of the matched photo obj.
     specs['matched_idx'] = -1
 
     specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
@@ -339,6 +345,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         possible_match['sep'] = sep[i:j]
         possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
 
+        # using following criteria one by one to find matching photo obj, stop when found
         for q, sorter in (
                 (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
                 (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
@@ -354,30 +361,39 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
                 specs['matched_idx'][spec_idx_this] = matched_base_idx
                 break
 
+    # now each photo obj can potentially have more than one spec matched to it
+    # so for each photo obj that has one or more specs, we will merge the specs
+
     if 'coord' in specs.colnames:
         del specs['coord']
     specs.sort(['matched_idx', 'ZQUALITY_sort_key', 'SPEC_Z'])
 
     specs['index'] = np.arange(len(specs))
     specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48)
+    specs['SPEC_REPEAT_ALL'] = get_empty_str_array(len(specs), 48)
     specs['OBJ_NSAID'] = np.int32(-1)
     specs['chosen'] = False
 
-    tel_ranks = dict(MMT=0, AAT=1, NSA=2, SDSS=4)
+    tel_ranks = dict(MMT=0, AAT=1, NSA=2, SDSS=4) # all other telnames get 3
 
     matched_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs['matched_idx']), [1])))
     for i, j in zip(matched_idx_edges[:-1], matched_idx_edges[1:]):
 
+        # matched_idx < 0 means there is no match, so nothing to do
         if specs['matched_idx'][i] < 0:
             continue
 
+        # j - i == 1 means there is only one match, so it's easy
         if j - i == 1:
             specs['chosen'][i] = True
             specs['SPEC_REPEAT'][i] = specs['TELNAME'][i]
+            specs['SPEC_REPEAT_ALL'][i] = specs['TELNAME'][i]
             if specs['TELNAME'][i] == 'NSA':
                 specs['OBJ_NSAID'][i] = int(specs['SPECOBJID'][i])
             continue
 
+        # now it's the real thing, we have more than one specs
+        # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
         specs_to_merge = specs[i:j]
         rank = np.fromiter((tel_ranks.get(t, 3) for t in specs_to_merge['TELNAME']), np.int, len(specs_to_merge))
         rank += (10 - specs_to_merge['ZQUALITY']) * (rank.max() + 1)
@@ -388,27 +404,30 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         )
         specs_to_merge = specs_to_merge[rank.argsort()]
         best_spec = specs_to_merge[0]
-        assert (specs_to_merge['ZQUALITY_sort_key'] >= best_spec['ZQUALITY_sort_key']).all()
 
+        # we now check if there is any spec that is not at the same redshift as the best spec
+        # if there is, and those specs are as good as the best spec, then we push them out of this merge process
         mask_within_dz = (np.fabs(specs_to_merge['SPEC_Z'] - best_spec['SPEC_Z']) < 150.0 / _SPEED_OF_LIGHT)
         mask_same_zq_class = (specs_to_merge['ZQUALITY_sort_key'] == best_spec['ZQUALITY_sort_key'])
         if ((~mask_within_dz) & mask_same_zq_class).any():
-            specs['matched_idx'][specs_to_merge['index'][~mask_within_dz]] = -2
+            specs['matched_idx'][specs_to_merge['index'][~mask_within_dz]] = -2 # we will deal with these -2 later
             specs_to_merge = specs_to_merge[mask_within_dz]
             mask_same_zq_class = mask_same_zq_class[mask_within_dz]
             mask_within_dz = mask_within_dz[mask_within_dz]
 
+        # so now specs_to_merge has specs that are ok to merge
+        # we need to find if there's NSA objects and also get SPEC_REPEAT and put those info on best spec
+        best_spec_index = best_spec['index']
+        specs['chosen'][best_spec_index] = True
+        specs['SPEC_REPEAT'][best_spec_index] = '+'.join(set(specs_to_merge['TELNAME'][mask_within_dz & mask_same_zq_class]))
+        specs['SPEC_REPEAT_ALL'][best_spec_index] = '+'.join(set(specs_to_merge['TELNAME']))
+
         nsa_specs = specs_to_merge[specs_to_merge['TELNAME'] == 'NSA']
-        nsa_id = int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
+        specs['OBJ_NSAID'][best_spec_index] = int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
         if len(nsa_specs) > 1:
             logging.warning('More than one NSA obj near ({}, {}): {}'.format(nsa_specs['RA'][0], nsa_specs['DEC'][0], ', '.join(nsa_specs['SPECOBJID'])))
 
-        spec_repeat = '+'.join(set(specs_to_merge['TELNAME'][mask_within_dz & mask_same_zq_class]))
-
-        specs['SPEC_REPEAT'][best_spec['index']] = spec_repeat
-        specs['OBJ_NSAID'][best_spec['index']] = nsa_id
-        specs['chosen'][best_spec['index']] = True
-
+    # print out warnings for unmatched good specs
     for spec in Query('matched_idx == -1', 'ZQUALITY >= 3').filter(specs):
         if spec['TELNAME'] in ('AAT', 'MMT', 'IMACS', 'WIYN', 'SDSS', 'NSA'):
             logging.warning('No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
@@ -420,6 +439,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
                 debug[key] = specs.copy()
                 break
 
+    # return both matched specs and specs that need to be rematched (those -2's)
     return Query('chosen').filter(specs), Query('matched_idx == -2').filter(specs)
 
 
@@ -442,10 +462,12 @@ def add_spectra(base, specs, debug=None):
     for _ in range(5):
         specs_matched, specs_need_rematch = match_spectra_to_base_and_merge_duplicates(specs, base_this, debug=debug)
 
-        for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'OBJ_NSAID'):
+        # for matched specs, copy their info to base catalog
+        for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'SPEC_REPEAT_ALL', 'OBJ_NSAID'):
             col_base = (col + '_spec') if col in ('RA', 'DEC') else col
             base[col_base][specs_matched['matched_idx']] = specs_matched[col]
 
+        # check if there are specs that need to be rematched, prepare specs and base_this for the next iteration
         if len(specs_need_rematch) in (0, needs_rematch_count):
             break
         needs_rematch_count = len(specs_need_rematch)
