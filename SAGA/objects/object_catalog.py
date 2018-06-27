@@ -225,10 +225,12 @@ class ObjectCatalog(object):
             # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
             nsa = Query('NSAID != 64408').filter(nsa)
         elif version == '1.0.1':
-            nsa = nsa[build2.NSA_COLS_USED]
+            remove_mask = (nsa['DFLAGS'][:,3:6] == 24).any(axis=1) & (nsa['DFLAGS'][:,3:6]).all(axis=1)
+            remove_mask |= np.in1d(nsa['NSAID'], [614276, 632725], True)
+            nsa = nsa[build2.NSA_COLS_USED][remove_mask]
+            del remove_mask
             for nsaid, fixes in fixes_to_nsa_v101.items():
                 fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
-            nsa = Query('NSAID != 632725').filter(nsa) # wrong NSA redshift
         nsa = add_skycoord(nsa)
         return nsa
 
