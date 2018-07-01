@@ -83,6 +83,7 @@ class Database(object):
                                             use_local_first=True),
             'spectra_2df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
             'spectra_6df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
+            'spectra_misc': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'other_spec_combined.fits'))),
             'spectra_2dflens': DataObject(
                 FileObject('http://2dflens.swin.edu.au/2dflens_bestredshifts_goodz_withtypesandmags_final.dat.gz', format='ascii.fast_commented_header'),
                 FileObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat'), format='ascii.fast_commented_header'),
@@ -98,6 +99,7 @@ class Database(object):
                 '2dflens': self._tables['spectra_2dflens'],
                 '6df': self._tables['spectra_6df'],
                 'ozdes': self._tables['spectra_ozdes_dr1'],
+                'misc': self._tables['spectra_misc'],
             },
         ))
 

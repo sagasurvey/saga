@@ -335,6 +335,14 @@ def read_ozdes(file_path):
     return ensure_specs_dtype(specs)
 
 
+def read_misc(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()
+    sepcs = specs[np.isfinite(specs['SPEC_Z'])]
+    return ensure_specs_dtype(specs)
+
+
 def extract_sdss_spectra(sdss):
     specs = Query('SPEC_Z > -1.0').filter(sdss['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN', 'OBJID'])
     specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
