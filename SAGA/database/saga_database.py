@@ -1,8 +1,8 @@
 import os
 from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary, FileObject
-from .spectra import SpectraData
+from ..spectra import SpectraData
 
-__all__ = ['known_google_sheets', 'Database']
+__all__ = ['known_google_sheets', 'Database', 'SpectraData']
 
 known_google_sheets = {
     'hosts': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),

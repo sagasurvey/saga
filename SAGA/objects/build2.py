@@ -14,7 +14,7 @@ import astropy.units
 
 from . import build
 from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
-from ..database.spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS
+from ..spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS, SPEED_OF_LIGHT
 
 __all__ = ['prepare_sdss_catalog_for_merging',
            'prepare_des_catalog_for_merging',
@@ -35,8 +35,6 @@ MERGED_CATALOG_COLUMNS = list(chain(
 _NSA_COLS_USED = ['RA', 'DEC', 'PETRO_TH50', 'PETRO_TH90', 'PETRO_BA90', 'PETRO_PHI90',
                   'Z', 'ZSRC', 'NSAID', 'SERSIC_FLUX', 'SERSIC_FLUX_IVAR', 'EXTINCTION']
 NSA_COLS_USED = list(_NSA_COLS_USED)
-
-_SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
 
 def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
@@ -407,7 +405,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
         # we now check if there is any spec that is not at the same redshift as the best spec
         # if there is, and those specs are as good as the best spec, then we push them out of this merge process
-        mask_within_dz = (np.fabs(specs_to_merge['SPEC_Z'] - best_spec['SPEC_Z']) < 150.0 / _SPEED_OF_LIGHT)
+        mask_within_dz = (np.fabs(specs_to_merge['SPEC_Z'] - best_spec['SPEC_Z']) < 150.0 / SPEED_OF_LIGHT)
         mask_same_zq_class = (specs_to_merge['ZQUALITY_sort_key'] == best_spec['ZQUALITY_sort_key'])
         if ((~mask_within_dz) & mask_same_zq_class).any():
             specs['matched_idx'][specs_to_merge['index'][~mask_within_dz]] = -2 # we will deal with these -2 later
@@ -509,8 +507,8 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                                           local_dict=ellipse_calculation, global_dict={})
 
             no_spec_z_or_close = Query('ZQUALITY < 3')
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 200.0/SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/SPEED_OF_LIGHT, 'SPEC_Z'))
             nearby_obj_mask &= no_spec_z_or_close.mask(base)
 
             remove_flag = 28
