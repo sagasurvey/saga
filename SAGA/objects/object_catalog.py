@@ -218,19 +218,23 @@ class ObjectCatalog(object):
 
     def load_nsa(self, version='0.1.2'):
         nsa = self._database['nsa_v{}'.format(version)].read()
+        remove_mask = np.zeros(len(nsa), np.bool)
+        objs_to_remove = []
+        fixes_dict = {}
+        cols = nsa.colnames
         if version == '0.1.2':
-            nsa = nsa[build.NSA_COLS_USED]
-            for nsaid, fixes in fixes_to_nsa_v012.items():
-                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
-            # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
-            nsa = Query('NSAID != 64408').filter(nsa)
+            objs_to_remove = [64408]
+            fixes_dict = fixes_to_nsa_v012
+            cols = build.NSA_COLS_USED
         elif version == '1.0.1':
-            remove_mask = (nsa['DFLAGS'][:,3:6] == 24).any(axis=1) & (nsa['DFLAGS'][:,3:6]).all(axis=1)
-            remove_mask |= np.in1d(nsa['NSAID'], [614276, 632725], True)
-            nsa = nsa[build2.NSA_COLS_USED][remove_mask]
-            del remove_mask
-            for nsaid, fixes in fixes_to_nsa_v101.items():
-                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
+            remove_mask |= (nsa['DFLAGS'][:,3:6] == 24).any(axis=1) & (nsa['DFLAGS'][:,3:6]).all(axis=1)
+            objs_to_remove = [614276, 632725]
+            fixes_dict = fixes_to_nsa_v101
+            cols = build2.NSA_COLS_USED
+        remove_mask |= np.in1d(nsa['NSAID'], objs_to_remove, assume_unique=True)
+        nsa = nsa[cols][~remove_mask]
+        for nsaid, fixes in fixes_dict.items():
+            fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
         nsa = add_skycoord(nsa)
         return nsa
 
