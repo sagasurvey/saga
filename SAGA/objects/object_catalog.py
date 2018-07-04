@@ -358,7 +358,7 @@ class ObjectCatalog(object):
             return catalogs_to_return
 
 
-    def generate_clean_specs(self, version=None):
+    def generate_clean_specs(self, hosts='all', version=None):
         """
         gather spectra from all base catalogs
         """
@@ -366,7 +366,7 @@ class ObjectCatalog(object):
         base_key = 'base' if version is None else 'base_v{}'.format(version)
         out = []
 
-        for host in self._host_catalog.resolve_id('all', 'string'):
+        for host in set(self._host_catalog.resolve_id(hosts, 'string')):
             try:
                 base = self._database[base_key, host].read()
             except IOError:
