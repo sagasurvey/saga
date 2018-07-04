@@ -358,7 +358,7 @@ class ObjectCatalog(object):
             return catalogs_to_return
 
 
-    def generate_clean_specs(self, hosts='all', version=None):
+    def generate_clean_specs(self, hosts='all', version=None, annotate=False):
         """
         gather spectra from all base catalogs
         """
@@ -384,4 +384,7 @@ class ObjectCatalog(object):
 
             out.append(base)
 
-        return vstack(out, 'exact', 'error')
+        out = vstack(out, 'exact', 'error')
+        if annotate:
+            out = self._annotate_catalog(out)
+        return out
