@@ -2,7 +2,7 @@
 base catalog building pipeline 2.0
 """
 import logging
-from itertools import chain
+from itertools import chain, count
 import numpy as np
 import numexpr as ne
 from easyquery import Query
@@ -14,13 +14,12 @@ import astropy.units
 
 from . import build
 from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
-from ..database.spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS
+from ..spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS, SPEED_OF_LIGHT
 
 __all__ = ['prepare_sdss_catalog_for_merging',
            'prepare_des_catalog_for_merging',
            'prepare_decals_catalog_for_merging',
            'merge_catalogs',
-           'merge_spectra',
            'add_spectra',
            'remove_shreds_near_spec_obj',
            'add_surface_brightness',
@@ -36,8 +35,6 @@ MERGED_CATALOG_COLUMNS = list(chain(
 _NSA_COLS_USED = ['RA', 'DEC', 'PETRO_TH50', 'PETRO_TH90', 'PETRO_BA90', 'PETRO_PHI90',
                   'Z', 'ZSRC', 'NSAID', 'SERSIC_FLUX', 'SERSIC_FLUX_IVAR', 'EXTINCTION']
 NSA_COLS_USED = list(_NSA_COLS_USED)
-
-_SPEED_OF_LIGHT = astropy.constants.c.to('km/s').value # pylint: disable=E1101
 
 
 def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
@@ -301,72 +298,10 @@ def replace_poor_sdss_sky_subtraction(base):
     return base
 
 
-def find_best_spec(specs):
-    d = dict(SDSS=0, GAMA=1, NSA=2, AAT=4, MMT=5)
-    rank = np.fromiter((d.get(t, 3) for t in specs['TELNAME']), np.int, len(specs))
-    rank += specs['ZQUALITY'] * (rank.max() + 1)
-
-    nsa_specs = specs[specs['TELNAME'] == 'NSA']
-    if len(nsa_specs) > 1:
-        logging.warning('More than one NSA obj near ({}, {}): {}'.format(nsa_specs['RA'][0], nsa_specs['DEC'][0], ', '.join(nsa_specs['SPECOBJID'])))
-    nsa_id = int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
-
-    zq_thres = 3 if (specs['ZQUALITY'].max() >= 3) else 0
-    spec_repeat = '+'.join(set(specs['TELNAME'][specs['ZQUALITY'] >= zq_thres]))
-
-    return rank.argmax(), spec_repeat, nsa_id
-
-
-def merge_spectra(specs, debug=None):
-    if 'coord' in specs.colnames:
-        del specs['coord']
-
-    specs['group_id'] = get_fof_group_id(specs, 20.0)
-    specs.sort(['group_id', 'SPEC_Z'])
-    group_id_shift = specs['group_id'][-1] + 1
-
-    edge_mask = (np.ediff1d(specs['group_id']) > 0) | (np.ediff1d(specs['SPEC_Z']) > 150.0/_SPEED_OF_LIGHT)
-    group_id_edges = np.flatnonzero(np.hstack(([True], edge_mask, [True])))
-    regroup_mask = np.zeros(len(specs), np.bool)
-    for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        if j - i > 1 and (np.median(specs['SPEC_Z'][i:j]) > 0.2 or np.count_nonzero(specs['TELNAME'][i:j] == 'NSA') > 1):
-            regroup_mask[i:j] = True
-
-    if regroup_mask.any():
-        specs['group_id'][regroup_mask] = get_fof_group_id(specs[regroup_mask], 10.0) + group_id_shift
-        specs.sort(['group_id', 'SPEC_Z'])
-        edge_mask = (np.ediff1d(specs['group_id']) > 0) | (np.ediff1d(specs['SPEC_Z']) > 150.0/_SPEED_OF_LIGHT)
-        group_id_edges = np.flatnonzero(np.hstack(([True], edge_mask, [True])))
-
-    del regroup_mask, edge_mask
-
-    specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48)
-    specs['OBJ_NSAID'] = np.int32(-1)
-    specs['chosen'] = False
-    for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        if j - i > 1:
-            k, spec_repeat, nsa_id = find_best_spec(specs[i:j])
-        else:
-            k = 0
-            spec_repeat = specs['TELNAME'][i]
-            nsa_id = int(specs['SPECOBJID'][i]) if spec_repeat == 'NSA' else -1
-        k += i
-        specs['chosen'][k] = True
-        specs['SPEC_REPEAT'][k] = spec_repeat
-        specs['OBJ_NSAID'][k] = nsa_id
-
-    if debug is not None:
-        debug['merged_specs'] = specs.copy()
-
-    specs = Query('chosen').filter(specs)
-    del specs['chosen'], specs['group_id']
-
-    return specs
-
-
 def add_columns_for_spectra(base):
     base['OBJ_NSAID'] = np.int32(-1)
     base['SPEC_REPEAT'] = get_empty_str_array(len(base), 48)
+    base['SPEC_REPEAT_ALL'] = get_empty_str_array(len(base), 48)
     cols_definition = SPECS_COLUMNS.copy()
     for col in ('RA', 'DEC'):
         cols_definition[col+'_spec'] = cols_definition[col]
@@ -375,16 +310,22 @@ def add_columns_for_spectra(base):
     return base
 
 
-def add_spectra(base, specs):
-    if 'coord' in specs.colnames:
-        del specs['coord']
-    specs.sort(['ZQUALITY', 'SPEC_Z'])
-    specs.reverse()
-    specs = add_skycoord(specs)
+def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
+    """
+    This function first match unmerged spectra to base catalog,
+    and then merge the spectra that are assigned to the same photo obj.
+    """
 
+    if 'coord' in specs.colnames:
+        del specs['coord'] # because "coord" breaks "sort"
+    specs.sort(['ZQUALITY_sort_key', 'SPEC_Z'])
+
+    specs = add_skycoord(specs)
+    base = add_skycoord(base)
     specs_idx, base_idx, sep, _ = search_around_sky(specs['coord'], base['coord'], 20.0*astropy.units.arcsec) # pylint: disable=E1101
     sep = sep.arcsec
 
+    # in case future astropy does not preserve the order of `specs_idx`
     if (np.ediff1d(specs_idx) < 0).any():
         sorter = specs_idx.argsort()
         specs_idx = specs_idx[sorter]
@@ -392,59 +333,148 @@ def add_spectra(base, specs):
         sep = sep[sorter]
         del sorter
 
-    base['index'] = np.arange(len(base))
-    base['no_spec_yet'] = True
+    # matched_idx will store the index of the matched photo obj.
     specs['matched_idx'] = -1
+
     specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
     for i, j in zip(specs_idx_edges[:-1], specs_idx_edges[1:]):
         spec_idx_this = specs_idx[i]
-        possible_match = base['REMOVE', 'is_galaxy', 'r_mag', 'radius', 'no_spec_yet', 'index'][base_idx[i:j]]
+        possible_match = base[base_idx[i:j]]
         possible_match['sep'] = sep[i:j]
-        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius']
+        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
 
-        if Query('sep < 1', ~Query('no_spec_yet')).count(possible_match) > 0:
-            specs['matched_idx'][spec_idx_this] = -2 # duplicated specs
-
-        possible_match = possible_match[possible_match['no_spec_yet']]
-        if not len(possible_match):
-            continue
-
-        larger_search_r = build._get_spec_search_radius(specs['SPEC_Z'][spec_idx_this])
+        # using following criteria one by one to find matching photo obj, stop when found
         for q, sorter in (
-                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
-                (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
-                (Query('REMOVE == 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
-                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
-                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 0.5'), 'sep'),
-                (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 1', 'sep < {:g}'.format(larger_search_r)), 'r_mag'),
-                (Query('REMOVE > 0', 'is_galaxy', 'sep < 3'), 'r_mag'),
-                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 3'), 'sep'),
+                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
+                (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
+                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
+                (Query('REMOVE == 0', 'sep < 5.0'), 'sep'),
+                (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
+                (Query('REMOVE > 0', 'sep < 5.0'), 'sep'),
         ):
             mask = q.mask(possible_match)
             if mask.any():
                 possible_match_this = possible_match[mask]
                 matched_base_idx = possible_match_this['index'][possible_match_this[sorter].argmin()]
                 specs['matched_idx'][spec_idx_this] = matched_base_idx
-                base['no_spec_yet'][matched_base_idx] = False
                 break
 
-    del base['index'], base['no_spec_yet'], specs['coord'], specs_idx, base_idx, sep, specs_idx_edges
+    # now each photo obj can potentially have more than one spec matched to it
+    # so for each photo obj that has one or more specs, we will merge the specs
 
-    specs.sort('matched_idx')
-    start_idx = np.flatnonzero(specs['matched_idx'] > -1)[0]
-    for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'OBJ_NSAID'):
-        col_base = (col + '_spec') if col in ('RA', 'DEC') else col
-        base[col_base][specs['matched_idx'][start_idx:]] = specs[col][start_idx:]
+    if 'coord' in specs.colnames:
+        del specs['coord']
+    specs.sort(['matched_idx', 'ZQUALITY_sort_key', 'SPEC_Z'])
 
-    specs_warn = specs[np.flatnonzero(specs['matched_idx'] > -2)[0]:start_idx]
-    specs_warn = specs_warn[specs_warn['SPEC_REPEAT'] != 'GAMA']
-    if len(specs_warn) > 100:
-        logging.warning('More than 100 spec objects have no match... something is very wrong!')
+    specs['index'] = np.arange(len(specs))
+    specs['SPEC_REPEAT'] = get_empty_str_array(len(specs), 48)
+    specs['SPEC_REPEAT_ALL'] = get_empty_str_array(len(specs), 48)
+    specs['OBJ_NSAID'] = np.int32(-1)
+    specs['chosen'] = False
+
+    tel_ranks = dict(MMT=0, AAT=1, NSA=2, SDSS=4) # all other telnames get 3
+
+    matched_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs['matched_idx']), [1])))
+    for i, j in zip(matched_idx_edges[:-1], matched_idx_edges[1:]):
+
+        # matched_idx < 0 means there is no match, so nothing to do
+        if specs['matched_idx'][i] < 0:
+            continue
+
+        # j - i == 1 means there is only one match, so it's easy
+        if j - i == 1:
+            specs['chosen'][i] = True
+            specs['SPEC_REPEAT'][i] = specs['TELNAME'][i]
+            specs['SPEC_REPEAT_ALL'][i] = specs['TELNAME'][i]
+            if specs['TELNAME'][i] == 'NSA':
+                specs['OBJ_NSAID'][i] = int(specs['SPECOBJID'][i])
+            continue
+
+        # now it's the real thing, we have more than one specs
+        # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
+        specs_to_merge = specs[i:j]
+        rank = np.fromiter((tel_ranks.get(t, 3) for t in specs_to_merge['TELNAME']), np.int, len(specs_to_merge))
+        rank += (10 - specs_to_merge['ZQUALITY']) * (rank.max() + 1)
+        rank = rank.astype(np.float) + np.where(
+            Query((np.isfinite, 'SPEC_Z_ERR'), 'SPEC_Z_ERR > 0', 'SPEC_Z_ERR < 1').mask(specs_to_merge),
+            specs_to_merge['SPEC_Z_ERR'],
+            0.99999
+        )
+        specs_to_merge = specs_to_merge[rank.argsort()]
+        best_spec = specs_to_merge[0]
+
+        # we now check if there is any spec that is not at the same redshift as the best spec
+        # if there is, and those specs are as good as the best spec, then we push them out of this merge process
+        mask_within_dz = (np.fabs(specs_to_merge['SPEC_Z'] - best_spec['SPEC_Z']) < 150.0 / SPEED_OF_LIGHT)
+        mask_same_zq_class = (specs_to_merge['ZQUALITY_sort_key'] == best_spec['ZQUALITY_sort_key'])
+        if ((~mask_within_dz) & mask_same_zq_class).any():
+            specs['matched_idx'][specs_to_merge['index'][~mask_within_dz]] = -2 # we will deal with these -2 later
+            specs_to_merge = specs_to_merge[mask_within_dz]
+            mask_same_zq_class = mask_same_zq_class[mask_within_dz]
+            mask_within_dz = mask_within_dz[mask_within_dz]
+
+        # so now specs_to_merge has specs that are ok to merge
+        # we need to find if there's NSA objects and also get SPEC_REPEAT and put those info on best spec
+        best_spec_index = best_spec['index']
+        specs['chosen'][best_spec_index] = True
+        specs['SPEC_REPEAT'][best_spec_index] = '+'.join(set(specs_to_merge['TELNAME'][mask_within_dz & mask_same_zq_class]))
+        specs['SPEC_REPEAT_ALL'][best_spec_index] = '+'.join(set(specs_to_merge['TELNAME']))
+
+        nsa_specs = specs_to_merge[specs_to_merge['TELNAME'] == 'NSA']
+        specs['OBJ_NSAID'][best_spec_index] = int(nsa_specs['SPECOBJID'][0]) if len(nsa_specs) else -1
+        if len(nsa_specs) > 1:
+            logging.warning('More than one NSA obj near ({}, {}): {}'.format(nsa_specs['RA'][0], nsa_specs['DEC'][0], ', '.join(nsa_specs['SPECOBJID'])))
+
+    # print out warnings for unmatched good specs
+    for spec in Query('matched_idx == -1', 'ZQUALITY >= 3').filter(specs):
+        if spec['TELNAME'] in ('AAT', 'MMT', 'IMACS', 'WIYN', 'SDSS', 'NSA'):
+            logging.warning('No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
+
+    if debug is not None:
+        for i in count():
+            key = 'specs_matching_{}'.format(i)
+            if key not in debug:
+                debug[key] = specs.copy()
+                break
+
+    # return both matched specs and specs that need to be rematched (those -2's)
+    return Query('chosen').filter(specs), Query('matched_idx == -2').filter(specs)
+
+
+def add_spectra(base, specs, debug=None):
+
+    specs['ZQUALITY_sort_key'] = 3 - specs['ZQUALITY']
+    fill_values_by_query(specs, 'ZQUALITY_sort_key < 0', {'ZQUALITY_sort_key': 0})
+    fill_values_by_query(specs, 'ZQUALITY_sort_key > 2', {'ZQUALITY_sort_key': 2})
+
+    base_this = base['REMOVE', 'is_galaxy', 'r_mag', 'coord']
+    base_this['index'] = np.arange(len(base))
+    base_this['radius_for_match'] = np.where(
+        Query('is_galaxy', 'radius <= abs(radius_err) * 2.0').mask(base),
+        10.0**(-0.2 * (base['r_mag'] - 20)),
+        base['radius'],
+    )
+    fill_values_by_query(base_this, ~Query((np.isfinite, 'radius_for_match'), 'radius_for_match > 0'), {'radius_for_match': 0.1})
+
+    needs_rematch_count = 0
+    for _ in range(5):
+        specs_matched, specs_need_rematch = match_spectra_to_base_and_merge_duplicates(specs, base_this, debug=debug)
+
+        # for matched specs, copy their info to base catalog
+        for col in tuple(SPECS_COLUMNS) + ('SPEC_REPEAT', 'SPEC_REPEAT_ALL', 'OBJ_NSAID'):
+            col_base = (col + '_spec') if col in ('RA', 'DEC') else col
+            base[col_base][specs_matched['matched_idx']] = specs_matched[col]
+
+        # check if there are specs that need to be rematched, prepare specs and base_this for the next iteration
+        if len(specs_need_rematch) in (0, needs_rematch_count):
+            break
+        needs_rematch_count = len(specs_need_rematch)
+        specs = specs_need_rematch
+        base_this = base_this[np.in1d(base_this['index'], specs_matched['matched_idx'], True, True)]
     else:
-        for spec in specs_warn:
-            logging.warning('No photo obj matched to {} spec obj {} ({}, {})'.format(spec['TELNAME'], spec['SPECOBJID'], spec['RA'], spec['DEC']))
-
-    del specs['matched_idx']
+        for spec in Query('ZQUALITY >= 3').filter(specs):
+            if spec['TELNAME'] in ('AAT', 'MMT', 'IMACS', 'WIYN', 'SDSS', 'NSA'):
+                logging.warning('Still no photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})'.format(spec))
 
     return base
 
@@ -452,15 +482,15 @@ def add_spectra(base, specs):
 def remove_shreds_near_spec_obj(base, nsa=None):
 
     has_nsa = Query('OBJ_NSAID > -1')
-    is_high_z = Query('SPEC_Z > 0.05', 'ZQUALITY >= 3', 'is_galaxy', 'radius > abs(radius_err) * 2.0', ~has_nsa)
+    has_spec_z = Query('SPEC_Z > 0', 'ZQUALITY >= 3', 'is_galaxy', 'radius > abs(radius_err) * 2.0', ~has_nsa)
 
     has_nsa_indices = np.flatnonzero(has_nsa.mask(base))
     has_nsa_indices = has_nsa_indices[base['r_mag'][has_nsa_indices].argsort()]
 
-    is_high_z_indices = np.flatnonzero(is_high_z.mask(base))
-    is_high_z_indices = is_high_z_indices[base['r_mag'][is_high_z_indices].argsort()]
+    has_spec_z_indices = np.flatnonzero(has_spec_z.mask(base))
+    has_spec_z_indices = has_spec_z_indices[base['r_mag'][has_spec_z_indices].argsort()]
 
-    for idx in chain(has_nsa_indices, is_high_z_indices):
+    for idx in chain(has_nsa_indices, has_spec_z_indices):
         obj_this = base[idx]
 
         if nsa is not None and obj_this['OBJ_NSAID'] > -1:
@@ -477,8 +507,8 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                                           local_dict=ellipse_calculation, global_dict={})
 
             no_spec_z_or_close = Query('ZQUALITY < 3')
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
-            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/_SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - nsa_obj['Z']) < 200.0/SPEED_OF_LIGHT, 'SPEC_Z'))
+            no_spec_z_or_close |= Query((lambda z: np.fabs(z - obj_this['SPEC_Z']) < 200.0/SPEED_OF_LIGHT, 'SPEC_Z'))
             nearby_obj_mask &= no_spec_z_or_close.mask(base)
 
             remove_flag = 28
@@ -587,13 +617,12 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
-        all_spectra = merge_spectra(all_spectra, debug=debug)
-        base = add_spectra(base, all_spectra)
+        base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
-    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 20)
+    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 30)
     base = add_surface_brightness(base)
     base = build.find_satellites(base, version=2)
     base = build.add_stellar_mass(base)

@@ -218,16 +218,23 @@ class ObjectCatalog(object):
 
     def load_nsa(self, version='0.1.2'):
         nsa = self._database['nsa_v{}'.format(version)].read()
+        remove_mask = np.zeros(len(nsa), np.bool)
+        objs_to_remove = []
+        fixes_dict = {}
+        cols = nsa.colnames
         if version == '0.1.2':
-            nsa = nsa[build.NSA_COLS_USED]
-            for nsaid, fixes in fixes_to_nsa_v012.items():
-                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
-            # NSA 64408 (127.324917502, 25.75292055) is wrong! For v0.1.2 ONLY!!
-            nsa = Query('NSAID != 64408').filter(nsa)
+            objs_to_remove = [64408]
+            fixes_dict = fixes_to_nsa_v012
+            cols = build.NSA_COLS_USED
         elif version == '1.0.1':
-            nsa = nsa[build2.NSA_COLS_USED]
-            for nsaid, fixes in fixes_to_nsa_v101.items():
-                fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
+            remove_mask |= (nsa['DFLAGS'][:,3:6] == 24).any(axis=1) & (nsa['DFLAGS'][:,3:6]).all(axis=1)
+            objs_to_remove = [614276, 632725]
+            fixes_dict = fixes_to_nsa_v101
+            cols = build2.NSA_COLS_USED
+        remove_mask |= np.in1d(nsa['NSAID'], objs_to_remove, assume_unique=True)
+        nsa = nsa[cols][~remove_mask]
+        for nsaid, fixes in fixes_dict.items():
+            fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
         nsa = add_skycoord(nsa)
         return nsa
 
@@ -351,7 +358,7 @@ class ObjectCatalog(object):
             return catalogs_to_return
 
 
-    def generate_clean_specs(self, version=None):
+    def generate_clean_specs(self, hosts='all', version=None, annotate=False):
         """
         gather spectra from all base catalogs
         """
@@ -359,7 +366,7 @@ class ObjectCatalog(object):
         base_key = 'base' if version is None else 'base_v{}'.format(version)
         out = []
 
-        for host in self._host_catalog.resolve_id('all', 'string'):
+        for host in set(self._host_catalog.resolve_id(hosts, 'string')):
             try:
                 base = self._database[base_key, host].read()
             except IOError:
@@ -377,4 +384,7 @@ class ObjectCatalog(object):
 
             out.append(base)
 
-        return vstack(out, 'exact', 'error')
+        out = vstack(out, 'exact', 'error')
+        if annotate:
+            out = self._annotate_catalog(out)
+        return out

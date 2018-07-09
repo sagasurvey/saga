@@ -1,8 +1,8 @@
 import os
 from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary, FileObject
-from .spectra import SpectraData
+from ..spectra import SpectraData
 
-__all__ = ['known_google_sheets', 'Database']
+__all__ = ['known_google_sheets', 'Database', 'SpectraData']
 
 known_google_sheets = {
     'hosts': GoogleSheets('1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8', 1471095077),
@@ -83,6 +83,9 @@ class Database(object):
                                             use_local_first=True),
             'spectra_2df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
             'spectra_6df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
+            'spectra_lcrs': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'LCRS_shectman96.fits'))),
+            'spectra_ukst': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'UKST_ratcliffe98.fits'))),
+            'spectra_slackers': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'Slackers_unpub.fits'))),
             'spectra_2dflens': DataObject(
                 FileObject('http://2dflens.swin.edu.au/2dflens_bestredshifts_goodz_withtypesandmags_final.dat.gz', format='ascii.fast_commented_header'),
                 FileObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat'), format='ascii.fast_commented_header'),
@@ -98,6 +101,9 @@ class Database(object):
                 '2dflens': self._tables['spectra_2dflens'],
                 '6df': self._tables['spectra_6df'],
                 'ozdes': self._tables['spectra_ozdes_dr1'],
+                'lcrs': self._tables['spectra_lcrs'],
+                'ukst': self._tables['spectra_ukst'],
+                'slackers': self._tables['spectra_slackers'],
             },
         ))
 
