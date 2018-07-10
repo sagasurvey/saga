@@ -562,6 +562,13 @@ def remove_shreds_near_spec_obj(base, nsa=None):
     return base
 
 
+def remove_too_close_to_host(base):
+    min_rhost = base['RHOST_KPC'].min()
+    q = Query((lambda r: ((r < 10.0) & (r > min_rhost)), 'RHOST_KPC'))
+    base['REMOVE'][q.mask(base)] += (1 << 30)
+    return base
+
+
 def add_surface_brightness(base):
     base['sb_r'] = base['r_mag'] + 2.5 * np.log10(np.maximum(2.0*np.pi*base['radius']**2.0, 1.0e-40))
     return base
@@ -586,7 +593,10 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     all_spectra = []
 
     if sdss is not None:
-        all_spectra.append(extract_sdss_spectra(sdss))
+        sdss_specs = extract_sdss_spectra(sdss)
+        if sdss_specs is not None:
+            all_spectra.append(sdss_specs)
+        del sdss_specs
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
 
     if des is not None:
@@ -622,7 +632,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
-    base['REMOVE'][Query('RHOST_KPC < 10.0').mask(base)] += (1 << 30)
+    base = remove_too_close_to_host(base)
     base = add_surface_brightness(base)
     base = build.find_satellites(base, version=2)
     base = build.add_stellar_mass(base)
