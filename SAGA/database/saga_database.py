@@ -108,9 +108,10 @@ class Database(object):
         ))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
-        for fname in os.listdir(gmm_dir):
-            if fname.startswith('gmm_parameters') and fname.endswith('.npz'):
-                self._tables[fname[:-4]] = DataObject(NumpyBinary(os.path.join(gmm_dir, fname)))
+        if os.path.isdir(gmm_dir):
+            for fname in os.listdir(gmm_dir):
+                if fname.startswith('gmm_parameters') and fname.endswith('.npz'):
+                    self._tables[fname[:-4]] = DataObject(NumpyBinary(os.path.join(gmm_dir, fname)))
 
         for k, v in known_google_sheets.items():
             if k == 'hosts':
