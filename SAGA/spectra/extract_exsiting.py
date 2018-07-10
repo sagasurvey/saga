@@ -7,6 +7,8 @@ __all__ = ['extract_sdss_spectra', 'extract_nsa_spectra']
 
 def extract_sdss_spectra(sdss):
     specs = Query('SPEC_Z > -1.0').filter(sdss['RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'SPEC_Z_WARN', 'OBJID'])
+    if not len(specs):
+        return
     specs['ZQUALITY'] = np.where(specs['SPEC_Z_WARN'] == 0, 4, 1)
     del specs['SPEC_Z_WARN']
     specs.rename_column('OBJID', 'SPECOBJID')

@@ -593,7 +593,10 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     all_spectra = []
 
     if sdss is not None:
-        all_spectra.append(extract_sdss_spectra(sdss))
+        sdss_specs = extract_sdss_spectra(sdss)
+        if sdss_specs is not None:
+            all_spectra.append(sdss_specs)
+        del sdss_specs
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
 
     if des is not None:
