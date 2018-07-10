@@ -1,4 +1,5 @@
 import time
+import traceback
 import numpy as np
 from astropy.table import vstack
 from easyquery import Query
@@ -337,10 +338,11 @@ class ObjectCatalog(object):
                 base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra, debug=debug_this,
                                                      **manual_lists, **catalog_dict)
             except Exception as e: # pylint: disable=W0703
-                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}\n{}'.format(host_id, e))
+                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}'.format(host_id))
                 base = None
                 if raise_exception:
                     raise e
+                traceback.print_exc()
                 continue
             finally:
                 del catalog_dict
@@ -351,7 +353,10 @@ class ObjectCatalog(object):
             try:
                 data_obj.write(base)
             except (IOError, OSError) as e:
-                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to write base catalog for {}\n{}'.format(host_id, e))
+                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to write base catalog for {}'.format(host_id))
+                if raise_exception:
+                    raise e
+                traceback.print_exc()
                 continue
 
         if return_catalogs:
