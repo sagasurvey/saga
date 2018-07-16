@@ -633,10 +633,11 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
-    base = remove_too_close_to_host(base)
-    base = add_surface_brightness(base)
     if 'FIELD_ID' not in base.colnames:
+        base = remove_too_close_to_host(base)
         base = build.find_satellites(base, version=2)
+
+    base = add_surface_brightness(base)
     base = build.add_stellar_mass(base)
 
     return base
