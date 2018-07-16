@@ -633,7 +633,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
-    if 'FIELD_ID' not in base.colnames:
+    if 'RHOST_KPC' in base.colnames: #has host info
         base = remove_too_close_to_host(base)
         base = build.find_satellites(base, version=2)
 
