@@ -447,6 +447,7 @@ def add_spectra(base, specs, debug=None):
     fill_values_by_query(specs, 'ZQUALITY_sort_key < 0', {'ZQUALITY_sort_key': 0})
     fill_values_by_query(specs, 'ZQUALITY_sort_key > 2', {'ZQUALITY_sort_key': 2})
 
+    add_skycoord(base)
     base_this = base['REMOVE', 'is_galaxy', 'r_mag', 'coord']
     base_this['index'] = np.arange(len(base))
     base_this['radius_for_match'] = np.where(
