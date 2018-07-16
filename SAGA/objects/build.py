@@ -106,6 +106,12 @@ def add_host_info(base, host, overwrite_if_different_host=False):
     -------
     base : astropy.table.Table
     """
+    if 'field_id' in host: # for LOWZ survey
+        base['FIELD_RA'] = np.float32(host['RA'])
+        base['FIELD_DEC'] = np.float32(host['Dec'])
+        base['FIELD_ID'] = get_empty_str_array(len(base), 48, host['field_id'])
+        return base
+
     if ('HOST_NSAID' in base.colnames and base['HOST_NSAID'][0] != host['NSAID']) and not overwrite_if_different_host:
         raise ValueError('Host info exists and differs from input host info.')
 
