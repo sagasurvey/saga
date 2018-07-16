@@ -376,6 +376,7 @@ class DesQuery(object):
 
         r.raw.decode_content = True
         file_open = gzip.open if compress else open
+        makedirs_if_needed(file_path)
         with file_open(file_path, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
 

@@ -46,9 +46,9 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
-    def __init__(self, database=None):
+    def __init__(self, database=None, host_catalog_class=HostCatalog):
         self._database = database or Database()
-        self._host_catalog = HostCatalog(self._database)
+        self._host_catalog = host_catalog_class(self._database)
 
 
     @staticmethod

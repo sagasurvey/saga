@@ -264,15 +264,16 @@ class FieldCatalog(HostCatalog):
     def __init__(self, database=None):
         self._database = database or Database()
         self._fields = self._database['lowz_fields'].read()
+        self._hosts = self._fields
         self._field_index = dict(zip(
-            self._fields['field_id'].replace('_', '').lower(),
+            (f.replace('_', '').lower() for f in self._fields['field_id']),
             range(len(self._fields))
         ))
 
     def resolve_id(self, field_ids, id_to_return='string'):
         indices = []
 
-        if field_ids is None:
+        if field_ids is None or field_ids == 'all':
             indices.extend(range(len(self._fields)))
 
         elif _is_string_like(field_ids):
