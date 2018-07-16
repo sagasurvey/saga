@@ -117,6 +117,8 @@ class Database(object):
         for k, v in known_google_sheets.items():
             if k == 'hosts':
                 self._tables[k] = DataObject(v, CsvTable(os.path.join(self._shared_dir, 'HostCatalogs', 'host_list.csv')), cache_in_memory=True)
+            elif k == 'lowz_fields':
+                self._tables[k] = DataObject(v, CsvTable(os.path.join(self._shared_dir, 'HostCatalogs', 'lowz_fields.csv')), cache_in_memory=True)
             else:
                 self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
