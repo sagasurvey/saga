@@ -14,6 +14,7 @@ known_google_sheets = {
     'decals_remove': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1574060112, include_names=['decals_objid']),
     'decals_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1549289503, include_names=['decals_objid']),
     'manual_targets_aat2018a': GoogleSheets('1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w', 0, include_names=['OBJID']),
+    'lowz_fields': GoogleSheets('1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c', 1883640266),
 }
 
 class Database(object):
@@ -116,6 +117,8 @@ class Database(object):
         for k, v in known_google_sheets.items():
             if k == 'hosts':
                 self._tables[k] = DataObject(v, CsvTable(os.path.join(self._shared_dir, 'HostCatalogs', 'host_list.csv')), cache_in_memory=True)
+            elif k == 'lowz_fields':
+                self._tables[k] = DataObject(v, CsvTable(os.path.join(self._shared_dir, 'HostCatalogs', 'lowz_fields.csv')), cache_in_memory=True)
             else:
                 self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 

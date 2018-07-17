@@ -46,9 +46,9 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
-    def __init__(self, database=None):
+    def __init__(self, database=None, host_catalog_class=HostCatalog):
         self._database = database or Database()
-        self._host_catalog = HostCatalog(self._database)
+        self._host_catalog = host_catalog_class(self._database)
 
 
     @staticmethod
@@ -240,7 +240,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, debug=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, use_nsa=True, convert_to_sdss_filters=True, debug=None):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -279,7 +279,11 @@ class ObjectCatalog(object):
             raise ValueError('`version` must be None, 1 or 2.')
         build_module = build if version == 1 else build2
 
-        nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
+        if use_nsa:
+            nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
+        else:
+            nsa = None
+
         spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
 
         manual_lists = {}
@@ -335,8 +339,15 @@ class ObjectCatalog(object):
                 debug_this = debug[host_id]
 
             try:
-                base = build_module.build_full_stack(host=host, nsa=nsa, spectra=spectra, debug=debug_this,
-                                                     **manual_lists, **catalog_dict)
+                base = build_module.build_full_stack(
+                    host=host,
+                    nsa=nsa,
+                    spectra=spectra,
+                    convert_to_sdss_filters=convert_to_sdss_filters,
+                    debug=debug_this,
+                    **manual_lists,
+                    **catalog_dict
+                )
             except Exception as e: # pylint: disable=W0703
                 print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}'.format(host_id))
                 base = None

@@ -10,7 +10,7 @@ from easyquery import Query
 from ..database import Database
 from ..utils import add_skycoord, find_near_ra_dec
 
-__all__ = ['HostCatalog']
+__all__ = ['HostCatalog', 'FieldCatalog']
 
 _paper1_complete_nsa = (166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887)
 _paper1_incomplete_nsa = (161174, 85746, 145729, 140594, 126115, 13927, 137625, 129237)
@@ -105,7 +105,7 @@ class HostCatalog(object):
         self._host_index = {k: tuple(v) for k, v in index.items()}
 
 
-    def resolve_id(self, hosts, id_to_return='NSA'):
+    def resolve_id(self, hosts, id_to_return='string'):
         """
         Get a list of host IDs from SAGA names or some short-hand names (e.g. 'paper1')
 
@@ -258,3 +258,43 @@ class HostCatalog(object):
         if len(cat) != 1:
             raise ValueError('More than one hosts found!')
         return cat[0]
+
+
+class FieldCatalog(HostCatalog):
+    def __init__(self, database=None):
+        self._database = database or Database()
+        self._fields = self._database['lowz_fields'].read()
+        self._hosts = self._fields
+        self._field_index = dict(zip(
+            (f.replace('_', '').lower() for f in self._fields['field_id']),
+            range(len(self._fields))
+        ))
+
+    def resolve_id(self, field_ids, id_to_return='string'):
+        indices = []
+
+        if field_ids is None or field_ids == 'all':
+            indices.extend(range(len(self._fields)))
+
+        elif _is_string_like(field_ids):
+            field_ids = field_ids.replace('_', '').lower()
+            if field_ids in self._field_index:
+                indices.append(self._field_index[field_ids])
+
+        elif isinstance(field_ids, Iterable):
+            for field_id in field_ids:
+                indices.extend(self.resolve_id(field_id, id_to_return='internal'))
+
+        if not indices:
+            raise KeyError('Can not find {}'.format(field_ids))
+
+        id_to_return = id_to_return.upper()
+        if id_to_return[:3] == 'INT':
+            return indices
+        if id_to_return[:3] in ('STR', 'FIL'):
+            return self._fields['field_id'][indices].tolist()
+
+        raise ValueError('`id_to_return` not known!')
+
+    def id_to_name(self, host_id):
+        raise NotImplementedError

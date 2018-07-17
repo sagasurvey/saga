@@ -101,7 +101,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None):
+def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True):
 
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
@@ -117,11 +117,12 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         if not all((col in catalog.colnames for col in ('RA', 'DEC', 'OBJID'))):
             raise RuntimeError('Cannot rename `RA`, `DEC`, and/or `OBJID` in DES catalog')
 
-    gi = catalog['g_mag'] - catalog['i_mag']
-    catalog['g_mag'] += (-0.0009 + 0.055 * gi)
-    catalog['r_mag'] += (-0.0048 + 0.0703 * gi)
-    catalog['i_mag'] += (-0.0065 - 0.0036 * gi + 0.02672 * gi * gi)
-    catalog['z_mag'] += (-0.0438 + 0.02854 * gi)
+    if convert_to_sdss_filters:
+        gi = catalog['g_mag'] - catalog['i_mag']
+        catalog['g_mag'] += (-0.0009 + 0.055 * gi)
+        catalog['r_mag'] += (-0.0048 + 0.0703 * gi)
+        catalog['i_mag'] += (-0.0065 - 0.0036 * gi + 0.02672 * gi * gi)
+        catalog['z_mag'] += (-0.0438 + 0.02854 * gi)
 
     catalog['u_mag'] = 99.0
     catalog['u_err'] = 99.0
@@ -136,7 +137,7 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
+def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True):
     catalog['OBJID'] = np.array(catalog['BRICKID'], dtype=np.int64) * int(1e13) + np.array(catalog['OBJID'], dtype=np.int64)
     catalog['is_galaxy'] = (catalog['TYPE'] != 'PSF')
     catalog['morphology_info'] = catalog['TYPE'].getfield('<U1').view(np.int32)
@@ -166,8 +167,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove, to_recover):
         catalog['{}_mag'.format(band)] = 99.0
         catalog['{}_err'.format(band)] = 99.0
 
-    for band in 'grz':
-        catalog['{}_mag'.format(band)] += 0.1
+    if convert_to_sdss_filters:
+        for band in 'grz':
+            catalog['{}_mag'.format(band)] += 0.1
 
     remove_queries = [
         'FRACMASKED_G >= 0.35',
@@ -447,6 +449,7 @@ def add_spectra(base, specs, debug=None):
     fill_values_by_query(specs, 'ZQUALITY_sort_key < 0', {'ZQUALITY_sort_key': 0})
     fill_values_by_query(specs, 'ZQUALITY_sort_key > 2', {'ZQUALITY_sort_key': 2})
 
+    add_skycoord(base)
     base_this = base['REMOVE', 'is_galaxy', 'r_mag', 'coord']
     base_this['index'] = np.arange(len(base))
     base_this['radius_for_match'] = np.where(
@@ -578,7 +581,8 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
                      sdss_remove=None, sdss_recover=None,
                      des_remove=None, des_recover=None,
                      decals_remove=None, decals_recover=None,
-                     spectra=None, debug=None, **kwargs):
+                     spectra=None, convert_to_sdss_filters=True, debug=None,
+                     **kwargs):
     """
     This function calls all needed functions to complete the full stack of building
     a base catalog (for a single host), in the following order:
@@ -600,10 +604,10 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         sdss = prepare_sdss_catalog_for_merging(sdss, sdss_remove, sdss_recover)
 
     if des is not None:
-        des = prepare_des_catalog_for_merging(des, des_remove, des_recover)
+        des = prepare_des_catalog_for_merging(des, des_remove, des_recover, convert_to_sdss_filters)
 
     if decals is not None:
-        decals = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
+        decals = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover, convert_to_sdss_filters)
 
     if nsa is not None:
         nsa = filter_nearby_object(nsa, host)
@@ -632,9 +636,11 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
         base = remove_shreds_near_spec_obj(base, nsa)
         del nsa
 
-    base = remove_too_close_to_host(base)
+    if 'RHOST_KPC' in base.colnames: #has host info
+        base = remove_too_close_to_host(base)
+        base = build.find_satellites(base, version=2)
+
     base = add_surface_brightness(base)
-    base = build.find_satellites(base, version=2)
     base = build.add_stellar_mass(base)
 
     return base
