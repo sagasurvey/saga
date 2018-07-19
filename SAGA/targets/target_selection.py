@@ -274,6 +274,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         sky_fiber_host_rvir_threshold=0.7*u.deg,
                         sky_fiber_radial_adjustment=2.0,
                         targeting_score_threshold=900,
+                        offset_ra=None,
+                        offset_dec=None,
                         seed=123,
                        ):
     """
@@ -409,6 +411,12 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     })
 
     target_catalog = vstack([target_catalog, sky_catalog])
+
+    if offset_ra:
+        target_catalog['RA'] -= float(offset_ra)
+
+    if offset_dec:
+        target_catalog['Dec'] -= float(offset_dec)
 
     if verbose:
         print('# of flux stars =', n_flux_star)
