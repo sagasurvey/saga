@@ -35,12 +35,13 @@ class TargetSelection(object):
     >>> score_bins = [150, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     >>> d = np.array([np.searchsorted(base['TARGETING_SCORE'], score_bins) for base in saga_targets.compile_target_list('iter')])
     """
-    def __init__(self, database, cuts=None, additional_columns=None,
+    def __init__(self, database, host_catalog_class=HostCatalog,
+                 cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
                  manual_selected_objids=None, version=None):
         self._version = version
         self._database = database
-        self._host_catalog = HostCatalog(self._database)
+        self._host_catalog = host_catalog_class(self._database)
         self._object_catalog = ObjectCatalog(self._database)
 
         self.target_catalogs = dict()
