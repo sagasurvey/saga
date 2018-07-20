@@ -42,7 +42,7 @@ class TargetSelection(object):
         self._version = version
         self._database = database
         self._host_catalog = host_catalog_class(self._database)
-        self._object_catalog = ObjectCatalog(self._database)
+        self._object_catalog = ObjectCatalog(self._database, host_catalog_class)
 
         self.target_catalogs = dict()
 
