@@ -338,28 +338,29 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     # matched_idx will store the index of the matched photo obj.
     specs['matched_idx'] = -1
 
-    specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
-    for i, j in zip(specs_idx_edges[:-1], specs_idx_edges[1:]):
-        spec_idx_this = specs_idx[i]
-        possible_match = base[base_idx[i:j]]
-        possible_match['sep'] = sep[i:j]
-        possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
+    if len(specs_idx):
+        specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
+        for i, j in zip(specs_idx_edges[:-1], specs_idx_edges[1:]):
+            spec_idx_this = specs_idx[i]
+            possible_match = base[base_idx[i:j]]
+            possible_match['sep'] = sep[i:j]
+            possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
 
-        # using following criteria one by one to find matching photo obj, stop when found
-        for q, sorter in (
-                (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
-                (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
-                (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
-                (Query('REMOVE == 0', 'sep < 5.0'), 'sep'),
-                (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
-                (Query('REMOVE > 0', 'sep < 5.0'), 'sep'),
-        ):
-            mask = q.mask(possible_match)
-            if mask.any():
-                possible_match_this = possible_match[mask]
-                matched_base_idx = possible_match_this['index'][possible_match_this[sorter].argmin()]
-                specs['matched_idx'][spec_idx_this] = matched_base_idx
-                break
+            # using following criteria one by one to find matching photo obj, stop when found
+            for q, sorter in (
+                    (Query('REMOVE == 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
+                    (Query('REMOVE == 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
+                    (Query('REMOVE > 0', ~Query('is_galaxy'), 'sep < 1.0'), 'sep'),
+                    (Query('REMOVE == 0', 'sep < 5.0'), 'sep'),
+                    (Query('REMOVE > 0', 'is_galaxy', 'sep_norm < 2.0'), 'r_mag'),
+                    (Query('REMOVE > 0', 'sep < 5.0'), 'sep'),
+            ):
+                mask = q.mask(possible_match)
+                if mask.any():
+                    possible_match_this = possible_match[mask]
+                    matched_base_idx = possible_match_this['index'][possible_match_this[sorter].argmin()]
+                    specs['matched_idx'][spec_idx_this] = matched_base_idx
+                    break
 
     # now each photo obj can potentially have more than one spec matched to it
     # so for each photo obj that has one or more specs, we will merge the specs
@@ -631,6 +632,7 @@ def build_full_stack(host, sdss=None, des=None, decals=None, nsa=None,
     base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, 'exact', 'error')
+    if len(all_spectra):
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa)

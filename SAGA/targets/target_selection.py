@@ -35,13 +35,14 @@ class TargetSelection(object):
     >>> score_bins = [150, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     >>> d = np.array([np.searchsorted(base['TARGETING_SCORE'], score_bins) for base in saga_targets.compile_target_list('iter')])
     """
-    def __init__(self, database, cuts=None, additional_columns=None,
+    def __init__(self, database, host_catalog_class=HostCatalog,
+                 cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
                  manual_selected_objids=None, version=None):
         self._version = version
         self._database = database
-        self._host_catalog = HostCatalog(self._database)
-        self._object_catalog = ObjectCatalog(self._database)
+        self._host_catalog = host_catalog_class(self._database)
+        self._object_catalog = ObjectCatalog(self._database, host_catalog_class)
 
         self.target_catalogs = dict()
 
@@ -274,6 +275,8 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
                         sky_fiber_host_rvir_threshold=0.7*u.deg,
                         sky_fiber_radial_adjustment=2.0,
                         targeting_score_threshold=900,
+                        offset_ra=None,
+                        offset_dec=None,
                         seed=123,
                        ):
     """
@@ -409,6 +412,12 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     })
 
     target_catalog = vstack([target_catalog, sky_catalog])
+
+    if offset_ra:
+        target_catalog['RA'] -= float(offset_ra)
+
+    if offset_dec:
+        target_catalog['Dec'] -= float(offset_dec)
 
     if verbose:
         print('# of flux stars =', n_flux_star)
