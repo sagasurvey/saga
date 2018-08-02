@@ -1,7 +1,8 @@
 import os
 import shutil
-import warnings
 import gzip
+import warnings
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 import numpy as np
 import requests
 from astropy.table import Table

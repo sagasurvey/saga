@@ -35,6 +35,6 @@ def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS):
             else:
                 raise ValueError('unknown spec type!')
         if spectra[c].dtype.str != t:
-            spectra[c] = spectra[c].astype(t)
+            spectra.replace_column(c, spectra[c].astype(t))
 
     return spectra
