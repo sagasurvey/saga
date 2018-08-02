@@ -240,7 +240,7 @@ class ObjectCatalog(object):
         return nsa
 
 
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, use_nsa=True, convert_to_sdss_filters=True, debug=None):
+    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, use_nsa=True, convert_to_sdss_filters=True, additional_specs=None, debug=None):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -284,7 +284,10 @@ class ObjectCatalog(object):
         else:
             nsa = None
 
-        spectra = self._database['spectra_raw_all'].read(before_time=add_specs_only_before_time)
+        spectra = self._database['spectra_raw_all'].read(
+            before_time=add_specs_only_before_time,
+            additional_specs=additional_specs,
+        )
 
         manual_lists = {}
         for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):

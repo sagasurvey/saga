@@ -4,6 +4,7 @@ from astropy.table import vstack
 
 from . import read_external
 from . import read_observed
+from .common import ensure_specs_dtype
 from ..utils import add_skycoord
 
 __all__ = ['SpectraData']
@@ -13,7 +14,7 @@ class SpectraData(object):
         self.spectra_dir_path = spectra_dir_path
         self._external_specs_dict = external_specs_dict or {}
 
-    def read(self, add_coord=True, before_time=None):
+    def read(self, add_coord=True, before_time=None, additional_specs=None):
         all_specs = []
 
         all_specs.extend((getattr(read_external, 'read_'+k.lower())(v) \
@@ -34,6 +35,9 @@ class SpectraData(object):
             read_observed.read_deimos(),
             read_observed.read_palomar(),
         ])
+
+        if additional_specs:
+            all_specs.extend(ensure_specs_dtype(spec) for spec in additional_specs)
 
         all_specs = vstack(all_specs, 'exact', 'error')
 
