@@ -27,6 +27,7 @@ class SpectraData(object):
                 read_observed.read_mmt(os.path.join(self.spectra_dir_path, 'MMT'), before_time=before_time),
                 read_observed.read_aat(os.path.join(self.spectra_dir_path, 'AAT'), before_time=before_time),
                 read_observed.read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT'), before_time=before_time),
+                read_observed.read_aat_mz(os.path.join(self.spectra_dir_path, 'AAT_LOWZ'), before_time=before_time),
                 read_observed.read_wiyn(os.path.join(self.spectra_dir_path, 'WIYN')),
                 read_observed.read_imacs(os.path.join(self.spectra_dir_path, 'IMACS')),
             ])
