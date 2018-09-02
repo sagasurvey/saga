@@ -79,6 +79,7 @@ class HostCatalog(object):
         'has_decals': (Query('decals_dr5 >= 0.98') | Query('decals_dr6 >= 0.98')),
         'has_decals_dr5': Query('decals_dr5 >= 0.98'),
         'has_decals_dr6': Query('decals_dr6 >= 0.98'),
+        'has_decals_dr7': Query('decals_dr5 >= 0.98'),
     }
 
 

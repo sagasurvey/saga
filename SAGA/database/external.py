@@ -393,7 +393,7 @@ class DecalsPrebuilt(object):
         else:
             self.host_id = 'nsa{}'.format(host_id)
 
-        self.data_release = 'dr6' if ensure_deg(dec) > 32 else 'dr5'
+        self.data_release = 'dr6' if ensure_deg(dec) > 32 else 'dr7'
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if not compress:
@@ -414,7 +414,7 @@ class DecalsPrebuilt(object):
 
 class DecalsQuery(object):
 
-    def __init__(self, ra, dec, radius=1.0, decals_dr='dr5',
+    def __init__(self, ra, dec, radius=1.0, decals_dr='dr7',
                  decals_base_dir='/global/project/projectdirs/cosmo/data/legacysurvey'):
 
         self.sweep_dir = os.path.join(decals_base_dir, decals_dr, 'sweep', decals_dr[-1]+'.0')
