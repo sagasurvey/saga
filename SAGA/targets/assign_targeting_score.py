@@ -109,7 +109,8 @@ def assign_targeting_score_v1(base, manual_selected_objids=None,
 
 
 def assign_targeting_score_v2(base, manual_selected_objids=None,
-                              gmm_parameters=None, testing=False):
+                              gmm_parameters=None, ignore_specs=False,
+                              debug=False, n_random=50, seed=123):
     """
     Last updated: 06/07/2018
      100 Human selection and Special targets
@@ -133,7 +134,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     grz_cut = Query('gr-abs(gr_err) < 0.85', 'rz-rz_err < 1')
     gri_or_grz_cut = Query(C.gri_cut, valid_i_mag) | Query(grz_cut, ~valid_i_mag)
     basic_cut = gri_or_grz_cut & C.is_clean2 & C.is_galaxy2 & Query('r_mag < 21')
-    if not testing:
+    if not ignore_specs:
         basic_cut &= (~C.has_spec)
     base_clean = basic_cut.filter(base)
     base_clean['index'] = np.flatnonzero(basic_cut.mask(base))
@@ -206,16 +207,16 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         to_update_idx = base_this['index'][to_update_mask]
         base['TARGETING_SCORE'][to_update_idx] = base_this['TARGETING_SCORE'][to_update_mask]
 
-        if testing:
+        if debug:
             for col in ('P_GMM', 'log_L_GMM', 'TARGETING_SCORE'):
                 base[col+postfix] = -1 if col == 'TARGETING_SCORE' else np.nan
                 base[col+postfix][base_this['index']] = base_this[col]
 
     need_random_selection = np.flatnonzero(Query('TARGETING_SCORE >= 800', 'TARGETING_SCORE < 900').mask(base))
-    if len(need_random_selection) > 50:
+    if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
-        random_mask[:50] = True
-        np.random.RandomState(123).shuffle(random_mask)
+        random_mask[:n_random] = True
+        np.random.RandomState(seed).shuffle(random_mask)
         need_random_selection = need_random_selection[random_mask]
     base['TARGETING_SCORE'][need_random_selection] -= 300
 
@@ -223,7 +224,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     fill_values_by_query(base, ~C.is_galaxy2, {'TARGETING_SCORE': 1200})
     fill_values_by_query(base, ~C.is_clean2, {'TARGETING_SCORE': 1300})
 
-    if not testing:
+    if not ignore_specs:
         fill_values_by_query(base, C.has_spec, {'TARGETING_SCORE': 1400})
 
         fill_values_by_query(
@@ -240,7 +241,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
 
     if manual_selected_objids is not None:
         q = Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID'))
-        if not testing:
+        if not ignore_specs:
             q &= (~C.has_spec)
         fill_values_by_query(base, q, {'TARGETING_SCORE': 100})
 

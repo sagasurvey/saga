@@ -38,7 +38,8 @@ class TargetSelection(object):
     def __init__(self, database, host_catalog_class=HostCatalog,
                  cuts=None, additional_columns=None,
                  assign_targeting_score_func=None, gmm_parameters=None,
-                 manual_selected_objids=None, version=None):
+                 manual_selected_objids=None, version=None,
+                 assign_targeting_score_kwargs=None):
         self._version = version
         self._database = database
         self._host_catalog = host_catalog_class(self._database)
@@ -52,6 +53,11 @@ class TargetSelection(object):
             self.assign_targeting_score = assign_targeting_score_func
             if not callable(self.assign_targeting_score):
                 raise TypeError('*assign_targeting_score_func* must be callable')
+
+        if assign_targeting_score_kwargs is None:
+            self.assign_targeting_score_kwargs = dict()
+        else:
+            self.assign_targeting_score_kwargs = dict(assign_targeting_score_kwargs)
 
         if isinstance(gmm_parameters, dict):
             self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
@@ -117,7 +123,12 @@ class TargetSelection(object):
                     del self.target_catalogs[host_id]['coord']
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
-                self.assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
+                self.assign_targeting_score(
+                    self.target_catalogs[host_id],
+                    self._manual_selected_objids,
+                    self._gmm_parameters,
+                    **self.assign_targeting_score_kwargs
+                )
 
         if return_as[0] == 'n':
             return
