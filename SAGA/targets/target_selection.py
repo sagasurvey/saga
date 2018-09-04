@@ -47,10 +47,10 @@ class TargetSelection(object):
         self.target_catalogs = dict()
 
         if assign_targeting_score_func is None:
-            self._assign_targeting_score = assign_targeting_score_v1 if self._version == 1 else assign_targeting_score_v2
+            self.assign_targeting_score = assign_targeting_score_v1 if self._version == 1 else assign_targeting_score_v2
         else:
-            self._assign_targeting_score = assign_targeting_score_func
-            if not callable(self._assign_targeting_score):
+            self.assign_targeting_score = assign_targeting_score_func
+            if not callable(self.assign_targeting_score):
                 raise TypeError('*assign_targeting_score_func* must be callable')
 
         if isinstance(gmm_parameters, dict):
@@ -117,7 +117,7 @@ class TargetSelection(object):
                     del self.target_catalogs[host_id]['coord']
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
-                self._assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
+                self.assign_targeting_score(self.target_catalogs[host_id], self._manual_selected_objids, self._gmm_parameters)
 
         if return_as[0] == 'n':
             return
