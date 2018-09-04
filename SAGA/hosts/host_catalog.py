@@ -14,9 +14,10 @@ __all__ = ['HostCatalog', 'FieldCatalog']
 
 _paper1_complete_nsa = (166313, 147100, 165536, 61945, 132339, 149781, 33446, 150887)
 _paper1_incomplete_nsa = (161174, 85746, 145729, 140594, 126115, 13927, 137625, 129237)
-_mmt_2018_nsa = (161174, 52773, 163956, 69028, 144953, 165082, 165707, 145729, 165980, 147606, 165980, 61945)
-_aat_2018_nsa = (3469, 141465, 165082, 145398, 145729, 145879)
-_aat_2018_pgc = (64427, 66318, 66934, 67146, 67663, 67817, 68128, 69521, 70094, 71548, 71729, 2052, 3089)
+_mmt_2018a_nsa = (161174, 52773, 163956, 69028, 144953, 165082, 165707, 145729, 165980, 147606, 165980, 61945)
+_mmt_2018b_nsa = (126115, 129237, 129387, 132339, 149781, 149977, 150307, 150578, 150887, 61945, 169439, 153017)
+_aat_2018a_nsa = (3469, 141465, 165082, 145398, 145729, 145879)
+_aat_2018a_pgc = (64427, 66318, 66934, 67146, 67663, 67817, 68128, 69521, 70094, 71548, 71729, 2052, 3089)
 
 def _is_string_like(obj):
     """
@@ -65,10 +66,11 @@ class HostCatalog(object):
         'paper1': Query((lambda x: np.in1d(x, _paper1_complete_nsa + _paper1_incomplete_nsa), 'NSAID')),
         'paper1_complete': Query((lambda x: np.in1d(x, _paper1_complete_nsa), 'NSAID')),
         'paper1_incomplete': Query((lambda x: np.in1d(x, _paper1_incomplete_nsa), 'NSAID')),
-        'mmt_2018': Query((lambda x: np.in1d(x, _mmt_2018_nsa), 'NSAID')),
-        'aat_2018_has_sdss': Query((lambda x: np.in1d(x, _aat_2018_nsa), 'NSAID')),
-        'aat_2018_des_only': Query((lambda x: np.in1d(x, _aat_2018_pgc), 'PGC')),
-        'aat_2018': Query((lambda x, y: np.in1d(x, _aat_2018_nsa) | np.in1d(y, _aat_2018_pgc), 'NSAID', 'PGC')),
+        'mmt_2018a': Query((lambda x: np.in1d(x, _mmt_2018a_nsa), 'NSAID')),
+        'mmt_2018b': Query((lambda x: np.in1d(x, _mmt_2018b_nsa), 'NSAID')),
+        'aat_2018a_has_sdss': Query((lambda x: np.in1d(x, _aat_2018a_nsa), 'NSAID')),
+        'aat_2018a_des_only': Query((lambda x: np.in1d(x, _aat_2018a_pgc), 'PGC')),
+        'aat_2018a': Query((lambda x, y: np.in1d(x, _aat_2018a_nsa) | np.in1d(y, _aat_2018a_pgc), 'NSAID', 'PGC')),
         'no_flags': Query('flag == 0'),
         'flag0': Query('flag == 0'),
         'has_nsa': Query('NSAID != -1'),
