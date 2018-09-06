@@ -74,14 +74,14 @@ class HostCatalog(object):
         'no_flags': Query('flag == 0'),
         'flag0': Query('flag == 0'),
         'has_nsa': Query('NSAID != -1'),
-        'has_deeper_imaging': (Query('decals_dr5 >= 0.98') | Query('decals_dr6 >= 0.98') | Query('des_dr1 >= 0.98')),
-        'has_decam': (Query('decals_dr5 >= 0.98') | Query('des_dr1 >= 0.98')),
-        'has_des': Query('des_dr1 >= 0.98'),
-        'has_des_dr1': Query('des_dr1 >= 0.98'),
-        'has_decals': (Query('decals_dr5 >= 0.98') | Query('decals_dr6 >= 0.98')),
-        'has_decals_dr5': Query('decals_dr5 >= 0.98'),
-        'has_decals_dr6': Query('decals_dr6 >= 0.98'),
-        'has_decals_dr7': Query('decals_dr5 >= 0.98'),
+        'has_deeper_imaging': (Query('decals_dr7 >= 0.95') | Query('decals_dr6 >= 0.95') | Query('des_dr1 >= 0.95')),
+        'has_decam': (Query('decals_dr7 >= 0.95') | Query('des_dr1 >= 0.95')),
+        'has_des': Query('des_dr1 >= 0.95'),
+        'has_des_dr1': Query('des_dr1 >= 0.95'),
+        'has_decals': (Query('decals_dr6 >= 0.95') | Query('decals_dr7 >= 0.95')),
+        'has_decals_dr5': Query('decals_dr5 >= 0.95'),
+        'has_decals_dr6': Query('decals_dr6 >= 0.95'),
+        'has_decals_dr7': Query('decals_dr7 >= 0.95'),
     }
 
 
