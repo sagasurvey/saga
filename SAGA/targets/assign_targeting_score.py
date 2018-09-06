@@ -38,7 +38,7 @@ def ensure_proper_prob(p):
 
 
 def assign_targeting_score_v1(base, manual_selected_objids=None,
-                              gmm_parameters=None):
+                              gmm_parameters=None, **kwargs):
     """
     Last updated: 05/07/2018
      100 Human selection and Special targets
@@ -110,24 +110,28 @@ def assign_targeting_score_v1(base, manual_selected_objids=None,
 
 def assign_targeting_score_v2(base, manual_selected_objids=None,
                               gmm_parameters=None, ignore_specs=False,
-                              debug=False, n_random=50, seed=123):
+                              debug=False, n_random=50, seed=123,
+                              remove_lists=None, **kwargs):
     """
-    Last updated: 06/07/2018
+    Last updated: 09/05/2018
      100 Human selection and Special targets
-     150 satellites
-     200 within host,  r < 17.77, gri cuts
-     300 within host,  r < 20.75, high p_GMM or GMM outliers, gri cuts
-     400 within host,  r < 20.75, high-proirity + gri cuts
-     500 within host,  r < 20.75, gri cuts, random selection of 50
-     600 very high p_GMM
+     150 satellites without AAT/MMT specs
+     180 low-z (z < 0.05) but ZQUALITY = 2
+     200 within host,  r < 17.77, gri/grz cuts
+     291 within host,  r < 21, very low SB (applied to DES only)
+     300 within host,  r < 20.75, high p_GMM or GMM outliers, low SB, gri/grz cuts
+     400 within host,  r < 20.75, high-proirity, low SB, gri/grz cuts
+     500 within host,  r < 20.75, gri/grz cuts, random selection of 50
+     600 very high p_GMM, low SB
      700 outwith host, r < 17.77
-     800 within host,  r < 20.75, gri cuts, everything else
-     900 outwith host, r < 20.75, gri cuts
+     800 within host,  r < 20.75, gri/grz cuts, everything else
+     900 outwith host, r < 20.75, gri/grz cuts
     1000 everything else
-    1100 Not in gri/fibermag_r_cut
+    1100 Not in gri/grz cut
     1200 Not galaxy
     1300 Not clean
-    1400 Has spec but not a satellite
+    1350 Removed by hand
+    1400 Has spec already
     """
 
     valid_i_mag = Query('i_mag > 0', 'i_mag < 30')
@@ -191,7 +195,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7')
         high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
         des_sb_cut = Query('sb_r > 0.6 * r_mag + 12.75', (lambda s: s == 'des', 'survey'))
-        sb_cut = Query('sb_r >= 0.7 * r_mag + 8')
+        sb_cut = Query('sb_r >= 0.7 * r_mag + 8') | (~Query((np.isfinite, 'sb_r')))
 
         base_this['TARGETING_SCORE'] = 1000
         fill_values_by_query(base_this, C.faint_end_limit, {'TARGETING_SCORE': 900})
@@ -225,12 +229,19 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     fill_values_by_query(base, ~C.is_galaxy2, {'TARGETING_SCORE': 1200})
     fill_values_by_query(base, ~C.is_clean2, {'TARGETING_SCORE': 1300})
 
+    if remove_lists is not None:
+        for survey in surveys:
+            if survey not in remove_lists:
+                continue
+            mask = np.in1d(base['OBJID_{}'.format(survey)], remove_lists[survey])
+            base['TARGETING_SCORE'][mask] = 1350
+
     if not ignore_specs:
         fill_values_by_query(base, C.has_spec, {'TARGETING_SCORE': 1400})
 
         fill_values_by_query(
             base,
-            Query('ZQUALITY == 2', 'SPEC_Z < 0.05'),
+            Query(basic_cut, 'ZQUALITY == 2', 'SPEC_Z < 0.05'),
             {'TARGETING_SCORE': 180}
         )
 

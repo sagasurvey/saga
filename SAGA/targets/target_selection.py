@@ -69,6 +69,12 @@ class TargetSelection(object):
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
 
+        self._remove_lists = {}
+        for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
+            objids = get_unique_objids(self._database['{}_remove'.format(survey)].read()[col])
+            if not len(objids):
+                self._remove_lists[survey] = objids
+
         self._cuts = cuts
         if self._version == 1:
             self.columns = list(set(chain(('OBJID', 'RA', 'DEC', 'HOST_NSAID'),
@@ -125,8 +131,9 @@ class TargetSelection(object):
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self.assign_targeting_score(
                     self.target_catalogs[host_id],
-                    self._manual_selected_objids,
-                    self._gmm_parameters,
+                    manual_selected_objids=self._manual_selected_objids,
+                    gmm_parameters=self._gmm_parameters,
+                    remove_lists=self._remove_lists,
                     **self.assign_targeting_score_kwargs
                 )
 
