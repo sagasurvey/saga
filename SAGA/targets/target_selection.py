@@ -71,9 +71,13 @@ class TargetSelection(object):
 
         self._remove_lists = {}
         for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
-            objids = get_unique_objids(self._database['{}_remove'.format(survey)].read()[col])
-            if not len(objids):
-                self._remove_lists[survey] = objids
+            try:
+                objids = get_unique_objids(self._database['{}_remove'.format(survey)].read()[col])
+            except KeyError:
+                pass
+            else:
+                if len(objids):
+                    self._remove_lists[survey] = objids
 
         self._cuts = cuts
         if self._version == 1:

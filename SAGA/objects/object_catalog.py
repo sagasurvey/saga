@@ -293,10 +293,13 @@ class ObjectCatalog(object):
         for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
             for list_type in ('remove', 'recover'):
                 key = '{}_{}'.format(survey, list_type)
-                val = get_unique_objids(self._database[key].read()[col])
-                if not len(val):
-                    val = None
-                manual_lists[key] = val
+                try:
+                    val = get_unique_objids(self._database[key].read()[col])
+                except KeyError:
+                    pass
+                else:
+                    if len(val):
+                        manual_lists[key] = val
 
         catalogs_to_return = list()
         host_ids = self._host_catalog.resolve_id(hosts, 'string')
