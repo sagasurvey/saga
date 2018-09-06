@@ -194,19 +194,30 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
 
         veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7')
         high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
-        des_sb_cut = Query('sb_r > 0.6 * r_mag + 12.75', (lambda s: s == 'des', 'survey'))
-        sb_cut = Query('sb_r >= 0.7 * r_mag + 8') | (~Query((np.isfinite, 'sb_r')))
+        sb_cut = Query('sb_r >= 0.7 * r_mag + 8')
+        bright = C.sdss_limit
+
+        if survey == 'sdss' and ('decals' in surveys or 'des' in surveys):
+            deep_survey = 'des' if 'des' in surveys else 'decals'
+            has_good_deep = Query('OBJID_{} != -1'.format(deep_survey), 'REMOVE_{} == 0'.format(deep_survey))
+            over_subtraction = Query(has_good_deep, 'r_mag_{} > 20.8'.format(deep_survey))
+            over_subtraction |= Query(~has_good_deep, 'u_mag > r_mag + 3.5')
+            bright = Query(bright, ~over_subtraction)
+            sb_cut = Query(sb_cut, ~over_subtraction)
 
         base_this['TARGETING_SCORE'] = 1000
         fill_values_by_query(base_this, C.faint_end_limit, {'TARGETING_SCORE': 900})
         fill_values_by_query(base_this, C.sat_rcut & C.faint_end_limit, {'TARGETING_SCORE': 800})
-        fill_values_by_query(base_this, C.sdss_limit, {'TARGETING_SCORE': 700})
+        fill_values_by_query(base_this, bright, {'TARGETING_SCORE': 700})
         fill_values_by_query(base_this, veryhigh_p & sb_cut, {'TARGETING_SCORE': 600})
         fill_values_by_query(base_this, C.sat_rcut & priority_cut & sb_cut & C.faint_end_limit, {'TARGETING_SCORE': 400})
         fill_values_by_query(base_this, C.sat_rcut & high_p & sb_cut & C.faint_end_limit, {'TARGETING_SCORE': 300})
-        fill_values_by_query(base_this, C.sat_rcut & C.sdss_limit, {'TARGETING_SCORE': 200})
+        fill_values_by_query(base_this, C.sat_rcut & bright, {'TARGETING_SCORE': 200})
         base_this['TARGETING_SCORE'] += (np.round((1.0 - base_this['P_GMM'])*80.0).astype(np.int) + 10)
-        fill_values_by_query(base_this, C.sat_rcut & des_sb_cut, {'TARGETING_SCORE': 291})
+
+        if survey == 'des':
+            des_sb_cut = Query('sb_r > 0.6 * r_mag + 12.75')
+            fill_values_by_query(base_this, C.sat_rcut & des_sb_cut, {'TARGETING_SCORE': 291})
 
         to_update_mask = base_this['TARGETING_SCORE'] < base['TARGETING_SCORE'][base_this['index']]
         to_update_idx = base_this['index'][to_update_mask]
