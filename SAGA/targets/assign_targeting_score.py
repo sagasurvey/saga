@@ -229,13 +229,6 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     fill_values_by_query(base, ~C.is_galaxy2, {'TARGETING_SCORE': 1200})
     fill_values_by_query(base, ~C.is_clean2, {'TARGETING_SCORE': 1300})
 
-    if remove_lists is not None:
-        for survey in surveys:
-            if survey not in remove_lists:
-                continue
-            mask = np.in1d(base['OBJID_{}'.format(survey)], remove_lists[survey])
-            base['TARGETING_SCORE'][mask] = 1350
-
     if not ignore_specs:
         fill_values_by_query(base, C.has_spec, {'TARGETING_SCORE': 1400})
 
@@ -250,6 +243,13 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
             Query(C.is_sat, (lambda x: (x != 'AAT') & (x != 'MMT'), 'TELNAME')),
             {'TARGETING_SCORE': 150}
         )
+
+    if remove_lists is not None:
+        for survey in surveys:
+            if survey not in remove_lists:
+                continue
+            mask = np.in1d(base['OBJID_{}'.format(survey)], remove_lists[survey])
+            base['TARGETING_SCORE'][mask] = 1350
 
     if manual_selected_objids is not None:
         q = Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID'))
