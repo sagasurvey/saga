@@ -111,7 +111,8 @@ def assign_targeting_score_v1(base, manual_selected_objids=None,
 def assign_targeting_score_v2(base, manual_selected_objids=None,
                               gmm_parameters=None, ignore_specs=False,
                               debug=False, n_random=50, seed=123,
-                              remove_lists=None, **kwargs):
+                              remove_lists=None, low_priority_objids=None,
+                              **kwargs):
     """
     Last updated: 09/05/2018
      100 Human selection and Special targets
@@ -196,6 +197,11 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
         sb_cut = Query('sb_r >= 0.7 * r_mag + 8')
         bright = C.sdss_limit
+
+        if low_priority_objids is not None:
+            not_low_priority = Query((lambda x: np.in1d(x, low_priority_objids, invert=True), 'OBJID'))
+            bright = Query(bright, not_low_priority)
+            sb_cut = Query(sb_cut, not_low_priority)
 
         if survey == 'sdss' and ('decals' in surveys or 'des' in surveys):
             deep_survey = 'des' if 'des' in surveys else 'decals'
