@@ -161,6 +161,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         {},
     )
     del mask
+    fill_values_by_query(catalog, Query('radius > 0', ~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
 
     for band in 'uiy':
         catalog['{}_mag'.format(band)] = 99.0
@@ -170,10 +171,6 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog['g_mag'] += 0.09
         catalog['r_mag'] += 0.1
         catalog['z_mag'] += 0.02
-        catalog['radius'] = 1.14 * catalog['radius'] ** 0.446
-        catalog['radius_err'] *= np.where(catalog['radius'] > 0, (1.14 * 0.446 * catalog['radius'] ** (0.446-1)), 1)
-
-    fill_values_by_query(catalog, Query('radius > 0', ~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
 
     remove_queries = [
         'FRACMASKED_G >= 0.35',
