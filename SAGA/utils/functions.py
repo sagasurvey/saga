@@ -2,16 +2,14 @@ import os
 import requests
 import numpy as np
 from easyquery import Query
-from astropy.coordinates import search_around_sky, SkyCoord
-from astropy import units as u
-
+from astropy.coordinates import SkyCoord
 
 __all__ = ['get_sdss_bands', 'get_sdss_colors', 'get_des_bands', 'get_des_colors',
            'get_decals_bands', 'get_decals_colors', 'get_all_bands', 'get_all_colors',
            'add_skycoord', 'get_empty_str_array', 'get_decals_viewer_image',
            'fill_values_by_query', 'get_remove_flag', 'view_table_as_2d_array',
            'find_objid', 'find_near_objid', 'find_near_coord', 'find_near_ra_dec',
-           'makedirs_if_needed']
+           'makedirs_if_needed', 'group_by']
 
 
 _sdss_bands = 'ugriz'
@@ -64,7 +62,7 @@ def add_skycoord(table, ra_label='RA', dec_label='DEC', coord_label='coord', uni
     return table
 
 
-def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None):
+def get_decals_viewer_image(ra, dec, pixscale=0.2, layer='sdssco', size=256, out=None): # pylint: disable=W0613
     url = 'http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}'.format(**locals())
     content = requests.get(url).content
     if out is not None:
@@ -198,3 +196,17 @@ def makedirs_if_needed(path):
     dirs = os.path.dirname(path)
     if not os.path.exists(dirs):
         os.makedirs(dirs)
+
+
+def group_by(x, is_sorted=False):
+    if not len(x):
+        return
+    if is_sorted:
+        edges = np.flatnonzero(np.hstack(([1], np.ediff1d(x), [1])))
+        for i, j in zip(edges[:-1], edges[1:]):
+            yield slice(i, j)
+    else:
+        sorter = np.argsort(x)
+        edges = np.flatnonzero(np.hstack(([1], np.ediff1d(x[sorter]), [1])))
+        for i, j in zip(edges[:-1], edges[1:]):
+            yield sorter[i:j]
