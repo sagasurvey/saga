@@ -311,7 +311,7 @@ def merge_catalogs(debug=None, **catalog_dict):
             orig_idx = orig_idx[regroup_mask]
             del regroup_mask
 
-        del coord, orig_idx
+        del coord, orig_idx, stacked_catalog['survey_p']
 
     if debug is not None:
         debug['stacked_catalog'] = stacked_catalog.copy()
@@ -325,8 +325,7 @@ def merge_catalogs(debug=None, **catalog_dict):
                               uniq_col_name='{col_name}{table_name}',
                               table_names=['', '_'+name])
 
-    del merged_catalog['group_id']
-    del merged_catalog['chosen']
+    del stacked_catalog, merged_catalog['group_id'], merged_catalog['chosen']
 
     for name in catalog_dict:
         merged_catalog['OBJID_{}'.format(name)].fill_value = -1
