@@ -94,6 +94,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         'abs(r_mag - i_mag) > 10',
         'abs(g_mag - r_mag) > 10',
         'FIBERMAG_R > 23',
+        'abs(u_mag - r_mag) > 10',
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
@@ -170,7 +171,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog['r_mag'] += 0.1
         catalog['z_mag'] += 0.02
         catalog['radius'] = 1.14 * catalog['radius'] ** 0.446
-        catalog['radius_err'] *= (1.14 * 0.446 * catalog['radius'] ** (0.446-1))
+        catalog['radius_err'] *= np.where(catalog['radius'] > 0, (1.14 * 0.446 * catalog['radius'] ** (0.446-1)), 1)
 
     fill_values_by_query(catalog, Query('radius > 0', ~Query((np.isfinite, 'radius_err'))), {'radius_err': 9999.0})
 
