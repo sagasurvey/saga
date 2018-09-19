@@ -362,22 +362,37 @@ class DesQuery(object):
         q = re.sub(', ', ',', q)
         return q
 
+    @staticmethod
+    def get_colnames_from_query(query):
+        cols = []
+        for item in query.lower().partition(' from ')[0].split(','):
+            _, has_as, name = item.rpartition(' as ')
+            if not has_as:
+                _, has_dot, name = item.rpartition('.')
+                if not has_dot:
+                    name = item
+            cols.append(name.strip())
+        return cols
+
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
             return
 
-        r = requests.get('https://dlsvcs.datalab.noao.edu/query/query',
-                         {'sql': self.query, 'ofmt': 'fits', 'async': False},
-                         headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'dltest.99998.99998.test_access'},
-                         stream=True)
+        cols = self.get_colnames_from_query(self.query)
+
+        r = requests.get(
+            'https://dlsvcs.datalab.noao.edu/query/query',
+            {'sql': self.query, 'ofmt': 'ascii', 'async': False},
+            headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
+        )
         if not r.ok:
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
 
-        r.raw.decode_content = True
+        t = Table.read(r.text, format='ascii.fast_tab', names=cols)
         file_open = gzip.open if compress else open
         makedirs_if_needed(file_path)
         with file_open(file_path, 'wb') as f:
-            shutil.copyfileobj(r.raw, f)
+            t.write(f, format='fits')
 
 
 class DecalsPrebuilt(object):
