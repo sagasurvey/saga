@@ -222,12 +222,20 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
         is_flux_star &= Query('PSFMAG_G - PSFMAG_R >= 0', 'PSFMAG_G - PSFMAG_R < 0.6')
         is_flux_star &= Query('(PSFMAG_G - PSFMAG_R) > 0.75 * (PSFMAG_U - PSFMAG_G) - 0.45')
     else:
-        is_star = Query((lambda x: x == 'sdss', 'survey'), 'morphology_info == 6')
-        is_guide_star = is_star & Query('r_mag >= 14', 'r_mag < 15')
-        is_flux_star = is_star & Query('r_mag >= 17', 'r_mag < 18')
-        is_flux_star &= Query('ug >= 0.6', 'ug < 1.2')
-        is_flux_star &= Query('gr >= 0', 'gr < 0.6')
-        is_flux_star &= Query('gr > 0.75 * ug - 0.45')
+        is_star = ~Query('is_galaxy')
+        if 'OBJID_sdss' in target_catalog.colnames:
+            is_star &= Query('OBJID_sdss != -1', 'morphology_info_sdss == 6')
+            is_guide_star = is_star & Query('r_mag_sdss >= 14', 'r_mag_sdss < 15')
+            is_flux_star = is_star & Query('r_mag_sdss >= 17', 'r_mag_sdss < 18')
+            is_flux_star &= Query('u_mag_sdss - g_mag_sdss >= 0.6', 'u_mag_sdss - g_mag_sdss < 1.2')
+            is_flux_star &= Query('g_mag_sdss - r_mag_sdss >= 0', 'g_mag_sdss - r_mag_sdss < 0.6')
+            is_flux_star &= Query('g_mag_sdss - r_mag_sdss > 0.75 * (u_mag_sdss - g_mag_sdss) - 0.45')
+        else:
+            is_guide_star = is_star & Query('r_mag >= 14', 'r_mag < 15')
+            is_flux_star = is_star & Query('r_mag >= 17', 'r_mag < 18')
+            is_flux_star &= Query('ug >= 0.6', 'ug < 1.2')
+            is_flux_star &= Query('gr >= 0', 'gr < 0.6')
+            is_flux_star &= Query('gr > 0.75 * ug - 0.45')
 
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
 
