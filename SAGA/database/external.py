@@ -324,9 +324,8 @@ class DesQuery(object):
         d.MAGERR_AUTO_Y as y_err,
         d.flags_r,
         d.imaflags_iso_r,
-        (CASE WHEN (d.wavg_spread_model_i + 3*d.wavg_spreaderr_model_i) > 0.005 THEN 1 ELSE 0 END) +
-        (CASE WHEN (d.wavg_spread_model_i + d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) +
-        (CASE WHEN (d.wavg_spread_model_i - d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) as wavg_extended_coadd_i
+        (CASE WHEN d.wavg_spread_model_r == -99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
+        (CASE WHEN d.wavg_spreaderr_model_r == -99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
         from des_dr1.main d where
         q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
 

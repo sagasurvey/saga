@@ -106,8 +106,17 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, co
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
 
-    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 3)
-    catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
+    if 'wavg_extended_coadd_i' in catalog.colnames:
+        # only for backward compatibility
+        catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 3)
+        catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
+
+    else:
+        extended_coadd = (catalog['spread_model_r'] + catalog['spreaderr_model_r'] * 3.0 > 0.005).astype(np.int32)
+        extended_coadd += (catalog['spread_model_r'] + catalog['spreaderr_model_r'] > 0.003).astype(np.int32)
+        extended_coadd += (catalog['spread_model_r'] - catalog['spreaderr_model_r'] > 0.003).astype(np.int32)
+        catalog['is_galaxy'] = (extended_coadd == 3)
+        catalog['morphology_info'] = extended_coadd
 
     try:
         catalog.rename_column('ra', 'RA')
