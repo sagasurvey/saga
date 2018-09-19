@@ -89,17 +89,23 @@ class FitsTable(FileObject):
     compress_after_write = True
 
     def read(self):
-        with fits.open(self.path, cache=False, lazy_load_hdus=True, **self.kwargs) as f:
-            return Table(f[1].data) # pylint: disable=E1101
+        with fits.open(self.path, cache=False, memmap=False, **self.kwargs) as hdu_list:
+            # pylint: disable=E1101
+            t = Table(hdu_list[1].data, masked=False)
+            del hdu_list[1].data
+        return t
 
     def write(self, table):
+        coord = None
         if 'coord' in table.columns and table['coord'].info.dtype.name == 'object':
-            table = table.copy()
+            coord = table['coord']
             del table['coord']
         file_open = gzip.open if self.compress_after_write else open
         makedirs_if_needed(self.path)
         with file_open(self.path, 'wb') as f_out:
             table.write(f_out, format='fits')
+        if coord is not None:
+            table['coord'] = coord
 
 
 class NumpyBinary(FileObject):

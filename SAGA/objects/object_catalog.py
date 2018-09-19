@@ -52,7 +52,7 @@ class ObjectCatalog(object):
 
 
     @staticmethod
-    def _annotate_catalog(table, to_add_skycoord=True):
+    def _annotate_catalog(table, to_add_skycoord=False):
         if 'EXTINCTION_R' in table.colnames:
             for b in get_sdss_bands():
                 table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
@@ -70,27 +70,17 @@ class ObjectCatalog(object):
 
 
     @staticmethod
-    def _slice_columns(table, columns, get_coord_later=False):
-        if columns is None:
-            return table
+    def _slice_columns(table, columns, to_add_skycoord=False):
+        if columns is not None:
+            table = table[columns]
 
-        if get_coord_later:
-            columns_this = list(columns)
-            try:
-                columns_this.remove('coord')
-            except ValueError:
-                pass
-            if 'RA' not in columns_this:
-                columns_this.append('RA')
-            if 'DEC' not in columns_this:
-                columns_this.append('DEC')
+        if to_add_skycoord:
+            table = add_skycoord(table)
 
-            return table[columns_this]
-
-        return table[columns]
+        return table
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, to_add_skycoord=True):
         """
         load object catalogs (aka "base catalogs")
 
@@ -145,12 +135,6 @@ class ObjectCatalog(object):
         >>> bases_table = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='stacked')
         """
 
-        if return_as is None:
-            return_as = 'stacked' if has_spec else 'list'
-        return_as = return_as.lower()
-        if return_as[0] not in 'slid':
-            raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
-
         if version is None:
             base_key = 'base'
         elif str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
@@ -159,6 +143,12 @@ class ObjectCatalog(object):
             base_key = 'base_v{}'.format(version)
         else:
             raise ValueError('`version` must be None, \'paper1\', 1 or 2.')
+
+        if return_as is None:
+            return_as = 'stacked' if (has_spec and base_key == 'base_v0p1') else 'list'
+        return_as = return_as.lower()
+        if return_as[0] not in 'slid':
+            raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
 
         if has_spec and base_key == 'base_v0p1':
             t = self._database['saga_spectra_May2017'].read()
@@ -175,46 +165,48 @@ class ObjectCatalog(object):
             if return_as[0] != 's':
                 if hosts is None:
                     host_ids = np.unique(t['HOST_NSAID'])
-                output_iterator = (self._slice_columns(Query('HOST_NSAID == {}'.format(i)).filter(t), columns) for i in host_ids)
+                output_iterator = (self._slice_columns(Query('HOST_NSAID == {}'.format(i)).filter(t), columns, to_add_skycoord) for i in host_ids)
                 if return_as[0] == 'i':
                     return output_iterator
                 if return_as[0] == 'd':
                     return dict(zip(host_ids, output_iterator))
                 return list(output_iterator)
 
-            return self._slice_columns(t, columns)
+            return self._slice_columns(t, columns, to_add_skycoord)
 
-        else:
-            q = Query(cuts)
-            if has_spec:
-                q = q & C.has_spec
-            elif has_spec is not None:
-                q = q & (~C.has_spec)
+        q = Query(cuts)
+        if has_spec:
+            q = q & C.has_spec
+        elif has_spec is not None:
+            q = q & (~C.has_spec)
 
-            hosts = self._host_catalog.resolve_id(hosts, 'string')
+        hosts = self._host_catalog.resolve_id(hosts, 'string')
 
-            need_coord = (columns is None or 'coord' in columns)
-            to_add_skycoord = (need_coord and return_as[0] != 's') # because skycoord cannot be stacked
+        output_iterator = (
+            self._slice_columns(
+                q.filter(self._annotate_catalog(self._database[base_key, host].read())),
+                columns,
+                (to_add_skycoord and return_as[0] != 's')
+            ) for host in hosts
+        )
 
-            output_iterator = (self._slice_columns(q.filter(self._annotate_catalog(self._database[base_key, host].read(), to_add_skycoord)), columns, (need_coord and not to_add_skycoord)) for host in hosts)
-
-            if return_as[0] == 'i':
-                return output_iterator
-            if return_as[0] == 's':
-                out = vstack(list(output_iterator), 'outer', 'error')
-                if out.masked:
-                    for name, (dtype, _) in out.dtype.fields.items():
-                        if dtype.kind == 'i':
-                            out[name].fill_value = -1
-                        if dtype.kind == 'b':
-                            out[name].fill_value = False
-                out = out.filled()
-                if need_coord:
-                    out = self._slice_columns(add_skycoord(out), columns)
-                return out
-            if return_as[0] == 'd':
-                return dict(zip(hosts, output_iterator))
-            return list(output_iterator)
+        if return_as[0] == 'i':
+            return output_iterator
+        if return_as[0] == 's':
+            out = vstack(list(output_iterator), 'outer', 'error')
+            if out.masked:
+                for name, (dtype, _) in out.dtype.fields.items():
+                    if dtype.kind == 'i':
+                        out[name].fill_value = -1
+                    if dtype.kind == 'b':
+                        out[name].fill_value = False
+            out = out.filled()
+            if to_add_skycoord:
+                out = add_skycoord(out)
+            return out
+        if return_as[0] == 'd':
+            return dict(zip(hosts, output_iterator))
+        return list(output_iterator)
 
 
     def load_nsa(self, version='0.1.2'):

@@ -3,6 +3,7 @@ base catalog building pipeline 2.0
 """
 import logging
 from itertools import chain, count
+from collections import Counter
 import numpy as np
 import numexpr as ne
 from easyquery import Query
@@ -13,7 +14,7 @@ import astropy.constants
 import astropy.units
 
 from . import build
-from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord
+from ..utils import fill_values_by_query, get_empty_str_array, get_remove_flag, get_sdss_bands, add_skycoord, group_by
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra, ensure_specs_dtype, SPECS_COLUMNS, SPEED_OF_LIGHT
 
 __all__ = ['prepare_sdss_catalog_for_merging',
@@ -49,14 +50,12 @@ def arcsec2dist(sep, r=1.0):
     return np.sin(np.deg2rad(sep / 3600.0 / 2.0)) * 2.0 * r
 
 
-def get_fof_group_id(catalog, linking_length_arcsec, reassign_group_indices=False):
+def get_cartesian_coord(catalog):
     if 'coord' in catalog.colnames:
         sc = catalog['coord']
     else:
         sc = SkyCoord(catalog['RA'], catalog['DEC'], unit='deg')
-    return find_friends_of_friends(sc.cartesian.xyz.value.T,
-                                   arcsec2dist(linking_length_arcsec),
-                                   reassign_group_indices=reassign_group_indices)
+    return sc.cartesian.xyz.value.T
 
 
 def set_remove_flag(catalog, remove_queries=None, manual_remove=None, manual_recover=None):
@@ -95,6 +94,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         'abs(r_mag - i_mag) > 10',
         'abs(g_mag - r_mag) > 10',
         'FIBERMAG_R > 23',
+        'abs(u_mag - r_mag) > 10',
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
@@ -106,8 +106,17 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, co
     catalog['radius'] = catalog['radius_r']
     catalog['radius_err'] = np.float32(0)
 
-    catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 3)
-    catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
+    if 'wavg_extended_coadd_i' in catalog.colnames:
+        # only for backward compatibility
+        catalog['is_galaxy'] = (catalog['wavg_extended_coadd_i'] >= 3)
+        catalog['morphology_info'] = catalog['wavg_extended_coadd_i'].astype(np.int32)
+
+    else:
+        extended_coadd = (catalog['spread_model_r'] + catalog['spreaderr_model_r'] * 3.0 > 0.005).astype(np.int32)
+        extended_coadd += (catalog['spread_model_r'] + catalog['spreaderr_model_r'] > 0.003).astype(np.int32)
+        extended_coadd += (catalog['spread_model_r'] - catalog['spreaderr_model_r'] > 0.003).astype(np.int32)
+        catalog['is_galaxy'] = (extended_coadd == 3)
+        catalog['morphology_info'] = extended_coadd
 
     try:
         catalog.rename_column('ra', 'RA')
@@ -168,8 +177,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog['{}_err'.format(band)] = 99.0
 
     if convert_to_sdss_filters:
-        for band in 'grz':
-            catalog['{}_mag'.format(band)] += 0.1
+        catalog['g_mag'] += 0.09
+        catalog['r_mag'] += 0.1
+        catalog['z_mag'] += 0.02
 
     remove_queries = [
         'FRACMASKED_G >= 0.35',
@@ -202,22 +212,48 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def assign_choice(surveys):
-    choice = list()
+def assign_photometry_choice(stacked_catalog, indices, is_last):
+    if len(indices) == 1:
+        return 2 # only one entry, always chosen
+
+    surveys = stacked_catalog['survey'][indices].tolist()
+    survey_count = Counter(surveys)
+    if min(survey_count.values()) > 1 and not is_last:
+        return # need to redo FoF search with smaller sep
+
+    sorter = np.lexsort(tuple((
+        stacked_catalog[col][indices] for col in ('r_mag', 'survey_p', 'REMOVE')
+    ))) # last one is the primary sort key
+
+    choices = [0 for _ in indices]
     done = set()
-    for s in surveys:
-        if not done:
-            choice.append(2)
-            done.add(s)
-        elif s not in done:
-            choice.append(1)
-            done.add(s)
+    not_selected = []
+    for s in sorter:
+        survey_this = surveys[s]
+        if survey_this in done:
+            not_selected.append(indices[s])
         else:
-            choice.append(0)
-    return choice
+            choices[s] = 1 if done else 2
+            done.add(survey_this)
+
+    if is_last or not not_selected:
+        return choices
+
+    not_selected = np.array(not_selected)
+    not_selected_good = not_selected[stacked_catalog['REMOVE'][not_selected] == 0]
+    if not not_selected_good.size:
+        return choices
+
+    if not_selected_good.size < len(survey_count) and (
+            stacked_catalog['r_mag'][not_selected_good].min()
+            > stacked_catalog['r_mag'][indices[sorter[0]]] + 1
+    ):
+        return choices
 
 
 def merge_catalogs(debug=None, **catalog_dict):
+
+    survey_priority = ('des', 'decals', 'sdss')
 
     catalog_dict = {k: v for k, v in catalog_dict.items() if v is not None}
     n_catalogs = len(catalog_dict)
@@ -228,37 +264,63 @@ def merge_catalogs(debug=None, **catalog_dict):
     elif n_catalogs == 1:
         survey, stacked_catalog = next(iter(catalog_dict.items()))
         stacked_catalog['survey'] = get_empty_str_array(len(stacked_catalog), max(6, len(survey)), survey)
-        stacked_catalog['group_id'] = get_fof_group_id(stacked_catalog, 1.0, True)
+        stacked_catalog['group_id'] = find_friends_of_friends(
+            get_cartesian_coord(stacked_catalog),
+            arcsec2dist(0.5),
+            reassign_group_indices=True,
+        )
+        stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
+        idx = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']))))
+        stacked_catalog['chosen'] = 0
+        stacked_catalog['chosen'][idx] = 2
+        del idx
 
     else:
         stacked_catalog = vstack(list(catalog_dict.values()), 'exact', 'error')
         stacked_catalog['survey'] = get_empty_str_array(len(stacked_catalog), max(6, max(len(s) for s in catalog_dict)))
-        i = 0
+        stacked_catalog['survey_p'] = 999
+        counter = 0
         for name, cat in catalog_dict.items():
-            stacked_catalog['survey'][i:i+len(cat)] = name
-            i += len(cat)
+            s = slice(counter, counter+len(cat))
+            stacked_catalog['survey'][s] = name
+            try:
+                p = survey_priority.index(name)
+            except ValueError:
+                pass
+            else:
+                stacked_catalog['survey_p'][s] = p
+            counter += len(cat)
 
-        group_id = get_fof_group_id(stacked_catalog, 3.0)
-        for sep in (2.0, 1.0):
-            _, group_id, counts = np.unique(group_id, return_inverse=True, return_counts=True)
-            group_id_shift = group_id.max() + 1
-            regroup_mask = (counts[group_id] > n_catalogs)
+        coord = get_cartesian_coord(stacked_catalog)
+        orig_idx = np.arange(len(stacked_catalog))
+        stacked_catalog['group_id'] = 0
+        stacked_catalog['chosen'] = 0
+        group_id_shift = 1
+
+        for sep in np.arange(3, 0.01, -0.5):
+            is_last = (sep < 0.9)
+            group_ids_tmp = find_friends_of_friends(coord, arcsec2dist(sep))
+
+            for group_id, indices in enumerate(group_by(group_ids_tmp)):
+                orig_idx_this = orig_idx[indices]
+                chosen = assign_photometry_choice(stacked_catalog, orig_idx_this, is_last)
+                if chosen is None:
+                    continue
+                stacked_catalog['group_id'][orig_idx_this] = group_id + group_id_shift
+                stacked_catalog['chosen'][orig_idx_this] = chosen
+                orig_idx[indices] = -1
+                del orig_idx_this
+
+            regroup_mask = (orig_idx > -1)
             if not regroup_mask.any():
+                del regroup_mask
                 break
-            group_id[regroup_mask] = get_fof_group_id(stacked_catalog[regroup_mask], sep)
-            group_id[regroup_mask] += group_id_shift
-        stacked_catalog['group_id'] = group_id
-        del group_id, regroup_mask
+            group_id_shift = stacked_catalog['group_id'].max() + 1
+            coord = coord[regroup_mask]
+            orig_idx = orig_idx[regroup_mask]
+            del regroup_mask
 
-    stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
-    stacked_catalog['chosen'] = 0
-
-    group_id_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']), [1])))
-    for i, j in zip(group_id_edges[:-1], group_id_edges[1:]):
-        if j-i == 1 or n_catalogs == 1:
-            stacked_catalog['chosen'][i] = 2
-        else:
-            stacked_catalog['chosen'][i:j] = assign_choice(stacked_catalog['survey'][i:j])
+        del coord, orig_idx, stacked_catalog['survey_p']
 
     if debug is not None:
         debug['stacked_catalog'] = stacked_catalog.copy()
@@ -272,8 +334,7 @@ def merge_catalogs(debug=None, **catalog_dict):
                               uniq_col_name='{col_name}{table_name}',
                               table_names=['', '_'+name])
 
-    del merged_catalog['group_id']
-    del merged_catalog['chosen']
+    del stacked_catalog, merged_catalog['group_id'], merged_catalog['chosen']
 
     for name in catalog_dict:
         merged_catalog['OBJID_{}'.format(name)].fill_value = -1
@@ -339,11 +400,10 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs['matched_idx'] = -1
 
     if len(specs_idx):
-        specs_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs_idx), [1])))
-        for i, j in zip(specs_idx_edges[:-1], specs_idx_edges[1:]):
-            spec_idx_this = specs_idx[i]
-            possible_match = base[base_idx[i:j]]
-            possible_match['sep'] = sep[i:j]
+        for group_slice in group_by(specs_idx, True):
+            spec_idx_this = specs_idx[group_slice.start]
+            possible_match = base[base_idx[group_slice]]
+            possible_match['sep'] = sep[group_slice]
             possible_match['sep_norm'] = possible_match['sep'] / possible_match['radius_for_match']
 
             # using following criteria one by one to find matching photo obj, stop when found
@@ -377,15 +437,14 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
     tel_ranks = dict(MMT=0, AAT=1, NSA=2, SDSS=4) # all other telnames get 3
 
-    matched_idx_edges = np.flatnonzero(np.hstack(([1], np.ediff1d(specs['matched_idx']), [1])))
-    for i, j in zip(matched_idx_edges[:-1], matched_idx_edges[1:]):
-
+    for group_slice in group_by(specs['matched_idx'], True):
         # matched_idx < 0 means there is no match, so nothing to do
-        if specs['matched_idx'][i] < 0:
+        if specs['matched_idx'][group_slice.start] < 0:
             continue
 
-        # j - i == 1 means there is only one match, so it's easy
-        if j - i == 1:
+        # stop - start == 1 means there is only one match, so it's easy
+        if group_slice.stop - group_slice.start == 1:
+            i = group_slice.start
             specs['chosen'][i] = True
             specs['SPEC_REPEAT'][i] = specs['TELNAME'][i]
             specs['SPEC_REPEAT_ALL'][i] = specs['TELNAME'][i]
@@ -395,7 +454,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
         # now it's the real thing, we have more than one specs
         # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
-        specs_to_merge = specs[i:j]
+        specs_to_merge = specs[group_slice]
         rank = np.fromiter((tel_ranks.get(t, 3) for t in specs_to_merge['TELNAME']), np.int, len(specs_to_merge))
         rank += (10 - specs_to_merge['ZQUALITY']) * (rank.max() + 1)
         rank = rank.astype(np.float) + np.where(

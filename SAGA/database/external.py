@@ -324,9 +324,8 @@ class DesQuery(object):
         d.MAGERR_AUTO_Y as y_err,
         d.flags_r,
         d.imaflags_iso_r,
-        (CASE WHEN (d.wavg_spread_model_i + 3*d.wavg_spreaderr_model_i) > 0.005 THEN 1 ELSE 0 END) +
-        (CASE WHEN (d.wavg_spread_model_i + d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) +
-        (CASE WHEN (d.wavg_spread_model_i - d.wavg_spreaderr_model_i) > 0.003 THEN 1 ELSE 0 END) as wavg_extended_coadd_i
+        (CASE WHEN d.wavg_spread_model_r=-99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
+        (CASE WHEN d.wavg_spreaderr_model_r=-99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
         from des_dr1.main d where
         q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
 
@@ -363,22 +362,37 @@ class DesQuery(object):
         q = re.sub(', ', ',', q)
         return q
 
+    @staticmethod
+    def get_colnames_from_query(query):
+        cols = []
+        for item in query.lower().partition(' from ')[0].split(','):
+            _, has_as, name = item.rpartition(' as ')
+            if not has_as:
+                _, has_dot, name = item.rpartition('.')
+                if not has_dot:
+                    name = item
+            cols.append(name.strip())
+        return cols
+
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
             return
 
-        r = requests.get('https://dlsvcs.datalab.noao.edu/query/query',
-                         {'sql': self.query, 'ofmt': 'fits', 'async': False},
-                         headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
-                         stream=True)
+        cols = self.get_colnames_from_query(self.query)
+
+        r = requests.get(
+            'https://dlsvcs.datalab.noao.edu/query/query',
+            {'sql': self.query, 'ofmt': 'ascii', 'async': False},
+            headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
+        )
         if not r.ok:
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
 
-        r.raw.decode_content = True
+        t = Table.read(r.text, format='ascii.fast_tab', names=cols)
         file_open = gzip.open if compress else open
         makedirs_if_needed(file_path)
         with file_open(file_path, 'wb') as f:
-            shutil.copyfileobj(r.raw, f)
+            t.write(f, format='fits')
 
 
 class DecalsPrebuilt(object):
