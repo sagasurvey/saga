@@ -91,7 +91,7 @@ class FitsTable(FileObject):
     def read(self):
         with fits.open(self.path, cache=False, memmap=False, **self.kwargs) as hdu_list:
             # pylint: disable=E1101
-            t = Table(hdu_list[1].data)
+            t = Table(hdu_list[1].data, masked=False)
             del hdu_list[1].data
         return t
 
