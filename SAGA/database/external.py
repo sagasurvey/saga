@@ -324,8 +324,8 @@ class DesQuery(object):
         d.MAGERR_AUTO_Y as y_err,
         d.flags_r,
         d.imaflags_iso_r,
-        (CASE WHEN d.wavg_spread_model_r == -99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
-        (CASE WHEN d.wavg_spreaderr_model_r == -99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
+        (CASE WHEN d.wavg_spread_model_r=-99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
+        (CASE WHEN d.wavg_spreaderr_model_r=-99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
         from des_dr1.main d where
         q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
 
@@ -368,7 +368,7 @@ class DesQuery(object):
 
         r = requests.get('https://dlsvcs.datalab.noao.edu/query/query',
                          {'sql': self.query, 'ofmt': 'fits', 'async': False},
-                         headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'anonymous.0.0.anon_access'},
+                         headers={'Content-Type': 'application/octet-stream', 'X-DL-AuthToken': 'dltest.99998.99998.test_access'},
                          stream=True)
         if not r.ok:
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
