@@ -80,7 +80,7 @@ class ObjectCatalog(object):
         return table
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, to_add_skycoord=False):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, to_add_skycoord=True):
         """
         load object catalogs (aka "base catalogs")
 
