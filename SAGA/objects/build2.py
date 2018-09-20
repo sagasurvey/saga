@@ -627,7 +627,13 @@ def remove_shreds_near_spec_obj(base, nsa=None):
 
 def remove_too_close_to_host(base):
     min_rhost = base['RHOST_KPC'].min()
-    q = Query((lambda r: ((r < 10.0) & (r > min_rhost)), 'RHOST_KPC'))
+    remove_dist = 10.0
+
+    # hot fix for pgc70094
+    if 'HOST_PGC' in base.colnames and base['HOST_PGC'][0] == 70094:
+        remove_dist = 24.0
+
+    q = Query((lambda r: ((r < remove_dist) & (r > min_rhost)), 'RHOST_KPC'))
     base['REMOVE'][q.mask(base)] += (1 << 30)
     return base
 
