@@ -652,7 +652,6 @@ def find_satellites(base, version=1):
      3 - host galaxy itself
     91 - removed objects but otherwise satisfying satellite cut
     92 - removed objects but otherwise satisfying low-z galaxy cut
-    93 - too close to host but otherwise satisfying satellite
 
     `base` is modified in-place.
 
@@ -686,10 +685,6 @@ def find_satellites(base, version=1):
         fill_values_by_query(base, C.obj_is_host, {'SATS':3, 'REMOVE':-1})
     else:
         base['SATS'][base['RHOST_ARCM'].argmin()] = 3
-
-    # TODO: need a better way to fix this kind of issue:
-    if 'HOST_PGC' in base.colnames and base['HOST_PGC'][0] == 70094:
-        fill_values_by_query(base, Query('SATS == 1', 'RHOST_KPC < 24'), {'SATS':93})
 
     return base
 
