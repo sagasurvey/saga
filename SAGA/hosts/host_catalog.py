@@ -62,7 +62,6 @@ class HostCatalog(object):
 
     _predefined_queries = {
         'all': Query(),
-        'no_sdss_flags': Query(),
         'paper1': Query((lambda x: np.in1d(x, _paper1_complete_nsa + _paper1_incomplete_nsa), 'NSAID')),
         'paper1_complete': Query((lambda x: np.in1d(x, _paper1_complete_nsa), 'NSAID')),
         'paper1_incomplete': Query((lambda x: np.in1d(x, _paper1_incomplete_nsa), 'NSAID')),
@@ -73,6 +72,7 @@ class HostCatalog(object):
         'aat_2018a': Query((lambda x, y: np.in1d(x, _aat_2018a_nsa) | np.in1d(y, _aat_2018a_pgc), 'NSAID', 'PGC')),
         'no_flags': Query('flag == 0'),
         'flag0': Query('flag == 0'),
+        'has_sdss': Query('flag == 0'),
         'has_nsa': Query('NSAID != -1'),
         'has_deeper_imaging': (Query('decals_dr7 >= 0.95') | Query('decals_dr6 >= 0.95') | Query('des_dr1 >= 0.95')),
         'has_decam': (Query('decals_dr7 >= 0.95') | Query('des_dr1 >= 0.95')),
@@ -82,6 +82,7 @@ class HostCatalog(object):
         'has_decals_dr5': Query('decals_dr5 >= 0.95'),
         'has_decals_dr6': Query('decals_dr6 >= 0.95'),
         'has_decals_dr7': Query('decals_dr7 >= 0.95'),
+        'good': (Query('NSAID != -1', (Query('flag == 0') | Query('decals_dr6 >= 0.95') | Query('decals_dr7 >= 0.95'))) | Query('des_dr1 >= 0.95')),
     }
 
 
