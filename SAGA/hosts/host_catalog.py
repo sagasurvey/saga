@@ -82,7 +82,7 @@ class HostCatalog(object):
         'has_decals_dr5': Query('decals_dr5 >= 0.95'),
         'has_decals_dr6': Query('decals_dr6 >= 0.95'),
         'has_decals_dr7': Query('decals_dr7 >= 0.95'),
-        'good': (Query('NSAID != -1', (Query('flag == 0') | Query('decals_dr6 >= 0.95') | Query('decals_dr7 >= 0.95'))) | Query('des_dr1 >= 0.95')),
+        'good': Query(Query('NSAID != -1', (Query('flag == 0') | Query('decals_dr6 >= 0.95') | Query('decals_dr7 >= 0.95'))) | Query('des_dr1 >= 0.95'), 'distance > 22'),
     }
 
 
