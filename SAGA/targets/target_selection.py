@@ -9,6 +9,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
+from ..utils import fill_values_by_query
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -134,10 +135,20 @@ class TargetSelection(object):
 
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:
-                self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
-                        cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
-                if 'coord' in self.target_catalogs[host_id].colnames:
-                    del self.target_catalogs[host_id]['coord']
+                self.target_catalogs[host_id] = self._object_catalog.load(
+                    host_id,
+                    cuts=self._cuts,
+                    columns=self.columns,
+                    return_as='list',
+                    version=self._version,
+                    to_add_skycoord=False,
+                ).pop()
+                # TODO: remove the following at a later time:
+                fill_values_by_query(
+                    self.target_catalogs[host_id],
+                    Query((lambda x: ((x == '2dF') | (x == '2dFLen')), 'TELNAME'), 'ZQUALITY == 3', 'SPEC_Z < 0.05'),
+                    {'ZQUALITY': 2}
+                )
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self.assign_targeting_score(
@@ -154,11 +165,11 @@ class TargetSelection(object):
         output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
         if return_as[0] == 'd':
             return dict(zip(host_ids, output_iter))
-        elif return_as[0] == 'i':
+        if return_as[0] == 'i':
             return output_iter
-        elif return_as[0] == 'l':
+        if return_as[0] == 'l':
             return list(output_iter)
-        elif return_as[0] == 's':
+        if return_as[0] == 's':
             out = vstack(list(output_iter), 'outer', 'error')
             if out.masked:
                 for name, (dtype, _) in out.dtype.fields.items():
