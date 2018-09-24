@@ -146,6 +146,9 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
 
     surveys = [col[6:] for col in base.colnames if col.startswith('OBJID_')]
 
+    if gmm_parameters is None:
+        gmm_parameters = dict()
+
     for survey in surveys:
         postfix = '_' + survey
         base_this = Query('OBJID{} != -1'.format(postfix)).filter(base_clean)
@@ -162,8 +165,8 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
                 base_this[''.join((b2, '_err', postfix))],
             )
 
-        if survey in (gmm_parameters or {}):
-            gmm_parameters_this = gmm_parameters[survey]
+        gmm_parameters_this = gmm_parameters.get(survey)
+        if gmm_parameters_this is not None:
             bands = getattr(utils, 'get_{}_bands'.format(survey))() # pylint: disable=E1102
             base_this['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
                 base_this,

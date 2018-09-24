@@ -59,7 +59,9 @@ class TargetSelection(object):
         else:
             self.assign_targeting_score_kwargs = dict(assign_targeting_score_kwargs)
 
-        if isinstance(gmm_parameters, dict):
+        if gmm_parameters is None:
+            self._gmm_parameters = {k: self._load_gmm_parameters(k) for k in ('sdss', 'des', 'decals')}
+        elif isinstance(gmm_parameters, dict):
             self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
         else:
             self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
@@ -92,11 +94,16 @@ class TargetSelection(object):
 
 
     def _load_gmm_parameters(self, gmm_parameters):
+        if gmm_parameters in ('sdss', 'des', 'decals'):
+            gmm_parameters = 'gmm_parameters_' + gmm_parameters
+            default_return = None
+        else:
+            default_return = gmm_parameters
+
         try:
             return self._database[gmm_parameters].read()
         except (TypeError, KeyError):
-            return gmm_parameters
-
+            return default_return
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
                               reload_base=False, recalculate_score=False):
