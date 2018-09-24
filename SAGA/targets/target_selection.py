@@ -222,13 +222,13 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
 
     if 'PHOTPTYPE' in target_catalog.colnames:
-        is_star = Query('PHOTPTYPE == 6')
+        is_star = Query('PHOTPTYPE == 6', 'REMOVE == -1')
         mags = {b: 'PSFMAG_{}'.format(b.upper) for b in 'ugr'}
     elif 'OBJID_sdss' in target_catalog.colnames:
-        is_star = Query('OBJID_sdss != -1', 'morphology_info_sdss == 6')
+        is_star = Query('OBJID_sdss != -1', 'morphology_info_sdss == 6', 'REMOVE_sdss == 0')
         mags = {b: '{}_mag_sdss'.format(b) for b in 'ugr'}
     else:
-        is_star = (~Query('is_galaxy'))
+        is_star = Query(~Query('is_galaxy'), 'REMOVE == 0')
         mags = {b: '{}_mag'.format(b) for b in 'ugr'}
 
     is_guide_star = is_star & Query('{r} >= 14'.format(**mags), '{r} < 15'.format(**mags))
@@ -397,8 +397,13 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     dec_sky = np.concatenate(dec_sky)[:sky_fiber_needed]
 
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
-    is_des = Query((lambda s: s == 'des', 'survey'))
-    is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
+
+    is_star = Query(~Query('is_galaxy'), 'REMOVE == 0')
+    if 'morphology_info_sdss' in target_catalog.colnames:
+        is_star &= Query('morphology_info_sdss == 6')
+    if 'morphology_info_des' in target_catalog.colnames:
+        is_star &= Query('morphology_info_des == 0')
+
     is_flux_star = Query(is_star, 'r_mag >= {}'.format(flux_star_r_range[0]), 'r_mag < {}'.format(flux_star_r_range[1]))
     is_flux_star &= Query('gr >= {}'.format(flux_star_gr_range[0]), 'gr < {}'.format(flux_star_gr_range[1]))
 
