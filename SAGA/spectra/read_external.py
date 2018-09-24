@@ -113,6 +113,7 @@ def read_ozdes(file_path):
     specs = file_path.read()['OzDES_ID', 'RA', 'DEC', 'z', 'flag']
 
     # flag 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    specs['flag'] = specs['flag'].astype(np.int16)
     specs = Query('flag >= 3').filter(specs)
 
     specs.rename_column('OzDES_ID', 'SPECOBJID')
