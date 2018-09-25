@@ -5,7 +5,8 @@ from itertools import chain
 import numpy as np
 from easyquery import Query
 from ..objects import cuts as C
-from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_all_colors, get_des_bands
+from .. import utils
+from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_all_colors
 from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_data, param_labels_nosat
 
 __all__ = ['assign_targeting_score_v1', 'assign_targeting_score_v2',
@@ -64,7 +65,7 @@ def assign_targeting_score_v1(base, manual_selected_objids=None,
     base['log_L_GMM'] = calc_log_likelihood(*get_input_data(base), *(gmm_parameters[n] for n in param_labels_nosat))
 
     basic_cut = C.gri_cut & C.fibermag_r_cut & C.is_clean & C.is_galaxy & (~C.has_spec)
-    within_host =  basic_cut & C.faint_end_limit & C.sat_rcut
+    within_host = basic_cut & C.faint_end_limit & C.sat_rcut
     outwith_host = basic_cut & C.faint_end_limit & (~C.sat_rcut)
 
     veryhigh_p = Query('P_GMM_sdss >= 0.95', 'log_L_GMM >= -7')
@@ -121,7 +122,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
      200 within host,  r < 17.77, gri/grz cuts
      291 within host,  r < 21, very low SB (applied to DES only)
      300 within host,  r < 20.75, high p_GMM or GMM outliers, low SB, gri/grz cuts
-     400 within host,  r < 20.75, high-proirity, low SB, gri/grz cuts
+     400 within host,  r < 20.75, high-priority, low SB, gri/grz cuts
      500 within host,  r < 20.75, gri/grz cuts, random selection of 50
      600 very high p_GMM, low SB
      700 outwith host, r < 17.77
@@ -135,10 +136,7 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     1400 Has spec already
     """
 
-    valid_i_mag = Query('i_mag > 0', 'i_mag < 30')
-    grz_cut = Query('gr-abs(gr_err) < 0.85', 'rz-rz_err < 1')
-    gri_or_grz_cut = Query(C.gri_cut, valid_i_mag) | Query(grz_cut, ~valid_i_mag)
-    basic_cut = gri_or_grz_cut & C.is_clean2 & C.is_galaxy2 & Query('r_mag < 21')
+    basic_cut = C.gri_or_grz_cut & C.is_clean2 & C.is_galaxy2 & Query('r_mag < 21')
     if not ignore_specs:
         basic_cut &= (~C.has_spec)
     base_clean = basic_cut.filter(base)
@@ -147,6 +145,9 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
     base['TARGETING_SCORE'] = 1000
 
     surveys = [col[6:] for col in base.colnames if col.startswith('OBJID_')]
+
+    if gmm_parameters is None:
+        gmm_parameters = dict()
 
     for survey in surveys:
         postfix = '_' + survey
@@ -164,9 +165,9 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
                 base_this[''.join((b2, '_err', postfix))],
             )
 
-        if survey in (gmm_parameters or {}):
-            gmm_parameters_this = gmm_parameters[survey]
-            bands = get_sdss_bands() if survey == 'sdss' else get_des_bands()
+        gmm_parameters_this = gmm_parameters.get(survey)
+        if gmm_parameters_this is not None:
+            bands = getattr(utils, 'get_{}_bands'.format(survey))() # pylint: disable=E1102
             base_this['P_GMM'] = ensure_proper_prob(calc_gmm_satellite_probability(
                 base_this,
                 gmm_parameters_this,
@@ -185,17 +186,16 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
             base_this['P_GMM'] = 0
             base_this['log_L_GMM'] = 0
 
-        if survey == 'decals':
-            priority_cut = Query('(gr-abs(gr_err)) < 0.6')
-        else:
-            priority_cut = Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6')
-            if survey == 'sdss':
-                priority_cut &= Query('-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08',
-                                      '-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5')
+        priority_cut = Query('gr - abs(gr_err) < (1.55 - 0.05*r_mag)')
+        if survey in ('sdss', 'des'):
+            priority_cut &= Query('(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6')
+        if survey == 'sdss':
+            priority_cut &= Query('-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08',
+                                  '-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5')
 
         veryhigh_p = Query('P_GMM >= 0.95', 'log_L_GMM >= -7')
         high_p = Query('P_GMM >= 0.6', 'log_L_GMM >= -7') | Query('log_L_GMM < -7', 'ri-abs(ri_err) < -0.25')
-        sb_cut = Query('sb_r >= 0.7 * r_mag + 8')
+        sb_cut = Query('sb_r > 0.6 * (r_mag - abs(r_err)) + 10.1')
         bright = C.sdss_limit
 
         if low_priority_objids is not None:
