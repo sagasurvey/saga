@@ -8,7 +8,8 @@ from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 from ..database import FitsTable, Database
 from ..hosts import HostCatalog
-from ..utils import get_sdss_bands, get_all_colors, add_skycoord, fill_values_by_query
+from .. import utils
+from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
 
 
 __all__ = ['ObjectCatalog', 'get_unique_objids']
@@ -46,13 +47,15 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
+    _surveys = ('sdss', 'des', 'decals')
+
     def __init__(self, database=None, host_catalog_class=HostCatalog):
         self._database = database or Database()
         self._host_catalog = host_catalog_class(self._database)
 
 
-    @staticmethod
-    def _annotate_catalog(table, to_add_skycoord=False):
+    @classmethod
+    def _annotate_catalog(cls, table, add_skycoord=False, ensure_all_objid_cols=False):
         if 'EXTINCTION_R' in table.colnames:
             for b in get_sdss_bands():
                 table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
@@ -63,24 +66,33 @@ class ObjectCatalog(object):
             table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
             table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
 
-        if to_add_skycoord:
-            table = add_skycoord(table)
+        if ensure_all_objid_cols:
+            for s in cls._surveys:
+                col = 'OBJID_{}'.format(s)
+                if col not in table.colnames:
+                    table[col] = -1
+
+        if add_skycoord:
+            table = utils.add_skycoord(table)
 
         return table
 
 
     @staticmethod
-    def _slice_columns(table, columns, to_add_skycoord=False):
+    def _slice_table(table, query=None, columns=None, add_skycoord=False):
+        if query is not None:
+            table = table[Query(query).mask(table)]
+
         if columns is not None:
             table = table[columns]
 
-        if to_add_skycoord:
-            table = add_skycoord(table)
+        if add_skycoord:
+            table = utils.add_skycoord(table)
 
         return table
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, to_add_skycoord=True):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, add_skycoord=True, ensure_all_objid_cols=False):
         """
         load object catalogs (aka "base catalogs")
 
@@ -107,6 +119,12 @@ class ObjectCatalog(object):
 
         version : int or str, optional
             Set to 'paper1' for paper1 catalogs
+
+        add_skycoord : bool, optional (default: True)
+            add `coord` column
+
+        ensure_all_objid_cols : bool, optional (default: False)
+            make sure `OBJID_sdss`, `OBJID_des`, `OBJID_decals` all exist
 
         Returns
         -------
@@ -155,24 +173,23 @@ class ObjectCatalog(object):
 
             if hosts is not None:
                 host_ids = self._host_catalog.resolve_id(hosts, 'NSA')
-                t = Query((lambda x: np.in1d(x, host_ids), 'HOST_NSAID')).filter(t)
+                t = self._slice_table(t, (lambda x: np.in1d(x, host_ids), 'HOST_NSAID'))
 
             t = self._annotate_catalog(t)
 
-            if cuts is not None:
-                t = Query(cuts).filter(t)
+            if return_as[0] == 's':
+                return self._slice_table(t, cuts, columns, add_skycoord)
 
-            if return_as[0] != 's':
-                if hosts is None:
-                    host_ids = np.unique(t['HOST_NSAID'])
-                output_iterator = (self._slice_columns(Query('HOST_NSAID == {}'.format(i)).filter(t), columns, to_add_skycoord) for i in host_ids)
-                if return_as[0] == 'i':
-                    return output_iterator
-                if return_as[0] == 'd':
-                    return dict(zip(host_ids, output_iterator))
-                return list(output_iterator)
-
-            return self._slice_columns(t, columns, to_add_skycoord)
+            if hosts is None:
+                host_ids = np.unique(t['HOST_NSAID'])
+            output_iterator = (
+                self._slice_table(t, Query(cuts, 'HOST_NSAID == {}'.format(i)), columns, add_skycoord)
+                for i in host_ids)
+            if return_as[0] == 'i':
+                return output_iterator
+            if return_as[0] == 'd':
+                return dict(zip(host_ids, output_iterator))
+            return list(output_iterator)
 
         q = Query(cuts)
         if has_spec:
@@ -183,10 +200,14 @@ class ObjectCatalog(object):
         hosts = self._host_catalog.resolve_id(hosts, 'string')
 
         output_iterator = (
-            self._slice_columns(
-                q.filter(self._annotate_catalog(self._database[base_key, host].read())),
+            self._slice_table(
+                self._annotate_catalog(
+                    self._database[base_key, host].read(),
+                    ensure_all_objid_cols=ensure_all_objid_cols
+                ),
+                q,
                 columns,
-                (to_add_skycoord and return_as[0] != 's')
+                (add_skycoord and return_as[0] != 's')
             ) for host in hosts
         )
 
@@ -201,8 +222,8 @@ class ObjectCatalog(object):
                     if dtype.kind == 'b':
                         out[name].fill_value = False
             out = out.filled()
-            if to_add_skycoord:
-                out = add_skycoord(out)
+            if add_skycoord:
+                out = utils.add_skycoord(out)
             return out
         if return_as[0] == 'd':
             return dict(zip(hosts, output_iterator))
@@ -228,7 +249,7 @@ class ObjectCatalog(object):
         nsa = nsa[cols][~remove_mask]
         for nsaid, fixes in fixes_dict.items():
             fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
-        nsa = add_skycoord(nsa)
+        nsa = utils.add_skycoord(nsa)
         return nsa
 
 
