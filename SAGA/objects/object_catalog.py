@@ -55,7 +55,7 @@ class ObjectCatalog(object):
 
 
     @classmethod
-    def _annotate_catalog(cls, table, add_skycoord=False, ensure_all_objid_cols=False):
+    def _annotate_catalog(cls, table, add_skycoord=False, ensure_all_objid_cols=False, fix_2df_lowz_zq=False):
         if 'EXTINCTION_R' in table.colnames:
             for b in get_sdss_bands():
                 table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
@@ -75,6 +75,14 @@ class ObjectCatalog(object):
         if add_skycoord:
             table = utils.add_skycoord(table)
 
+        # TODO: remove this in the future:
+        if fix_2df_lowz_zq:
+            fill_values_by_query(
+                table,
+                Query((lambda x: ((x == '2dF') | (x == '2dFLen')), 'TELNAME'), 'ZQUALITY == 3', 'SPEC_Z < 0.05'),
+                {'ZQUALITY': 2}
+            )
+
         return table
 
 
@@ -92,7 +100,7 @@ class ObjectCatalog(object):
         return table
 
 
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, add_skycoord=True, ensure_all_objid_cols=False):
+    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, add_skycoord=True, ensure_all_objid_cols=False, fix_2df_lowz_zq=True):
         """
         load object catalogs (aka "base catalogs")
 
@@ -203,7 +211,8 @@ class ObjectCatalog(object):
             self._slice_table(
                 self._annotate_catalog(
                     self._database[base_key, host].read(),
-                    ensure_all_objid_cols=ensure_all_objid_cols
+                    ensure_all_objid_cols=ensure_all_objid_cols,
+                    fix_2df_lowz_zq=fix_2df_lowz_zq,
                 ),
                 q,
                 columns,

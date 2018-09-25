@@ -9,7 +9,6 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
-from ..utils import fill_values_by_query
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -143,12 +142,6 @@ class TargetSelection(object):
                     version=self._version,
                     add_skycoord=False,
                 ).pop()
-                # TODO: remove the following at a later time:
-                fill_values_by_query(
-                    self.target_catalogs[host_id],
-                    Query((lambda x: ((x == '2dF') | (x == '2dFLen')), 'TELNAME'), 'ZQUALITY == 3', 'SPEC_Z < 0.05'),
-                    {'ZQUALITY': 2}
-                )
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self.assign_targeting_score(
