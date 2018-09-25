@@ -141,7 +141,7 @@ class TargetSelection(object):
                     columns=self.columns,
                     return_as='list',
                     version=self._version,
-                    to_add_skycoord=False,
+                    add_skycoord=False,
                 ).pop()
                 # TODO: remove the following at a later time:
                 fill_values_by_query(
