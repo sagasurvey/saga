@@ -9,6 +9,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
+from ..utils import fill_values_by_query
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -59,7 +60,9 @@ class TargetSelection(object):
         else:
             self.assign_targeting_score_kwargs = dict(assign_targeting_score_kwargs)
 
-        if isinstance(gmm_parameters, dict):
+        if gmm_parameters is None:
+            self._gmm_parameters = {k: self._load_gmm_parameters(k) for k in ('sdss', 'des', 'decals')}
+        elif isinstance(gmm_parameters, dict):
             self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
         else:
             self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
@@ -92,11 +95,16 @@ class TargetSelection(object):
 
 
     def _load_gmm_parameters(self, gmm_parameters):
+        if gmm_parameters in ('sdss', 'des', 'decals'):
+            gmm_parameters = 'gmm_parameters_' + gmm_parameters
+            default_return = None
+        else:
+            default_return = gmm_parameters
+
         try:
             return self._database[gmm_parameters].read()
         except (TypeError, KeyError):
-            return gmm_parameters
-
+            return default_return
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
                               reload_base=False, recalculate_score=False):
@@ -127,10 +135,20 @@ class TargetSelection(object):
 
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:
-                self.target_catalogs[host_id] = self._object_catalog.load(host_id, \
-                        cuts=self._cuts, columns=self.columns, return_as='list', version=self._version).pop()
-                if 'coord' in self.target_catalogs[host_id].colnames:
-                    del self.target_catalogs[host_id]['coord']
+                self.target_catalogs[host_id] = self._object_catalog.load(
+                    host_id,
+                    cuts=self._cuts,
+                    columns=self.columns,
+                    return_as='list',
+                    version=self._version,
+                    to_add_skycoord=False,
+                ).pop()
+                # TODO: remove the following at a later time:
+                fill_values_by_query(
+                    self.target_catalogs[host_id],
+                    Query((lambda x: ((x == '2dF') | (x == '2dFLen')), 'TELNAME'), 'ZQUALITY == 3', 'SPEC_Z < 0.05'),
+                    {'ZQUALITY': 2}
+                )
 
             if recalculate_score or 'TARGETING_SCORE' not in self.target_catalogs[host_id].colnames:
                 self.assign_targeting_score(
@@ -147,11 +165,11 @@ class TargetSelection(object):
         output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
         if return_as[0] == 'd':
             return dict(zip(host_ids, output_iter))
-        elif return_as[0] == 'i':
+        if return_as[0] == 'i':
             return output_iter
-        elif return_as[0] == 'l':
+        if return_as[0] == 'l':
             return list(output_iter)
-        elif return_as[0] == 's':
+        if return_as[0] == 's':
             out = vstack(list(output_iter), 'outer', 'error')
             if out.masked:
                 for name, (dtype, _) in out.dtype.fields.items():
@@ -215,13 +233,13 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
 
     if 'PHOTPTYPE' in target_catalog.colnames:
-        is_star = Query('PHOTPTYPE == 6')
+        is_star = Query('PHOTPTYPE == 6', 'REMOVE == -1')
         mags = {b: 'PSFMAG_{}'.format(b.upper) for b in 'ugr'}
     elif 'OBJID_sdss' in target_catalog.colnames:
-        is_star = Query('OBJID_sdss != -1', 'morphology_info_sdss == 6')
+        is_star = Query('OBJID_sdss != -1', 'morphology_info_sdss == 6', 'REMOVE_sdss == 0')
         mags = {b: '{}_mag_sdss'.format(b) for b in 'ugr'}
     else:
-        is_star = (~Query('is_galaxy'))
+        is_star = Query(~Query('is_galaxy'), 'REMOVE == 0')
         mags = {b: '{}_mag'.format(b) for b in 'ugr'}
 
     is_guide_star = is_star & Query('{r} >= 14'.format(**mags), '{r} < 15'.format(**mags))
@@ -390,8 +408,13 @@ def prepare_aat_catalog(target_catalog, write_to=None, verbose=True,
     dec_sky = np.concatenate(dec_sky)[:sky_fiber_needed]
 
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
-    is_des = Query((lambda s: s == 'des', 'survey'))
-    is_star = Query('morphology_info == 0', is_des) | Query(~is_des, ~Query('is_galaxy'))
+
+    is_star = Query(~Query('is_galaxy'), 'REMOVE == 0')
+    if 'morphology_info_sdss' in target_catalog.colnames:
+        is_star &= Query('morphology_info_sdss == 6')
+    if 'morphology_info_des' in target_catalog.colnames:
+        is_star &= Query('morphology_info_des == 0')
+
     is_flux_star = Query(is_star, 'r_mag >= {}'.format(flux_star_r_range[0]), 'r_mag < {}'.format(flux_star_r_range[1]))
     is_flux_star &= Query('gr >= {}'.format(flux_star_gr_range[0]), 'gr < {}'.format(flux_star_gr_range[1]))
 
