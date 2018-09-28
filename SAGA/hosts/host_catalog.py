@@ -18,6 +18,8 @@ _mmt_2018a_nsa = (161174, 52773, 163956, 69028, 144953, 165082, 165707, 145729, 
 _mmt_2018b_nsa = (126115, 129237, 129387, 132339, 149781, 149977, 150307, 150578, 150887, 61945, 169439, 153017)
 _aat_2018a_nsa = (3469, 141465, 165082, 145398, 145729, 145879)
 _aat_2018a_pgc = (64427, 66318, 66934, 67146, 67663, 67817, 68128, 69521, 70094, 71548, 71729, 2052, 3089)
+_aat_2018b_nsa = (133355,)
+_aat_2018b_pgc = (64427, 67817, 66934, 67146, 2052, 9747, 67663, 70094, 10965, 1952, 71729)
 
 def _is_string_like(obj):
     """
@@ -70,6 +72,7 @@ class HostCatalog(object):
         'aat_2018a_has_sdss': Query((lambda x: np.in1d(x, _aat_2018a_nsa), 'NSAID')),
         'aat_2018a_des_only': Query((lambda x: np.in1d(x, _aat_2018a_pgc), 'PGC')),
         'aat_2018a': Query((lambda x, y: np.in1d(x, _aat_2018a_nsa) | np.in1d(y, _aat_2018a_pgc), 'NSAID', 'PGC')),
+        'aat_2018b': Query((lambda x, y: np.in1d(x, _aat_2018b_nsa) | np.in1d(y, _aat_2018b_pgc), 'NSAID', 'PGC')),
         'no_flags': Query('flag == 0'),
         'flag0': Query('flag == 0'),
         'has_sdss': Query('flag == 0'),
