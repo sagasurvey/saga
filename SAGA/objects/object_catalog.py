@@ -121,6 +121,7 @@ class ObjectCatalog(object):
             If set to 'stacked' (default when `has_spec` is True), return a stacked table
             If set to 'iter', return an iterator for looping over hosts
             If set to 'dict', return a dictionary with host ids being the keys
+            If set to 'items', return an iterator like dict.items()
 
         columns : list, optional
             If set, only load a subset of columns
@@ -220,6 +221,10 @@ class ObjectCatalog(object):
             ) for host in hosts
         )
 
+        if return_as.startswith('item'):
+            return zip(hosts, output_iterator)
+        if return_as[0] == 'd':
+            return dict(zip(hosts, output_iterator))
         if return_as[0] == 'i':
             return output_iterator
         if return_as[0] == 's':
@@ -234,8 +239,6 @@ class ObjectCatalog(object):
             if add_skycoord:
                 out = utils.add_skycoord(out)
             return out
-        if return_as[0] == 'd':
-            return dict(zip(hosts, output_iterator))
         return list(output_iterator)
 
 

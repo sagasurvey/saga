@@ -120,8 +120,9 @@ class TargetSelection(object):
             If set to None (default), no return
             If set to 'dict', return as a dict
             If set to 'list', return a list that contains all tables
-            If set to 'stacked', return a stacked table
+            If set to 'stack', return a stacked table
             If set to 'iter', return an iterator for looping over hosts
+            If set to 'items', return an iterator like dict.items()
 
         columns : list, optional
             If set, only return a subset of columns
@@ -156,6 +157,8 @@ class TargetSelection(object):
             return
 
         output_iter = (self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids)
+        if return_as.startswith('item'):
+            return zip(host_ids, output_iter)
         if return_as[0] == 'd':
             return dict(zip(host_ids, output_iter))
         if return_as[0] == 'i':
