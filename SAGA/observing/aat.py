@@ -10,9 +10,8 @@ from astropy import table
 from astropy.coordinates import SkyCoord, Angle
 
 __all__ = ['get_gaia_guidestars', 'get_sdss_guidestars', 'write_fld_file',
-           'subsample_catalog', 'infer_radec_cols',
-           'make_decals_viewer_cutouts', 'make_des_cutouts_file',
-           'show_des_cutouts']
+           'subsample_catalog', 'make_decals_viewer_cutouts',
+            'make_des_cutouts_file', 'show_des_cutouts']
 
 def get_gaia_guidestars(hostname, host_catalog, object_catalog, magrng=(12.5, 13.5),
                         matchmagrng=(16, 17), d_matchmag=1, matchtol0=1*u.arcsec,
