@@ -505,9 +505,10 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
 def add_spectra(base, specs, debug=None):
 
-    specs['ZQUALITY_sort_key'] = 3 - specs['ZQUALITY']
+    # map ZQ >=4, 3, 2, <=1 to 0, 1, 2, 3
+    specs['ZQUALITY_sort_key'] = 4 - specs['ZQUALITY']
     fill_values_by_query(specs, 'ZQUALITY_sort_key < 0', {'ZQUALITY_sort_key': 0})
-    fill_values_by_query(specs, 'ZQUALITY_sort_key > 2', {'ZQUALITY_sort_key': 2})
+    fill_values_by_query(specs, 'ZQUALITY_sort_key > 3', {'ZQUALITY_sort_key': 3})
 
     add_skycoord(base)
     base_this = base['REMOVE', 'is_galaxy', 'r_mag', 'coord']
