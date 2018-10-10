@@ -608,6 +608,11 @@ def remove_shreds_near_spec_obj(base, nsa=None):
 
         else:
             remove_radius = 2.0 * obj_this['radius']
+
+            # HOT FIX for 219806824 in pgc67817
+            if obj_this['OBJID'] == 219806824:
+                remove_radius = 60.0
+
             nearby_obj_mask = (base['coord'].separation(obj_this['coord']).arcsec < remove_radius)
             remove_flag = 29
 
