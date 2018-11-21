@@ -209,7 +209,7 @@ class SdssQuery(object):
         q = cls._query_template.format(**locals())
         q = re.sub(r'[^\S\n]+', ' ', q).strip()
         if not select_into_mydb:
-            q = q.replace('INTO mydb.{} '.format(db_table_name), '')
+            q = q.replace('INTO mydb.{}'.format(db_table_name), '')
         return q
 
 
