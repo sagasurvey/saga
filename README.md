@@ -36,7 +36,7 @@ All required dependencies will be installed automatically. There are two optiona
    
    * To install sciservevr:
      ```sh
-     pip install -e "git+https://github.com/sciserver/SciScript-Python.git#egg=SciServer-1.10.2&subdirectory=py3"
+     pip install -e "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.1#egg=SciServer-2.0.0&subdirectory=py3"
      ```
    In both cases you need to set environmental variables to store your credentials. (`CASJOBS_WSID` and `CASJOBS_PW` for casjobs; `SCISERVER_USER` and `SCISERVER_PASS` for sciserver). 
    
@@ -54,7 +54,16 @@ All required dependencies will be installed automatically. There are two optiona
         ```sh
         pip install https://github.com/nirinA/kcorrect_python/archive/master.zip
         ```
+
+3. Extreme Deconvolution
    
+   You only need to install [Extreme Deconvolution](https://github.com/jobovy/extreme-deconvolution) if you want to build GMM (you don't need it to use GMMs). 
+
+   ```sh
+   pip install https://github.com/jobovy/extreme-deconvolution/archive/master.zip
+   ```
+
+
 ## Example Usage
 
 See more examples at https://github.com/sagasurvey/examples/tree/master/notebooks
