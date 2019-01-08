@@ -15,6 +15,7 @@ known_google_sheets = {
     'decals_recover': GoogleSheets('1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo', 1549289503, include_names=['decals_objid']),
     'manual_targets_aat2018a': GoogleSheets('1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w', 0, include_names=['OBJID']),
     'manual_targets_aat2018b': GoogleSheets('1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w', 478933689, include_names=['OBJID']),
+    'manual_targets_mmt2019a': GoogleSheets('1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w', 85066145, include_names=['OBJID']),
     'lowz_fields': GoogleSheets('1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c', 1883640266),
 }
 
