@@ -185,7 +185,7 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
         if hasattr(col_this, 'filled'):
             return col_this.filled().data
         return col_this.data
-    return np.vstack((_get_data(table[c][row_mask]).astype(dtype, casting='same_kind', copy=False) for c in cols)).T
+    return np.vstack([_get_data(table[c][row_mask]).astype(dtype, casting='same_kind', copy=False) for c in cols]).T
 
 
 def makedirs_if_needed(path):
