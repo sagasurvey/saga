@@ -63,7 +63,7 @@ def read_mmt(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 4:'mag', 5:'SPEC_Z', 6:'SPEC_Z_ERR',
                7:'ZQUALITY', 8:'SPECOBJID'}
-    cuts = Query('mag != 0', 'ZQUALITY >= 1')
+    cuts = Query('mag != 0', 'ZQUALITY >= 0')
 
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
@@ -89,7 +89,7 @@ def read_mmt(dir_path, before_time=None):
 def read_aat(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 7:'ZQUALITY', 8:'SPECOBJID'}
-    cuts = Query('ZQUALITY >= 1')
+    cuts = Query('ZQUALITY >= 0')
 
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
@@ -114,7 +114,7 @@ def read_aat(dir_path, before_time=None):
 def read_aat_mz(dir_path, before_time=None):
 
     usecols = {3:'RA', 4:'DEC', 13:'SPEC_Z', 14:'ZQUALITY', 1:'SPECOBJID'}
-    cuts = Query('ZQUALITY >= 1')
+    cuts = Query('ZQUALITY >= 0')
 
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.mz', '.fits.gz'))
@@ -141,7 +141,7 @@ def read_aat_mz(dir_path, before_time=None):
 def read_imacs(dir_path):
 
     usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 6:'SPEC_Z_ERR', 7:'ZQUALITY', 1:'SPECOBJID', 11:'MASKNAME'}
-    cuts = Query('ZQUALITY >= 1')
+    cuts = Query('ZQUALITY >= 0')
     def midprocess(t):
         t['SPECOBJID'] = t['SPECOBJID'].astype('<U48')
         return t
@@ -156,7 +156,7 @@ def read_wiyn(dir_path):
         if not f.endswith('.fits.gz'):
             continue
         this = FitsTable(os.path.join(dir_path, f)).read()[['RA', 'DEC', 'ZQUALITY', 'FID', 'Z', 'Z_ERR']]
-        this = Query('ZQUALITY >= 1').filter(this)
+        this = Query('ZQUALITY >= 0').filter(this)
         this['MASKNAME'] = f
         output.append(this)
 
