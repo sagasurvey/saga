@@ -184,8 +184,10 @@ class TargetSelection(object):
 
 
 def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
-                        flux_star_removal_threshold=20.0,
-                        targeting_score_threshold=900):
+                        flux_star_removal_threshold=25.0,
+                        flux_star_max_number=80,
+                        targeting_score_threshold=900,
+                        seed=None):
     """
     Prepare MMT target catalog.
 
@@ -196,9 +198,17 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
         You can use `TargetSelection.build_target_catalogs` to generate `target_catalog`
     write_to : str, optional
         If set, it will write the catalog in MMT format to `write_to`.
-    flux_star_removal_threshold : float, optional
-        In arcseconds
     verbose : bool, optional
+        If set to True (default), print out useful information
+    flux_star_removal_threshold : float, optional (default: 25)
+        In arcseconds
+    flux_star_max_number : int, optional (default: 80)
+        Maximum number (approximate) of flux stars
+    targeting_score_threshold : int, optional (default: 900)
+        Targets with a score number higher than this value (i.e., priority lower than this value)
+        will be excluded.
+    seed : int or None, optional
+        Random seed to use.
 
     Returns
     -------
@@ -256,16 +266,22 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
     flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
     target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
     sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
+    del flux_star_sc, target_sc
     target_catalog['rank'][flux_star_indices[sep.arcsec < flux_star_removal_threshold]] = 0
     target_catalog = Query('rank > 0').filter(target_catalog)
+
+    flux_star_indices = np.flatnonzero(Query('rank == 1').mask(target_catalog))
+    if flux_star_max_number and len(flux_star_indices) > flux_star_max_number:
+        mask = np.random.RandomState(seed).rand(len(flux_star_indices)) > flux_star_max_number / len(flux_star_indices)
+        target_catalog['rank'][flux_star_indices[mask]] = 9
 
     if verbose:
         print('# of guide stars     =', is_guide_star.count(target_catalog))
         print('# of flux stars      =', is_flux_star.count(target_catalog))
         print('# of rank>1 targets  =', is_target.count(target_catalog))
         for rank in range(1, 9):
-            print('# of rank={} targets ='.format(rank),
-                Query('rank == {}'.format(rank)).count(target_catalog))
+            print('# of rank={} targets  ='.format(rank),
+                  Query('rank == {}'.format(rank)).count(target_catalog))
 
     target_catalog['type'] = 'TARGET'
     target_catalog['type'][is_guide_star.mask(target_catalog)] = 'guide'
