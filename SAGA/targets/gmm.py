@@ -49,9 +49,9 @@ def get_input_data(catalog, bands=tuple(get_sdss_bands()),
     color_errors = [''.join((b1, b2, color_err_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])]
     mag_errors = [b + mag_err_postfix for b in bands[1:-1]]
     X = view_table_as_2d_array(catalog, colors)
-    Xcov = np.stack((np.diag(e*e) for e in view_table_as_2d_array(catalog, color_errors)))
+    Xcov = np.stack([np.diag(e*e) for e in view_table_as_2d_array(catalog, color_errors)])
     if include_covariance:
-        Xcov -= np.stack(((np.diag(e*e, 1) + np.diag(e*e, -1)) for e in view_table_as_2d_array(catalog, mag_errors)))
+        Xcov -= np.stack([(np.diag(e*e, 1) + np.diag(e*e, -1)) for e in view_table_as_2d_array(catalog, mag_errors)])
     return X, Xcov
 
 
@@ -66,7 +66,7 @@ def check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_wei
 
 def calc_log_likelihood(data, data_cov, gmm_means, gmm_covs, gmm_weights):
     if gmm_covs.ndim == 2:
-        gmm_covs = np.stack((np.diag(c) for c in gmm_covs))
+        gmm_covs = np.stack([np.diag(c) for c in gmm_covs])
     check_calc_log_likelihood_input(data, data_cov, gmm_means, gmm_covs, gmm_weights)
     d = data[:, np.newaxis] - gmm_means
     cov = data_cov[:, np.newaxis] + gmm_covs
@@ -78,7 +78,7 @@ def calc_log_likelihood(data, data_cov, gmm_means, gmm_covs, gmm_weights):
 
 
 def calc_model1_prob(data, data_cov, model_params, priors=None):
-    p = np.stack((calc_log_likelihood(data, data_cov, *model_params_this) for model_params_this in model_params))
+    p = np.stack([calc_log_likelihood(data, data_cov, *model_params_this) for model_params_this in model_params])
     if priors is not None:
         priors = np.asarray(priors)
         assert len(priors) == len(p) and (priors > 0).all()

@@ -202,11 +202,11 @@ def group_by(x, is_sorted=False):
     if not len(x):
         return
     if is_sorted:
-        edges = np.flatnonzero(np.hstack(([1], np.ediff1d(x), [1])))
+        edges = np.flatnonzero(np.hstack([[1], np.ediff1d(x), [1]]))
         for i, j in zip(edges[:-1], edges[1:]):
             yield slice(i, j)
     else:
         sorter = np.argsort(x)
-        edges = np.flatnonzero(np.hstack(([1], np.ediff1d(x[sorter]), [1])))
+        edges = np.flatnonzero(np.hstack([[1], np.ediff1d(x[sorter]), [1]]))
         for i, j in zip(edges[:-1], edges[1:]):
             yield sorter[i:j]

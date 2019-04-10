@@ -270,7 +270,7 @@ def merge_catalogs(debug=None, **catalog_dict):
             reassign_group_indices=True,
         )
         stacked_catalog.sort(['group_id', 'REMOVE', 'r_mag'])
-        idx = np.flatnonzero(np.hstack(([1], np.ediff1d(stacked_catalog['group_id']))))
+        idx = np.flatnonzero(np.hstack([[1], np.ediff1d(stacked_catalog['group_id'])]))
         stacked_catalog['chosen'] = 0
         stacked_catalog['chosen'][idx] = 2
         del idx

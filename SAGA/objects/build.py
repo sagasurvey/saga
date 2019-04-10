@@ -740,7 +740,7 @@ def add_stellar_mass(base, cosmology=WMAP9):
     # CONVERT SDSS MAGNITUDES INTO MAGGIES
     mgy = 10.0 ** (-0.4 * mag)
     mgy_ivar = (0.4 * np.log(10.0) * mgy * mag_err) ** -2.0
-    kcorrect_input = np.hstack((redshift, mgy, mgy_ivar))
+    kcorrect_input = np.hstack([redshift, mgy, mgy_ivar])
 
     # USE ASTROPY TO CALCULATE LUMINOSITY DISTANCE
     lf_distmod = cosmology.distmod(redshift.ravel()).value
