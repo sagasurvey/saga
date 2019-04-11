@@ -205,11 +205,8 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
         Targets with a score number higher than this value (i.e., priority lower than this value)
         will be excluded.
     flux_star_kwargs : dict or None, optional
-        min_dist_to_target : 0.4 (arcmin)
-        max_dist_to_target : 10  (arcmin)
-        min_dist_to_center : 4   (arcmin)
-        max_density : 30 (per sq deg)
-        seed : None
+        min_dist_to_target : 20 (arcsec)
+        rank : 5
 
     Returns
     -------
