@@ -278,7 +278,7 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
         flux_star_kwargs = {}
 
     fs_min_dist_to_target = max(0, float(flux_star_kwargs.get('min_dist_to_target', 20))) #arcsec
-    fs_rank = int(flux_star_kwargs.get('rank', 4))
+    fs_rank = int(flux_star_kwargs.get('rank', 5))
 
     if fs_rank < 1 or fs_rank > 8:
         raise ValueError('not a valid rank value for flux stars')
