@@ -9,6 +9,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, Angle
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
+from ..utils import add_skycoord
 from .assign_targeting_score import assign_targeting_score_v1, assign_targeting_score_v2, COLUMNS_USED
 
 __all__ = ['TargetSelection', 'prepare_mmt_catalog', 'prepare_aat_catalog']
@@ -184,11 +185,8 @@ class TargetSelection(object):
 
 
 def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
-                        flux_star_target_removal_threshold_arcsec=25.0,
-                        flux_star_center_removal_threshold_arcsec=250.0,
-                        flux_star_max_number=90,
-                        targeting_score_threshold=900,
-                        seed=None):
+                        remove_outskirts=True, targeting_score_threshold=900,
+                        flux_star_kwargs=None):
     """
     Prepare MMT target catalog.
 
@@ -201,15 +199,17 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
         If set, it will write the catalog in MMT format to `write_to`.
     verbose : bool, optional
         If set to True (default), print out useful information
-    flux_star_target_removal_threshold_arcsec : float, optional (default: 25)
-    flux_star_center_removal_threshold_arcsec : float, optional (default: 300)
-    flux_star_max_number : int, optional (default: 80)
-        Maximum number (approximate) of flux stars
+    remove_outskirts : bool, optional
+        If set to True (default), remove targets that is outside of 400 kpc AND 40 arcmin.
     targeting_score_threshold : int, optional (default: 900)
         Targets with a score number higher than this value (i.e., priority lower than this value)
         will be excluded.
-    seed : int or None, optional
-        Random seed to use.
+    flux_star_kwargs : dict or None, optional
+        min_dist_to_target : 0.4 (arcmin)
+        max_dist_to_target : 10  (arcmin)
+        min_dist_to_center : 4   (arcmin)
+        max_density : 30 (per sq deg)
+        seed : None
 
     Returns
     -------
@@ -236,6 +236,9 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
     if 'TARGETING_SCORE' not in target_catalog.colnames:
         return KeyError('`target_catalog` does not have column "TARGETING_SCORE".'
                         'Have you run `compile_target_list` or `assign_targeting_score`?')
+
+    if remove_outskirts:
+        target_catalog = (Query('RHOST_KPC < 400.0') | Query('RHOST_ARCM < 40.0')).filter(target_catalog)
 
     is_target = Query('TARGETING_SCORE >= 0', 'TARGETING_SCORE < {}'.format(targeting_score_threshold))
 
@@ -267,36 +270,43 @@ def prepare_mmt_catalog(target_catalog, write_to=None, verbose=True,
     target_catalog['rank'][is_flux_star.mask(target_catalog)] = 1
     target_catalog['rank'][is_guide_star.mask(target_catalog)] = 99 # set to 99 for sorting
 
-    flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
-    flux_star_sc = SkyCoord(*target_catalog[['RA', 'DEC']][flux_star_indices].itercols(), unit='deg')
+    is_guide_star = Query('rank == 99')
+    is_flux_star = Query('rank == 1')
+    is_target = Query('rank >= 2', 'rank <= 8')
 
-    if flux_star_center_removal_threshold_arcsec:
-        host_sc = SkyCoord(target_catalog['HOST_RA'][0], target_catalog['HOST_DEC'][0], unit='deg')
-        mask = flux_star_sc.separation(host_sc).arcsec < flux_star_center_removal_threshold_arcsec
-        target_catalog['rank'][flux_star_indices[mask]] = 0
-        flux_star_indices = flux_star_indices[~mask]
-        flux_star_sc = flux_star_sc[~mask]
+    if flux_star_kwargs is None:
+        flux_star_kwargs = {}
 
-    if flux_star_target_removal_threshold_arcsec:
-        target_sc = SkyCoord(*is_target.filter(target_catalog)[['RA', 'DEC']].itercols(), unit='deg')
-        sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-        del target_sc
-        target_catalog['rank'][flux_star_indices[sep.arcsec < flux_star_target_removal_threshold_arcsec]] = 0
+    fs_min_dist_to_target = max(0, float(flux_star_kwargs.get('min_dist_to_target', 20))) #arcsec
+    fs_rank = int(flux_star_kwargs.get('rank', 4))
 
-    del flux_star_sc
-    target_catalog = Query('rank > 0').filter(target_catalog)
+    if fs_rank < 1 or fs_rank > 8:
+        raise ValueError('not a valid rank value for flux stars')
+    if fs_rank > 1:
+        target_catalog['rank'][is_flux_star.mask(target_catalog)] = 0
+        target_catalog['rank'][Query('rank >= 2', 'rank <= {}'.format(fs_rank)).mask(target_catalog)] -= 1
+        target_catalog['rank'][Query('rank == 0').mask(target_catalog)] = fs_rank
+        is_flux_star = Query('rank == {}'.format(fs_rank))
+        is_target = Query('rank >= 1', 'rank <= 8', 'rank != {}'.format(fs_rank))
 
-    flux_star_indices = np.flatnonzero(Query('rank == 1').mask(target_catalog))
-    if flux_star_max_number and len(flux_star_indices) > flux_star_max_number:
-        mask_idx = np.random.RandomState(seed).choice(len(flux_star_indices), len(flux_star_indices)-flux_star_max_number, False)
-        target_catalog['rank'][flux_star_indices[mask_idx]] = 9
+    if fs_min_dist_to_target:
+        target_catalog = add_skycoord(target_catalog)
+        flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
+        is_target_mask = is_target.mask(target_catalog)
+        sep = target_catalog['coord'][flux_star_indices].match_to_catalog_sky(target_catalog['coord'][is_target_mask])[1].arcsec
+        target_catalog['rank'][flux_star_indices[sep < fs_min_dist_to_target]] = 0
+        target_catalog = Query('rank > 0').filter(target_catalog)
+        del target_catalog['coord']
 
     if verbose:
-        print('# of guide stars     =', is_guide_star.count(target_catalog))
-        print('# of flux stars      =', is_flux_star.count(target_catalog))
-        print('# of galaxy targets  =', is_target.count(target_catalog))
-        for rank in range(1, 10):
-            print('# of rank={} targets  ='.format(rank),
+        print('host diameter in deg   =', np.rad2deg(np.arcsin(0.3 / target_catalog['HOST_DIST'][0]))*2)
+        print('flux star ranked at    =', fs_rank)
+        print('# of guide stars       =', is_guide_star.count(target_catalog))
+        print('# of total targets     =', (is_flux_star | is_target).count(target_catalog))
+        print('# of flux star targets =', is_flux_star.count(target_catalog))
+        print('# of galaxy targets    =', is_target.count(target_catalog))
+        for rank in range(1, 9):
+            print('# of rank-{} targets    ='.format(rank),
                   Query('rank == {}'.format(rank)).count(target_catalog))
 
     target_catalog['type'] = 'TARGET'

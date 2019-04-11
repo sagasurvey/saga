@@ -12,6 +12,9 @@ Examples
 from easyquery import Query
 import numpy as np
 
+def _vectorize(mask_func):
+    return lambda c: np.fromiter(map(mask_func, c), np.bool, len(c))
+
 COLUMNS_USED = ['ZQUALITY', 'REMOVE', 'PHOTPTYPE', 'FIBERMAG_R', 'SPEC_Z',
                 'RHOST_KPC', 'HOST_VHOST', 'SATS', 'OBJ_NSAID', 'HOST_NSAID',
                 'SPEC_REPEAT', 'r_mag', 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err']
@@ -19,7 +22,7 @@ COLUMNS_USED = ['ZQUALITY', 'REMOVE', 'PHOTPTYPE', 'FIBERMAG_R', 'SPEC_Z',
 COLUMNS_USED2 = ['ZQUALITY', 'REMOVE', 'is_galaxy', 'SPEC_Z',
                  'RHOST_KPC', 'HOST_VHOST', 'SATS', 'SPEC_REPEAT',
                  'r_mag', 'i_mag',
-                 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err', 'rz', 'rz_err']
+                 'ug', 'ug_err', 'gr', 'gr_err', 'ri', 'ri_err', 'rz', 'rz_err', 'sb_r']
 
 has_spec = Query('ZQUALITY >= 3')
 is_clean = Query('REMOVE == -1')
@@ -44,6 +47,11 @@ valid_i_mag = Query('i_mag > 0', 'i_mag < 30')
 grz_cut = (gr_cut & rz_cut)
 gri_or_grz_cut = (gr_cut & ((valid_i_mag & ri_cut) | (~valid_i_mag & rz_cut)))
 
+high_priority_cuts = Query(
+    'gr - abs(gr_err) < (1.55 - 0.05*r_mag)',
+    'sb_r > 0.6 * (r_mag - abs(r_err)) + 10.1',
+)
+
 is_sat = Query('SATS == 1')
 
 is_high_z = Query('SPEC_Z >= 0.03')
@@ -51,8 +59,16 @@ is_low_z = Query('SPEC_Z >= 0.0038', 'SPEC_Z <= 0.015')
 
 obj_is_host = Query('OBJ_NSAID == HOST_NSAID')
 
-has_sdss_spec = Query((lambda c: np.fromiter(('SDSS' in i for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
-has_sdss_nsa_spec = Query((lambda c: np.fromiter((('SDSS' in i) or ('NSA' in i) for i in c), np.bool, len(c)), 'SPEC_REPEAT'))
-
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
+
+has_sdss_spec = Query((_vectorize(lambda x: 'SDSS' in x), 'SPEC_REPEAT'))
+has_nsa_spec = Query((_vectorize(lambda x: 'NSA' in x), 'SPEC_REPEAT'))
+has_sdss_nsa_spec = Query((_vectorize(lambda x: 'SDSS' in x or 'NSA' in x), 'SPEC_REPEAT'))
+
+has_aat_spec = Query((_vectorize(lambda x: 'AAT' in x), 'SPEC_REPEAT'))
+has_mmt_spec = Query((_vectorize(lambda x: 'MMT' in x), 'SPEC_REPEAT'))
+
+_known_telnames = {'2dF', '6dF', 'SDSS', 'NSA', 'GAMA', 'OzDES', '2dFLen', 'UKST', 'LCRS', 'slack'}
+has_our_specs_only = Query((_vectorize(lambda x: x and set(x.split('+')).isdisjoint(_known_telnames)), 'SPEC_REPEAT'))
+has_our_specs = Query((_vectorize(lambda x: x and not set(x.split('+')).issubset(_known_telnames)), 'SPEC_REPEAT'))
