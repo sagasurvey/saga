@@ -109,6 +109,7 @@ class Database(object):
                 'ukst': self._tables['spectra_ukst'],
                 'slackers': self._tables['spectra_slackers'],
             },
+            self._tables['spectra_halpha'],
         ))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')

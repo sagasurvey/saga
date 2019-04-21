@@ -10,9 +10,10 @@ from ..utils import add_skycoord
 __all__ = ['SpectraData']
 
 class SpectraData(object):
-    def __init__(self, spectra_dir_path=None, external_specs_dict=None):
+    def __init__(self, spectra_dir_path=None, external_specs_dict=None, halpha_data_obj=None):
         self.spectra_dir_path = spectra_dir_path
         self._external_specs_dict = external_specs_dict or {}
+        self.halpha_data_obj = halpha_data_obj
 
     def read(self, add_coord=True, before_time=None, additional_specs=None):
         all_specs = []
