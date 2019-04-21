@@ -94,6 +94,7 @@ class Database(object):
                 FileObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat'), format='ascii.fast_commented_header'),
                 use_local_first=True
             ),
+            'spectra_halpha': DataObject(FileObject(os.path.join(self._shared_dir, 'Spectra', 'saga_halpha.dat'), format='ascii.fast_basic')),
         }
 
         self._tables['spectra_raw_all'] = DataObject(SpectraData(
