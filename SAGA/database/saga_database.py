@@ -215,3 +215,7 @@ class Database(object):
 
     def keys(self):
         return self._tables.keys()
+
+
+    def _ipython_key_completions_(self):
+        return list(self.keys())
