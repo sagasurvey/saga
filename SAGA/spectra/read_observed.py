@@ -43,13 +43,15 @@ def read_generic_spectra(dir_path, extension, telname, usecols, n_cols_total,
         except (IOError, CParserError) as e:
             logging.warning('SKIPPING spectra file {}/{} - could not read or parse\n{}'.format(dir_path, f, e))
             continue
+        this = ensure_specs_dtype(this, skip_missing_cols=True)
         this = Query(cuts).filter(this)
+        if not len(this):
+            continue
         if 'MASKNAME' not in this.colnames:
             this['MASKNAME'] = f
         if midprocess:
             this = midprocess(this)
-        if this is not None:
-            output.append(this)
+        output.append(this)
 
     output = vstack(output, 'exact', 'error')
     output['TELNAME'] = telname
@@ -63,7 +65,7 @@ def read_mmt(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 4:'mag', 5:'SPEC_Z', 6:'SPEC_Z_ERR',
                7:'ZQUALITY', 8:'SPECOBJID'}
-    cuts = Query('mag != 0', 'ZQUALITY >= 0')
+    cuts = Query('mag != 0', 'ZQUALITY >= 0', (lambda x: x != '0', 'SPECOBJID'))
 
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
@@ -89,7 +91,7 @@ def read_mmt(dir_path, before_time=None):
 def read_aat(dir_path, before_time=None):
 
     usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 7:'ZQUALITY', 8:'SPECOBJID'}
-    cuts = Query('ZQUALITY >= 0')
+    cuts = Query('ZQUALITY >= 0', (lambda x: x != '0', 'SPECOBJID'))
 
     def midprocess(t):
         fits_filepath = os.path.join(dir_path, t['MASKNAME'][0].replace('.zlog', '.fits.gz'))
@@ -140,12 +142,9 @@ def read_aat_mz(dir_path, before_time=None):
 
 def read_imacs(dir_path):
 
-    usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 6:'SPEC_Z_ERR', 7:'ZQUALITY', 1:'SPECOBJID', 11:'MASKNAME'}
-    cuts = Query('ZQUALITY >= 0')
-    def midprocess(t):
-        t['SPECOBJID'] = t['SPECOBJID'].astype('<U48')
-        return t
-    return read_generic_spectra(dir_path, '.zlog', 'IMACS', usecols, 12, cuts, midprocess=midprocess)
+    usecols = {2:'RA', 3:'DEC', 5:'SPEC_Z', 6:'SPEC_Z_ERR', 7:'ZQUALITY', 8:'SPECOBJID', 11:'MASKNAME'}
+    cuts = Query('ZQUALITY >= 1', (lambda x: x != '0', 'SPECOBJID'))
+    return read_generic_spectra(dir_path, '.zlog', 'IMACS', usecols, 12, cuts)
 
 
 def read_wiyn(dir_path):
@@ -156,7 +155,7 @@ def read_wiyn(dir_path):
         if not f.endswith('.fits.gz'):
             continue
         this = FitsTable(os.path.join(dir_path, f)).read()[['RA', 'DEC', 'ZQUALITY', 'FID', 'Z', 'Z_ERR']]
-        this = Query('ZQUALITY >= 0').filter(this)
+        this = Query('ZQUALITY >= 1').filter(this)
         this['MASKNAME'] = f
         output.append(this)
 
@@ -180,7 +179,7 @@ def read_deimos():
         'RA'         : [247.825839103498, 221.86742, 150.12470],
         'DEC'        : [20.210825313885, -0.28144459, 32.561687],
         'MASKNAME'   : ['deimos2014', 'deimos2016-DN1', 'deimos2016-MD1'],
-        'SPECOBJID'  : [0, 0, 0],
+        'SPECOBJID'  : [1, 1, 1],
         'SPEC_Z'     : [2375 / SPEED_OF_LIGHT, 0.056, 1.08],
         'SPEC_Z_ERR' : [0.001, 0.001, 0.001],
         'ZQUALITY'   : [4, 4, 4],
@@ -194,7 +193,7 @@ def read_palomar():
         'RA'         : [248.048926969, 335.696461603],
         'DEC'        : [19.902625348, -3.311516291],
         'MASKNAME'   : ['PAL', 'PAL'],
-        'SPECOBJID'  : ['', ''],
+        'SPECOBJID'  : [1, 2],
         'SPEC_Z'     : [0.0907, 0.0524],
         'SPEC_Z_ERR' : [0.0001, 0.0001],
         'ZQUALITY'   : [4, 4],

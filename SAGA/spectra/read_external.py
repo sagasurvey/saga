@@ -161,7 +161,7 @@ def read_lcrs(file_path):
     """
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    specs = file_path.read()['_RAJ2000', '_DEJ2000', 'p', 'cz', 'e_cz']
+    specs = file_path.read()['_RAJ2000', '_DEJ2000', 'Field', 'p', 'cz', 'e_cz']
 
     specs = specs[specs['cz'] != np.iinfo(np.int32).min]
     specs['SPEC_Z'] = specs['cz'].astype(np.float64) / SPEED_OF_LIGHT
@@ -170,6 +170,7 @@ def read_lcrs(file_path):
 
     specs.rename_column('_RAJ2000', 'RA')
     specs.rename_column('_DEJ2000', 'DEC')
+    specs.rename_column('Field', 'MASKNAME')
     specs.rename_column('p', 'SPECOBJID')
 
     specs['ZQUALITY'] = 4
@@ -184,16 +185,17 @@ def read_slackers(file_path):
     """
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
-    specs = file_path.read()['OBJ_RA', 'OBJ_DEC', 'ID', 'WFCCD_ZQUAL', 'WFCCD_Z', 'WFCCD_ZERR']
+    specs = file_path.read()['OBJ_RA', 'OBJ_DEC', 'WFCCD_ZQUAL', 'WFCCD_Z', 'WFCCD_ZERR', 'WFCCD_MASKNAME', 'WFCCD_SLITID']
 
     specs = Query('WFCCD_ZQUAL >= 3').filter(specs)
 
     specs.rename_column('OBJ_RA', 'RA')
     specs.rename_column('OBJ_DEC', 'DEC')
-    specs.rename_column('ID', 'SPECOBJID')
     specs.rename_column('WFCCD_ZQUAL', 'ZQUALITY')
     specs.rename_column('WFCCD_Z', 'SPEC_Z')
     specs.rename_column('WFCCD_ZERR', 'SPEC_Z_ERR')
+    specs.rename_column('WFCCD_MASKNAME', 'MASKNAME')
+    specs.rename_column('WFCCD_SLITID', 'SPECOBJID')
 
     specs['TELNAME'] = 'slack'
     specs['HELIO_CORR'] = True

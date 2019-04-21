@@ -94,6 +94,7 @@ class Database(object):
                 FileObject(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dflens_final.dat'), format='ascii.fast_commented_header'),
                 use_local_first=True
             ),
+            'spectra_halpha': DataObject(FileObject(os.path.join(self._shared_dir, 'Spectra', 'saga_halpha.dat'), format='ascii.fast_basic')),
         }
 
         self._tables['spectra_raw_all'] = DataObject(SpectraData(
@@ -108,6 +109,7 @@ class Database(object):
                 'ukst': self._tables['spectra_ukst'],
                 'slackers': self._tables['spectra_slackers'],
             },
+            self._tables['spectra_halpha'],
         ))
 
         gmm_dir = os.path.join(self._shared_dir, 'AuxiliaryData', 'gmm')
@@ -215,3 +217,7 @@ class Database(object):
 
     def keys(self):
         return self._tables.keys()
+
+
+    def _ipython_key_completions_(self):
+        return list(self.keys())
