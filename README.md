@@ -36,7 +36,7 @@ All required dependencies will be installed automatically. There are two optiona
    
    * To install sciservevr:
      ```sh
-     pip install -e "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.1#egg=SciServer-2.0.0&subdirectory=py3"
+     pip install -e "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.13#egg=SciServer-2.0.13&subdirectory=py3"
      ```
    In both cases you need to set environmental variables to store your credentials. (`CASJOBS_WSID` and `CASJOBS_PW` for casjobs; `SCISERVER_USER` and `SCISERVER_PASS` for sciserver). 
    
