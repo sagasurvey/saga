@@ -16,14 +16,18 @@ _SPECS_COLUMNS = (
     ('TELNAME', '<U6'),
     ('EM_ABS', '<i2'),
     ('HELIO_CORR', '|b1'),
+    ('EW_Halpha', '<f8'),
+    ('EW_Halpha_err', '<f8'),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
 
-def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS):
+def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_cols=False):
     cols_iter = cols_definition.items() if isinstance(cols_definition, dict) else cols_definition
     for c, t in cols_iter:
         if c not in spectra.colnames:
+            if skip_missing_cols:
+                continue
             if t[1] == 'f':
                 spectra[c] = np.nan
             elif t[1] == 'i':
