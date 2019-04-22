@@ -3,7 +3,7 @@ SAGA.host.host_catalog
 
 This file defines the HostCatalog class
 """
-from collections import defaultdict, Iterable
+from collections import defaultdict
 import numpy as np
 from easyquery import Query
 
@@ -165,7 +165,7 @@ class HostCatalog(object):
         elif isinstance(hosts, int) and hosts in self._host_index:
             indices = list(self._host_index[hosts])
 
-        elif isinstance(hosts, Iterable):
+        elif hasattr(hosts, '__iter__'):
             for host in hosts:
                 indices.extend(self.resolve_id(host, id_to_return='internal'))
 
@@ -291,7 +291,7 @@ class FieldCatalog(HostCatalog):
             if field_ids in self._field_index:
                 indices.append(self._field_index[field_ids])
 
-        elif isinstance(field_ids, Iterable):
+        elif hasattr(field_ids, '__iter__'):
             for field_id in field_ids:
                 indices.extend(self.resolve_id(field_id, id_to_return='internal'))
 
