@@ -6,7 +6,7 @@ from easyquery import Query
 from . import cuts as C
 from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
-from ..database import FitsTable, Database
+from ..database import FitsTable, Database, FileObject, DataObject
 from ..hosts import HostCatalog
 from .. import utils
 from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
@@ -405,33 +405,41 @@ class ObjectCatalog(object):
             return catalogs_to_return
 
 
-    def generate_clean_specs(self, hosts='all', version=None, annotate=False):
+    def generate_clean_specs(self, save_to=None, **kwargs):
         """
-        gather spectra from all base catalogs
+        generate clean spectra from all good base catalogs and save to disk
         """
-        surveys = ('sdss', 'des', 'decals')
-        base_key = 'base' if version is None else 'base_v{}'.format(version)
-        out = []
+        defaults = dict(
+            hosts='good',
+            has_spec=True,
+            cuts=C.is_clean2,
+            return_as='stack',
+            add_skycoord=False,
+            ensure_all_objid_cols=True,
+        )
 
-        for host in set(self._host_catalog.resolve_id(hosts, 'string')):
-            try:
-                base = self._database[base_key, host].read()
-            except IOError:
-                print('[WARNING] cannot find base catalog for', host)
+        defaults.update(kwargs)
 
-            base = C.has_spec.filter(base)
+        t = self.load(**defaults)
 
-            if version != 1:
-                cols = [col for col in base.colnames if col.startswith('OBJID_') or not any(col.endswith('_'+s) for s in surveys)]
-                base = base[cols]
-                for s in surveys:
-                    key = 'OBJID_' + s
-                    if key not in base.colnames:
-                        base[key] = -1
+        if save_to is not False:
+            if save_to is None:
+                save_to = self._database['saga_clean_specs']
+            if not isinstance(save_to, (FileObject, DataObject)):
+                save_to = FitsTable(save_to)
+            save_to.write(t)
 
-            out.append(base)
+        return t
 
-        out = vstack(out, 'exact', 'error')
-        if annotate:
-            out = self._annotate_catalog(out)
-        return out
+    def load_clean_specs(self, generate_if_not_exist=True, **kwargs):
+        """
+        load clean spectra from all good base catalogs
+        """
+        try:
+            t = self._database['saga_clean_specs'].read()
+        except IOError:
+            if generate_if_not_exist:
+                t = self.generate_clean_specs(**kwargs)
+            else:
+                raise
+        return t

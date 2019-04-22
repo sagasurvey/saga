@@ -69,6 +69,7 @@ class Database(object):
 
         self._tables = {
             'saga_spectra_May2017': DataObject(FitsTable(os.path.join(self._shared_dir, 'Products', 'saga_spectra_May2017.fits.gz'))),
+            'saga_clean_specs': DataObject(FitsTable(os.path.join(self._local_dir, 'saga_clean_specs.fits.gz'))),
             'nsa_v1.0.1': DataObject(FitsTable('https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits'),
                                      FitsTable(os.path.join(self._local_dir, 'external_catalogs', 'nsa', 'nsa_v1_0_1.fits')),
                                      use_local_first=True),
