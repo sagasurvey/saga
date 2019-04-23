@@ -405,7 +405,7 @@ class ObjectCatalog(object):
             return catalogs_to_return
 
 
-    def generate_clean_specs(self, save_to=None, **kwargs):
+    def generate_clean_specs(self, save_to=None, overwrite=False, **kwargs):
         """
         generate clean spectra from all good base catalogs and save to disk
         """
@@ -427,7 +427,7 @@ class ObjectCatalog(object):
                 save_to = self._database['saga_clean_specs']
             if not isinstance(save_to, (FileObject, DataObject)):
                 save_to = FitsTable(save_to)
-            save_to.write(t)
+            save_to.write(t, overwrite=overwrite)
 
         return t
 
