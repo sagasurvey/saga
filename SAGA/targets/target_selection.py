@@ -60,12 +60,7 @@ class TargetSelection(object):
         else:
             self.assign_targeting_score_kwargs = dict(assign_targeting_score_kwargs)
 
-        if gmm_parameters is None:
-            self._gmm_parameters = {k: self._load_gmm_parameters(k) for k in ('sdss', 'des', 'decals')}
-        elif isinstance(gmm_parameters, dict):
-            self._gmm_parameters = {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
-        else:
-            self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
+        self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
             self._manual_selected_objids = get_unique_objids(self._database[manual_selected_objids or 'manual_targets'].read()['OBJID'])
@@ -95,16 +90,24 @@ class TargetSelection(object):
 
 
     def _load_gmm_parameters(self, gmm_parameters):
-        if gmm_parameters in ('sdss', 'des', 'decals'):
-            gmm_parameters = 'gmm_parameters_' + gmm_parameters
-            default_return = None
-        else:
-            default_return = gmm_parameters
+        prefix = 'gmm_parameters_'
+        keys = [k[len(prefix):] for k in self._database.keys() if not isinstance(k, tuple) and k.startswith(prefix)]
+
+        if gmm_parameters is None:
+            return {k: self._database[prefix + k].read() for k in keys}
+
+        if isinstance(gmm_parameters, dict):
+            return {k: self._load_gmm_parameters(v) for k, v in gmm_parameters.items()}
 
         try:
-            return self._database[gmm_parameters].read()
-        except (TypeError, KeyError):
-            return default_return
+            if gmm_parameters.startswith(prefix):
+                gmm_parameters = gmm_parameters[len(prefix):]
+        except AttributeError:
+            return gmm_parameters
+
+        if gmm_parameters in keys:
+            return self._database[prefix + gmm_parameters].read()
+
 
     def build_target_catalogs(self, hosts=None, return_as=None, columns=None,
                               reload_base=False, recalculate_score=False):

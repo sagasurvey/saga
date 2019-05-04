@@ -33,6 +33,7 @@ fibermag_r_cut = Query('FIBERMAG_R <= 23.0')
 
 faint_end_limit = Query('r_mag < 20.75')
 sdss_limit = Query('r_mag < 17.77')
+lowz_mag_cut = Query('r_mag > 18', 'r_mag < 20')
 
 sat_vcut = Query('abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0')
 sat_rcut = Query('RHOST_KPC < 300.0')
@@ -61,6 +62,7 @@ obj_is_host = Query('OBJ_NSAID == HOST_NSAID')
 
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
+basic_cut_lowz = is_clean2 & is_galaxy2 & lowz_mag_cut & gri_cut
 
 has_sdss_spec = Query((_vectorize(lambda x: 'SDSS' in x), 'SPEC_REPEAT'))
 has_nsa_spec = Query((_vectorize(lambda x: 'NSA' in x), 'SPEC_REPEAT'))

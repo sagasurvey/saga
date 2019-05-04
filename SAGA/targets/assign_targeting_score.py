@@ -9,7 +9,7 @@ from .. import utils
 from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_all_colors
 from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_data, param_labels_nosat
 
-__all__ = ['assign_targeting_score_v1', 'assign_targeting_score_v2',
+__all__ = ['assign_targeting_score_v1', 'assign_targeting_score_v2', 'assign_targeting_score_lowz',
            'calc_simple_satellite_probability', 'calc_gmm_satellite_probability']
 
 
@@ -276,6 +276,33 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
         if not ignore_specs:
             q &= (~C.has_spec)
         fill_values_by_query(base, q, {'TARGETING_SCORE': 100})
+
+    base.sort('TARGETING_SCORE')
+    return base
+
+
+def assign_targeting_score_lowz(base, manual_selected_objids=None,
+                                gmm_parameters=None, ignore_specs=False,
+                                **kwargs):
+    base['p_GMM'] = calc_gmm_satellite_probability(base, gmm_parameters['des_lowz'], bands='grizy')
+    base['p_GMM_fsps'] = calc_gmm_satellite_probability(base, gmm_parameters['des_lowz_fake'], bands='griz')
+    base['pass_r_gr_cut'] = Query('r_mag < (2-gr)*14').mask(base)
+    base['pass_gr_ri_cut'] = Query('0.5*gr + 0.05 > ri').mask(base)
+    base['pass_r_sb_cut'] = Query('0.9*r_mag + 5.25 < sb_r').mask(base)
+
+    base['TARGETING_SCORE'] = 1000
+    basic = Query('r_mag > 18', 'pass_r_gr_cut', 'pass_gr_ri_cut', 'pass_r_sb_cut')
+    if not ignore_specs:
+        basic &= (~C.has_spec)
+    fill_values_by_query(base, basic, {'TARGETING_SCORE': 900})
+    fill_values_by_query(base, Query(basic, 'p_GMM + p_GMM_fsps > 0.95'), {'TARGETING_SCORE': 800})
+    fill_values_by_query(base, Query(basic, 'p_GMM > 0.6', 'p_GMM_fsps > 0.6'), {'TARGETING_SCORE': 800})
+
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), 'OBJID'))
+        if not ignore_specs:
+            q &= (~C.has_spec)
+        fill_values_by_query(base, q, {'TARGETING_SCORE': 800})
 
     base.sort('TARGETING_SCORE')
     return base
