@@ -211,6 +211,11 @@ def assign_targeting_score_v2(base, manual_selected_objids=None,
             bright = Query(bright, ~over_subtraction)
             sb_cut = Query(sb_cut, ~over_subtraction)
 
+        # remove bright DES stars
+        if survey == 'des':
+            bright_stars = Query('0.7 * (r_mag + 10.2) > sb_r', 'gr < 0.6', 'r_mag < 17')
+            bright = bright & (~bright_stars)
+
         base_this['TARGETING_SCORE'] = 1000
         fill_values_by_query(base_this, C.faint_end_limit, {'TARGETING_SCORE': 900})
         fill_values_by_query(base_this, C.sat_rcut & C.faint_end_limit, {'TARGETING_SCORE': 800})

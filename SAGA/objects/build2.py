@@ -133,6 +133,13 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, co
         catalog['i_mag'] += (-0.0065 - 0.0036 * gi + 0.02672 * gi * gi)
         catalog['z_mag'] += (-0.0438 + 0.02854 * gi)
 
+    # fixing DES bright star misclassification issue
+    fill_values_by_query(catalog, Query(
+        '0.7 * (r_mag + 10.2) > r_mag + 2.5 * log10(8 * arctan(1) * radius**2)',
+        'g_mag - r_mag < 0.6',
+        'r_mag < 17',
+    ), {'is_galaxy': False})
+
     catalog['u_mag'] = 99.0
     catalog['u_err'] = 99.0
 
