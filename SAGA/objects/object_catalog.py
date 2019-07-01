@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 import numpy as np
 from astropy.time import Time
-from astropy.table import vstack, Table
+from astropy.table import vstack, Table, join
 from easyquery import Query
 from . import cuts as C
 from . import build, build2
@@ -523,6 +523,10 @@ class ObjectCatalog(object):
             data = generate_func(host, data)
 
         data = Table(data)
+
+        host_table = self._host_catalog.load()['HOSTID', 'RA', 'Dec', 'distance', 'MK_compiled']
+        host_table.rename_columns(['HOSTID', 'MK_compiled'], ['host', 'M_K'])
+        data = join(data, host_table, 'host', 'left')
 
         if save_to is not None:
             if not isinstance(save_to, (FileObject, DataObject)):
