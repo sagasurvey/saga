@@ -300,12 +300,19 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+        host_ids = self._host_catalog.resolve_id(hosts, 'string')
+        if not host_ids:
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'No host to build! Abort!')
+            return
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'Start to build {} base catalog(s).'.format(len(host_ids)))
+
         if version not in (None, 1, 2):
             raise ValueError('`version` must be None, 1 or 2.')
         build_module = build if version == 1 else build2
 
         if use_nsa:
             nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
+            print(time.strftime('[%m/%d %H:%M:%S]'), 'NSA catalog loaded.')
         else:
             nsa = None
 
@@ -313,6 +320,7 @@ class ObjectCatalog(object):
             before_time=add_specs_only_before_time,
             additional_specs=additional_specs,
         )
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'All spectra loaded.')
 
         manual_lists = {}
         for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
@@ -325,10 +333,9 @@ class ObjectCatalog(object):
                 else:
                     if len(val):
                         manual_lists[key] = val
+        print(time.strftime('[%m/%d %H:%M:%S]'), 'All other manual lists loaded.')
 
         catalogs_to_return = list()
-        host_ids = self._host_catalog.resolve_id(hosts, 'string')
-
         for i, host_id in enumerate(host_ids):
             if base_file_path_pattern is None:
                 base_key = 'base' if version is None else 'base_v{}'.format(version)
@@ -348,7 +355,7 @@ class ObjectCatalog(object):
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
                     print(time.strftime('[%m/%d %H:%M:%S]'), '[WARNING] Not found: {} catalog for {}.'.format(catalog_name.upper(), host_id))
-                    return None
+                    return
                 return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
 
             catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
