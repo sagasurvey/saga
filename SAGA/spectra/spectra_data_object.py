@@ -19,8 +19,13 @@ class SpectraData(object):
     def read(self, add_coord=True, before_time=None, additional_specs=None):
         all_specs = []
 
-        all_specs.extend((getattr(read_external, 'read_'+k.lower())(v) \
-                for k, v in self._external_specs_dict.items()))
+        for k, v in self._external_specs_dict.items():
+            func_name = 'read_' + k.lower()
+            func = getattr(read_external, func_name, None) or getattr(read_observed, func_name, None)
+            if func is None:
+                print('Cannot find function to read {}'.format(k))
+                continue
+            all_specs.extend(func(v))
 
         if self.spectra_dir_path is not None:
             if before_time is not None and not isinstance(before_time, Time):
@@ -36,7 +41,6 @@ class SpectraData(object):
 
         all_specs.extend([
             read_observed.read_deimos(),
-            read_observed.read_palomar(),
         ])
 
         if additional_specs:

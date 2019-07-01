@@ -10,7 +10,7 @@ import astropy.constants
 from easyquery import Query
 
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
-from ..database import FitsTable
+from ..database import FitsTable, CsvTable
 
 __all__ = ['read_mmt', 'read_aat', 'read_aat_mz', 'read_imacs', 'read_wiyn',
            'read_deimos', 'read_palomar']
@@ -188,15 +188,11 @@ def read_deimos():
     return ensure_specs_dtype(Table(data))
 
 
-def read_palomar():
-    data = {
-        'RA'         : [248.048926969, 335.696461603],
-        'DEC'        : [19.902625348, -3.311516291],
-        'MASKNAME'   : ['PAL', 'PAL'],
-        'SPECOBJID'  : [1, 2],
-        'SPEC_Z'     : [0.0907, 0.0524],
-        'SPEC_Z_ERR' : [0.0001, 0.0001],
-        'ZQUALITY'   : [4, 4],
-        'TELNAME'    : ['MMT', 'MMT'],
-    }
-    return ensure_specs_dtype(Table(data))
+def read_palomar(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = CsvTable(file_path)
+
+    cols = ['SPECOBJID', 'RA', 'DEC', 'SPEC_Z', 'SPEC_Z_ERR', 'ZQUALITY', 'MASKNAME', 'TELNAME', 'HELIO_CORR']
+    specs = file_path.read()[cols]
+
+    return ensure_specs_dtype(specs)
