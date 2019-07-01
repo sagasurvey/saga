@@ -95,7 +95,7 @@ class FitsTable(FileObject):
             del hdu_list[1].data
         return t
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         coord = None
         if 'coord' in table.columns and table['coord'].info.dtype.name == 'object':
             coord = table['coord']
@@ -103,7 +103,7 @@ class FitsTable(FileObject):
         file_open = gzip.open if self.compress_after_write else open
         makedirs_if_needed(self.path)
         with file_open(self.path, 'wb') as f_out:
-            table.write(f_out, format='fits')
+            table.write(f_out, format='fits', **kwargs)
         if coord is not None:
             table['coord'] = coord
 
@@ -112,7 +112,7 @@ class NumpyBinary(FileObject):
     def read(self):
         return np.load(self.path, **self.kwargs)
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
         np.savez(self.path, **table)
 
