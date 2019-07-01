@@ -1,6 +1,8 @@
+import os
 import time
 import traceback
 import numpy as np
+from astropy.time import Time
 from astropy.table import vstack
 from easyquery import Query
 from . import cuts as C
@@ -281,6 +283,7 @@ class ObjectCatalog(object):
 
         overwrite : bool, optional (default: False)
             If set to True, overwrite existing base catalog
+            If set to an astropy.time.Time object, overwrite catalogs that are older than that time.
 
         base_file_path_pattern : str, optional
         version : int, optional (default: 2)
@@ -300,6 +303,10 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+
+        if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
+            overwrite = Time(overwrite)
+
         host_ids = self._host_catalog.resolve_id(hosts, 'string')
         if not host_ids:
             print(time.strftime('[%m/%d %H:%M:%S]'), 'No host to build! Abort!')
@@ -343,14 +350,22 @@ class ObjectCatalog(object):
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
-            if data_obj.isfile() and not overwrite:
-                print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version or 2, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
-                continue
+            if data_obj.isfile():
+                if overwrite is False or overwrite is None:
+                    print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version or 2, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
+                    continue
+
+                file_time = Time(os.path.getmtime(data_obj.path), format='unix')
+
+                if file_time > overwrite:
+                    print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog {} ({}) is newer than {}.'.format(host_id, file_time.isot, overwrite.isot), '({}/{})'.format(i+1, len(host_ids)))
+                    continue
 
             host = self._host_catalog.load_single(host_id)
             catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
 
             def get_catalog_or_none(catalog_name):
+                # pylint: disable=cell-var-from-loop
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
