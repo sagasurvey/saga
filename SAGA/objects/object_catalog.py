@@ -525,7 +525,8 @@ class ObjectCatalog(object):
         data = Table(data)
 
         host_table = self._host_catalog.load()['HOSTID', 'RA', 'Dec', 'distance', 'MK_compiled']
-        host_table.rename_columns(['HOSTID', 'MK_compiled'], ['host', 'M_K'])
+        host_table.rename_column('HOSTID', 'host')
+        host_table.rename_column('MK_compiled', 'M_K')
         data = join(data, host_table, 'host', 'left')
 
         if save_to is not None:
