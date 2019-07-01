@@ -89,6 +89,8 @@ class Database(object):
             'spectra_6df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
             'spectra_lcrs': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'LCRS_shectman96.fits'))),
             'spectra_ukst': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'UKST_ratcliffe98.fits'))),
+            'spectra_palomar': DataObject(GoogleSheets('12MM0KdnSb2RdieyUci6DSCnW-h7x0B-bLdxbTkAGhTI', 1276422948),
+                                          CsvTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'SAGA_Palomar - Final.csv'))),
             'spectra_slackers': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'Slackers_unpub.fits'))),
             'spectra_2dflens': DataObject(
                 FileObject('http://2dflens.swin.edu.au/2dflens_bestredshifts_goodz_withtypesandmags_final.dat.gz', format='ascii.fast_commented_header'),
@@ -109,6 +111,7 @@ class Database(object):
                 'lcrs': self._tables['spectra_lcrs'],
                 'ukst': self._tables['spectra_ukst'],
                 'slackers': self._tables['spectra_slackers'],
+                'palomar': self._tables['spectra_palomar'],
             },
             self._tables['spectra_halpha'],
         ))
