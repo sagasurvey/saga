@@ -1,14 +1,15 @@
 import os
 import time
 import traceback
+from collections import defaultdict
 import numpy as np
 from astropy.time import Time
-from astropy.table import vstack
+from astropy.table import vstack, Table
 from easyquery import Query
 from . import cuts as C
 from . import build, build2
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
-from ..database import FitsTable, Database, FileObject, DataObject
+from ..database import FitsTable, Database, FileObject, DataObject, CsvTable
 from ..hosts import HostCatalog
 from .. import utils
 from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
@@ -465,3 +466,67 @@ class ObjectCatalog(object):
             else:
                 raise
         return t
+
+    def _generate_object_stats_single_host(self, host, data=None):
+        if data is None:
+            data = defaultdict(list)
+
+        data['host'].append(host)
+        base = self.load(host, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False).pop()
+
+        simple_cuts = (C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut)
+        high_p_cuts = (Query('r_mag > 12') & C.high_priority_cuts)
+
+        simple_mask = simple_cuts.mask(base)
+        high_p_mask = high_p_cuts.mask(base)
+        high_p_mask &= simple_mask
+        has_spec_mask = C.has_spec.mask(base)
+        sats_mask = C.is_sat.mask(base)
+        low_z_mask = C.is_low_z.mask(base)
+        low_z_mask &= (~sats_mask)
+        our_specs_mask = C.has_our_specs_only.mask(base)
+        our_specs_mask &= has_spec_mask
+        aat_mask = C.has_aat_spec.mask(base)
+        mmt_mask = C.has_mmt_spec.mask(base)
+
+        data['need_spec'].append(np.count_nonzero(simple_mask & (~has_spec_mask)))
+        data['really_need_spec'].append(np.count_nonzero(high_p_mask & (~has_spec_mask)))
+
+        data['specs_total'].append(np.count_nonzero(has_spec_mask))
+        data['low_z_total'].append(np.count_nonzero(has_spec_mask & low_z_mask))
+        data['sats_total'].append(np.count_nonzero(sats_mask))
+
+        data['specs_ours'].append(np.count_nonzero(our_specs_mask))
+        data['low_z_ours'].append(np.count_nonzero(our_specs_mask & low_z_mask))
+        data['sats_ours'].append(np.count_nonzero(our_specs_mask & sats_mask))
+
+        data['specs_aat'].append(np.count_nonzero(has_spec_mask & aat_mask))
+        data['specs_mmt'].append(np.count_nonzero(has_spec_mask & mmt_mask))
+
+        return data
+
+    def generate_object_stats(self, hosts=None, save_to=None, overwrite=False, generate_func=None):
+        """
+        generate object statistics for *hosts*
+        """
+
+        if hosts is None:
+            hosts = sorted(self._host_catalog.resolve_id('good'))
+        else:
+            hosts = self._host_catalog.resolve_id(hosts)
+
+        if generate_func is None:
+            generate_func = self._generate_object_stats_single_host
+
+        data = None
+        for host in hosts:
+            data = generate_func(host, data)
+
+        data = Table(data)
+
+        if save_to is not None:
+            if not isinstance(save_to, (FileObject, DataObject)):
+                save_to = CsvTable(save_to)
+            save_to.write(data, overwrite=overwrite)
+
+        return data
