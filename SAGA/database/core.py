@@ -38,9 +38,9 @@ class FileObject(object):
     def read(self):
         return Table.read(self.path, **self.kwargs)
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
-        return table.write(self.path)
+        return table.write(self.path, **kwargs)
 
     def download_as_file(self, file_path, overwrite=False, compress=False):
         makedirs_if_needed(file_path)
@@ -70,9 +70,9 @@ class CsvTable(FileObject):
     def read(self):
         return Table.read(self.path, format='ascii.csv', **self.kwargs)
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
-        return table.write(self.path, format='ascii.csv')
+        return table.write(self.path, format='ascii.csv', **kwargs)
 
 
 class GoogleSheets(CsvTable):
