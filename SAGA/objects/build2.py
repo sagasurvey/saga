@@ -442,7 +442,8 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs['OBJ_NSAID'] = np.int32(-1)
     specs['chosen'] = False
 
-    tel_ranks = dict(MMT=0, AAT=1, NSA=2, SDSS=4) # all other telnames get 3
+    def get_tel_rank(tel, _ranks=dict(MMT=0, AAT=1, PAL=2, NSA=3, SDSS=5)): # pylint: disable=dangerous-default-value
+        return _ranks.get(tel, 4)
 
     for group_slice in group_by(specs['matched_idx'], True):
         # matched_idx < 0 means there is no match, so nothing to do
@@ -462,7 +463,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         # now it's the real thing, we have more than one specs
         # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
         specs_to_merge = specs[group_slice]
-        rank = np.fromiter((tel_ranks.get(t, 3) for t in specs_to_merge['TELNAME']), np.int, len(specs_to_merge))
+        rank = np.fromiter(map(get_tel_rank, specs_to_merge['TELNAME']), np.int, len(specs_to_merge))
         rank += (10 - specs_to_merge['ZQUALITY']) * (rank.max() + 1)
         rank = rank.astype(np.float) + np.where(
             Query((np.isfinite, 'SPEC_Z_ERR'), 'SPEC_Z_ERR > 0', 'SPEC_Z_ERR < 1').mask(specs_to_merge),
