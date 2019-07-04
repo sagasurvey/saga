@@ -351,7 +351,7 @@ class ObjectCatalog(object):
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
-            if data_obj.isfile():
+            if data_obj.isfile() and overwrite is not True:
                 if overwrite is False or overwrite is None:
                     print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version or 2, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
                     continue
