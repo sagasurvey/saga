@@ -144,8 +144,8 @@ def read_wigglez(file_path):
     specs.rename_column('WIGGLEZ', 'SPECOBJID')
     specs.rename_column('RAJ2000', 'RA')
     specs.rename_column('DEJ2000', 'DEC')
-    specs.rename_column('Q_Z', 'ZQUALITY')
-    specs.rename_column('Z', 'SPEC_Z')
+    specs.rename_column('q_z', 'ZQUALITY')
+    specs.rename_column('z', 'SPEC_Z')
 
     # LOWZ REDSHIFTS IN WIGGLEZ ARE PROBLEMATIC, SET ZQ = 2       
     fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
