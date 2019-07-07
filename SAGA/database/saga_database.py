@@ -87,6 +87,7 @@ class Database(object):
                                             use_local_first=True),
             'spectra_2df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '2dF', '2dF_best.fit'))),
             'spectra_6df': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', '6dF', '6dF_DR3.fit'))),
+            'spectra_wigglez': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'WiggleZ', 'Wigglez.fits'))),
             'spectra_lcrs': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'LCRS_shectman96.fits'))),
             'spectra_ukst': DataObject(FitsTable(os.path.join(self._shared_dir, 'Spectra', 'Final', 'other', 'UKST_ratcliffe98.fits'))),
             'spectra_palomar': DataObject(GoogleSheets('12MM0KdnSb2RdieyUci6DSCnW-h7x0B-bLdxbTkAGhTI', 1276422948),
