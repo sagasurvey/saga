@@ -47,7 +47,7 @@ def read_2df(file_path):
     specs.rename_column('n_z', 'EM_ABS')
 
     fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
-    fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
+    #fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
 
     specs['SPEC_Z_ERR'] = 60 / SPEED_OF_LIGHT
     specs['TELNAME'] = '2dF'
@@ -71,7 +71,7 @@ def read_2dflens(file_path):
     specs.rename_column('z', 'SPEC_Z')
 
     fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
-    fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
+    #fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
 
     specs['SPECOBJID'] = ['2dFLenS_{}'.format(i) for i in range(len(specs))]
     specs['SPEC_Z_ERR'] = 60 / SPEED_OF_LIGHT
