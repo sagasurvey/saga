@@ -109,7 +109,7 @@ class Database(object):
                 '2dflens': self._tables['spectra_2dflens'],
                 '6df': self._tables['spectra_6df'],
                 'ozdes': self._tables['spectra_ozdes_dr1'],
-                'wigglez': self._tables['spectra_wiggelz'],
+                'wigglez': self._tables['spectra_wigglez'],
                 'lcrs': self._tables['spectra_lcrs'],
                 'ukst': self._tables['spectra_ukst'],
                 'slackers': self._tables['spectra_slackers'],
