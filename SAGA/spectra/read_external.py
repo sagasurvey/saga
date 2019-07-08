@@ -141,7 +141,7 @@ def read_wigglez(file_path):
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
     specs = Query('q_z >= 3').filter(specs)
 
-    specs.rename_column('WIGGLEZ', 'SPECOBJID')
+    specs.rename_column('WiggleZ', 'SPECOBJID')
     specs.rename_column('RAJ2000', 'RA')
     specs.rename_column('DEJ2000', 'DEC')
     specs.rename_column('q_z', 'ZQUALITY')
