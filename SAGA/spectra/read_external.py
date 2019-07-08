@@ -136,7 +136,7 @@ def read_wigglez(file_path):
     if not hasattr(file_path, 'read'):
         file_path = FitsTable(file_path)
 
-    specs = file_path.read()['RAJ2000', 'DEJ2000', 'Name', 'z', 'q_z']
+    specs = file_path.read()['RAJ2000', 'DEJ2000', 'WIGGLEZ', 'z', 'q_z']
 
     # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
     specs = Query('q_z >= 3').filter(specs)
