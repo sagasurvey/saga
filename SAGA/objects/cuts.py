@@ -71,6 +71,6 @@ has_sdss_nsa_spec = Query((_vectorize(lambda x: 'SDSS' in x or 'NSA' in x), 'SPE
 has_aat_spec = Query((_vectorize(lambda x: 'AAT' in x), 'SPEC_REPEAT'))
 has_mmt_spec = Query((_vectorize(lambda x: 'MMT' in x), 'SPEC_REPEAT'))
 
-_known_telnames = {'2dF', '6dF', 'SDSS', 'NSA', 'GAMA', 'OzDES', '2dFLen', 'UKST', 'LCRS', 'slack'}
+_known_telnames = {'2dF', '6dF', 'SDSS', 'NSA', 'GAMA', 'OzDES', '2dFLen', 'WIGGZ' ,'UKST', 'LCRS', 'slack'}
 has_our_specs_only = Query((_vectorize(lambda x: x and set(x.split('+')).isdisjoint(_known_telnames)), 'SPEC_REPEAT'))
 has_our_specs = Query((_vectorize(lambda x: x and not set(x.split('+')).issubset(_known_telnames)), 'SPEC_REPEAT'))

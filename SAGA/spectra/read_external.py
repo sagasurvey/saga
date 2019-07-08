@@ -46,6 +46,7 @@ def read_2df(file_path):
     specs.rename_column('z', 'SPEC_Z')
     specs.rename_column('n_z', 'EM_ABS')
 
+    # LOWZ REDSHIFTS IN 2dF ARE PROBLEMATIC, SET ZQ = 2       
     fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
     fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
 
@@ -70,6 +71,7 @@ def read_2dflens(file_path):
     specs.rename_column('qual', 'ZQUALITY')
     specs.rename_column('z', 'SPEC_Z')
 
+    # LOWZ REDSHIFTS IN 2dFLENS ARE PROBLEMATIC, SET ZQ = 2       
     fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
     fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
 
@@ -125,6 +127,33 @@ def read_ozdes(file_path):
     specs['SPEC_Z_ERR'] = 60 / SPEED_OF_LIGHT
     specs['TELNAME'] = 'OzDES'
     specs['MASKNAME'] = 'OzDES'
+    specs['HELIO_CORR'] = True
+
+    return ensure_specs_dtype(specs)
+
+
+def read_wigglez(file_path):
+    if not hasattr(file_path, 'read'):
+        file_path = FitsTable(file_path)
+
+    specs = file_path.read()['RAJ2000', 'DEJ2000', 'WiggleZ', 'z', 'q_z']
+
+    # 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
+    specs = Query('q_z >= 3').filter(specs)
+
+    specs.rename_column('WiggleZ', 'SPECOBJID')
+    specs.rename_column('RAJ2000', 'RA')
+    specs.rename_column('DEJ2000', 'DEC')
+    specs.rename_column('q_z', 'ZQUALITY')
+    specs.rename_column('z', 'SPEC_Z')
+
+    # LOWZ REDSHIFTS IN WIGGLEZ ARE PROBLEMATIC, SET ZQ = 2       
+    fill_values_by_query(specs, 'ZQUALITY > 4', {'ZQUALITY': 4})
+    fill_values_by_query(specs, Query('ZQUALITY == 3', 'SPEC_Z < 0.05'), {'ZQUALITY': 2})
+
+    specs['SPEC_Z_ERR'] = 60 / SPEED_OF_LIGHT
+    specs['TELNAME'] = 'WIGGZ'
+    specs['MASKNAME'] = 'WIGGZ'
     specs['HELIO_CORR'] = True
 
     return ensure_specs_dtype(specs)
