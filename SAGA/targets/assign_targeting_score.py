@@ -10,7 +10,8 @@ from ..utils import fill_values_by_query, get_sdss_bands, get_sdss_colors, get_a
 from .gmm import calc_gmm_satellite_probability, calc_log_likelihood, get_input_data, param_labels_nosat
 
 __all__ = ['assign_targeting_score_v1', 'assign_targeting_score_v2', 'assign_targeting_score_lowz',
-           'calc_simple_satellite_probability', 'calc_gmm_satellite_probability']
+           'calc_simple_satellite_probability', 'calc_gmm_satellite_probability',
+           'calc_simple_satellite_probability_gri', 'calc_simple_satellite_probability_grz']
 
 
 COLUMNS_USED = list(set(chain(C.COLUMNS_USED, ['TELNAME'],
@@ -20,16 +21,27 @@ COLUMNS_USED = list(set(chain(C.COLUMNS_USED, ['TELNAME'],
                               map('{}_err'.format, get_sdss_colors()))))
 
 
-def calc_simple_satellite_probability(base,
-                                      model_parameters=(-0.84526783,
-                                                        -0.53434289,
-                                                        -1.0123662441968917,
-                                                        0.18628167890581865,
-                                                        9.4021013202593942,
-                                                        0.055890285233031099)):
-    x = np.asarray(base['gr'])*model_parameters[0] + np.asarray(base['ri'])*model_parameters[1]
+def _calc_simple_satellite_probability(base, model_parameters, colors):
+    x = np.asarray(base[colors[0]])*model_parameters[0] + np.asarray(base[colors[1]])*model_parameters[1]
+    x = np.where(np.isfinite(x), x, 9999)
     return np.where(x > model_parameters[2], np.minimum(np.exp((x-model_parameters[3])*model_parameters[4]), model_parameters[5]), 0.0)
 
+def calc_simple_satellite_probability_gri(base):
+    return _calc_simple_satellite_probability(
+        base,
+        (-0.84526783, -0.53434289, -1.0123662441968917, 0.18628167890581865, 9.4021013202593942, 0.055890285233031099),
+        ('gr', 'ri')
+    )
+
+def calc_simple_satellite_probability_grz(base):
+    return _calc_simple_satellite_probability(
+        base,
+        (-0.6394620175672536, -0.7688226896292912, -1.3123654045614568, 0.30417493992455574,
+ 5.029875624196831, 0.04425228193300764),
+        ('gr', 'rz')
+    )
+
+calc_simple_satellite_probability = calc_simple_satellite_probability_gri
 
 def ensure_proper_prob(p):
     p[np.isnan(p)] = 0
