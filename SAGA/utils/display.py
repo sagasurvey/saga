@@ -1,15 +1,16 @@
 from IPython.display import display_html
 
 def show_images(table, pixscale=0.2, size=200,
-                keys=('OBJID', 'RA', 'DEC', 'survey', 'r_mag', 'sb_r', 'gr', 'RHOST_KPC')):
+                keys=('OBJID', 'RA', 'DEC', 'survey', 'r_mag', 'sb_r', 'gr', 'RHOST_KPC'), layer='auto'):
     out = []
     for row in table:
-        if row['survey'] == 'des':
-            layer = 'des-dr1'
-        elif row['survey'] == 'decals':
-            layer = 'mzls+bass-dr6' if row['DEC'] > 32 else 'decals-dr7'
-        else:
-            layer = 'sdssco'
+        if layer == 'auto':
+            if row['survey'] == 'des':
+                layer = 'des-dr1'
+            elif row['survey'] == 'decals':
+                layer = 'dr8'
+            else:
+                layer = 'sdss2'
 
         host_id = 'nsa{}'.format(row['HOST_NSAID']) if row['HOST_NSAID'] != -1 else 'pgc{}'.format(row['HOST_PGC'])
 
