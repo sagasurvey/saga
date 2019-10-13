@@ -20,14 +20,10 @@ Quantity Label | Unit | Definition
 `radius` | arcsec | Effective radius of object
 `<band>_mag` | - | ugriz-mag from primary survey, e.g.,  `r_mag`, [99 if no measurement]
 `<band>_err` | - | ugriz magnitude error from primary survey, e.g.,  `r_err`, [99 if no measurement]
-
 `survey` | - | Primary survey source for photometry [SDSS, DES, LS]
-
 `TELNAME` | - | Primary source for spectroscopy
 `SPEC_Z` | - |  Redshift of object (-1 if not measured)
 `ZQUALITY` | - |  Quality of redshift (use if >=3)
-
-
 `HOST_NSAID` | - |  NSAID of host (v0)
 `HOST_NGC` | - |  NGC name of host
 `HOST_PGC` | - |  PGC name of host
