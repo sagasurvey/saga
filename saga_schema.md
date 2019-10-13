@@ -1,8 +1,6 @@
 # Schema for SAGA Data Release 2 (DR2) Base Catalogs 
 
 
-## Schema
-
 - Data for SDSS DR14, DES DR1 and LS DR6/7 are included where
   available.
 
