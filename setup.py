@@ -10,27 +10,34 @@ http://opensource.org/licenses/MIT
 import os
 from setuptools import setup, find_packages
 
-with open(os.path.join(os.path.dirname(__file__), 'SAGA', 'version.py')) as f:
-    exec(f.read()) # pylint: disable=W0122
+with open(os.path.join(os.path.dirname(__file__), "SAGA", "version.py")) as f:
+    exec(f.read())  # pylint: disable=W0122
 
 setup(
-    name='SAGA',
-    version=__version__, # pylint: disable=E0602
-    description='Code to access, create and edit SAGA Survey data catalogs.',
-    url='https://github.com/sagasurvey/saga',
-    author='The SAGA Survey',
-    author_email='saga@sagasurvey.org',
-    maintainer='Yao-Yuan Mao',
-    maintainer_email='yymao.astro@gmail.com',
-    license='MIT',
+    name="SAGA",
+    version=__version__,  # pylint: disable=E0602 # noqa: F821
+    description="Code to access, create and edit SAGA Survey data catalogs.",
+    url="https://github.com/sagasurvey/saga",
+    author="The SAGA Survey",
+    author_email="saga@sagasurvey.org",
+    maintainer="Yao-Yuan Mao",
+    maintainer_email="yymao.astro@gmail.com",
+    license="MIT",
     classifiers=[
-        'Intended Audience :: Developers',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: MIT License',
-        'Topic :: Scientific/Engineering :: Astronomy',
-        'Programming Language :: Python :: 3.6',
+        "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: MIT License",
+        "Topic :: Scientific/Engineering :: Astronomy",
+        "Programming Language :: Python :: 3.6",
     ],
-    keywords='SAGA',
+    keywords="SAGA",
     packages=find_packages(),
-    install_requires=['numpy', 'numexpr', 'astropy', 'easyquery>=0.1.2', 'requests', 'fast3tree>=0.3.1'],
+    install_requires=[
+        "numpy>=1.9",
+        "numexpr>=2.0",
+        "astropy>=2.0",
+        "easyquery>=0.1.5",
+        "requests>=2.0",
+        "fast3tree>=0.3.1",
+    ],
 )

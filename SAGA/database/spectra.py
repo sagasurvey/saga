@@ -1,1 +1,1 @@
-raise ImportError('Deprecated! Use `SAGA.spectra` instead!')
+raise ImportError("Deprecated! Use `SAGA.spectra` instead!")
