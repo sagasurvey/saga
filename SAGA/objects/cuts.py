@@ -9,13 +9,7 @@ Examples
 >>> is_sat.filter(base_table)
 """
 
-from easyquery import Query
-import numpy as np
-
-
-def _vectorize(mask_func):
-    return lambda c: np.fromiter(map(mask_func, c), np.bool, len(c))
-
+from easyquery import Query, QueryMaker
 
 COLUMNS_USED = [
     "ZQUALITY",
@@ -100,14 +94,13 @@ basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
 basic_cut_lowz = is_clean2 & is_galaxy2 & lowz_mag_cut & gri_cut
 
-has_sdss_spec = Query((_vectorize(lambda x: "SDSS" in x), "SPEC_REPEAT"))
-has_nsa_spec = Query((_vectorize(lambda x: "NSA" in x), "SPEC_REPEAT"))
-has_sdss_nsa_spec = Query(
-    (_vectorize(lambda x: "SDSS" in x or "NSA" in x), "SPEC_REPEAT")
-)
+has_sdss_spec = QueryMaker.contains("SPEC_REPEAT", "SDSS")
+has_nsa_spec = QueryMaker.contains("SPEC_REPEAT", "NSA")
+has_sdss_nsa_spec = has_sdss_spec | has_nsa_spec
 
-has_aat_spec = Query((_vectorize(lambda x: "AAT" in x), "SPEC_REPEAT"))
-has_mmt_spec = Query((_vectorize(lambda x: "MMT" in x), "SPEC_REPEAT"))
+has_aat_spec = QueryMaker.contains("SPEC_REPEAT", "AAT")
+has_mmt_spec = QueryMaker.contains("SPEC_REPEAT", "MMT")
+has_aat_mmt_spec = has_aat_spec | has_mmt_spec
 
 _known_telnames = {
     "2dF",
@@ -122,21 +115,12 @@ _known_telnames = {
     "LCRS",
     "slack",
 }
-has_our_specs_only = Query(
-    (
-        _vectorize(lambda x: x and set(x.split("+")).isdisjoint(_known_telnames)),
-        "SPEC_REPEAT",
-    )
+has_our_specs_only = QueryMaker.vectorize(
+    lambda x: x and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT"
 )
-has_our_specs = Query(
-    (
-        _vectorize(lambda x: x and not set(x.split("+")).issubset(_known_telnames)),
-        "SPEC_REPEAT",
-    )
+has_our_specs = QueryMaker.vectorize(
+    lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT"
 )
-has_been_targeted = Query(
-    (
-        _vectorize(lambda x: x and not set(x.split("+")).issubset(_known_telnames)),
-        "SPEC_REPEAT_ALL",
-    )
+has_been_targeted = QueryMaker.vectorize(
+    lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT_ALL"
 )
