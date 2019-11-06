@@ -15,7 +15,14 @@ except NameError:
     FileExistsError = OSError
 
 
-__all__ = ['DataObject', 'FileObject', 'CsvTable', 'GoogleSheets', 'FitsTable', 'NumpyBinary']
+__all__ = [
+    "DataObject",
+    "FileObject",
+    "CsvTable",
+    "GoogleSheets",
+    "FitsTable",
+    "NumpyBinary",
+]
 
 
 class FileObject(object):
@@ -31,6 +38,7 @@ class FileObject(object):
     **kwargs :
         other keyword arguments to pass to astropy.table.Table.read
     """
+
     def __init__(self, path=None, **kwargs):
         self.path = path
         self.kwargs = kwargs
@@ -53,7 +61,7 @@ class FileObject(object):
                 r.raw.decode_content = True
                 file_open = gzip.open if compress else open
                 try:
-                    with file_open(file_path, 'wb') as f:
+                    with file_open(file_path, "wb") as f:
                         shutil.copyfileobj(r.raw, f)
                 except:
                     if os.path.isfile(file_path):
@@ -68,17 +76,21 @@ class FileObject(object):
 
 class CsvTable(FileObject):
     def read(self):
-        return Table.read(self.path, format='ascii.csv', **self.kwargs)
+        return Table.read(self.path, format="ascii.csv", **self.kwargs)
 
     def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
-        return table.write(self.path, format='ascii.csv', **kwargs)
+        return table.write(self.path, format="ascii.csv", **kwargs)
 
 
 class GoogleSheets(CsvTable):
     def __init__(self, key, gid, **kwargs):
-        path = 'https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}'.format(key, gid)
-        self.url = 'https://docs.google.com/spreadsheets/d/{0}/edit#gid={1}'.format(key, gid)
+        path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
+            key, gid
+        )
+        self.url = "https://docs.google.com/spreadsheets/d/{0}/edit#gid={1}".format(
+            key, gid
+        )
         super(GoogleSheets, self).__init__(path, **kwargs)
 
     def write(self, table):
@@ -97,15 +109,15 @@ class FitsTable(FileObject):
 
     def write(self, table, **kwargs):
         coord = None
-        if 'coord' in table.columns and table['coord'].info.dtype.name == 'object':
-            coord = table['coord']
-            del table['coord']
+        if "coord" in table.columns and table["coord"].info.dtype.name == "object":
+            coord = table["coord"]
+            del table["coord"]
         file_open = gzip.open if self.compress_after_write else open
         makedirs_if_needed(self.path)
-        with file_open(self.path, 'wb') as f_out:
-            table.write(f_out, format='fits', **kwargs)
+        with file_open(self.path, "wb") as f_out:
+            table.write(f_out, format="fits", **kwargs)
         if coord is not None:
-            table['coord'] = coord
+            table["coord"] = coord
 
 
 class NumpyBinary(FileObject):
@@ -115,7 +127,6 @@ class NumpyBinary(FileObject):
     def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
         np.savez(self.path, **table)
-
 
 
 class DataObject(object):
@@ -144,8 +155,10 @@ class DataObject(object):
     Or
     >>> dobj.download('data/file.fits')
     """
-    def __init__(self, remote, local=None, cache_in_memory=False,
-                 use_local_first=False):
+
+    def __init__(
+        self, remote, local=None, cache_in_memory=False, use_local_first=False
+    ):
         self.remote = remote
         self.local = local
         self.local_type = type(remote) if local is None else type(local)
@@ -153,12 +166,10 @@ class DataObject(object):
         self.cache_in_memory = cache_in_memory
         self._cached_table = None
 
-
     def _get_local(self):
         if self.local is not None and not isinstance(self.local, self.local_type):
             self.local = self.local_type(self.local)
         return self.local
-
 
     def read(self, reload=False, **kwargs):
         """
@@ -182,15 +193,19 @@ class DataObject(object):
             try:
                 table = self._get_local().read()
             except (IOError, OSError):
-                warnings.warn("Failed to read local file, will try reading the remote file")
+                warnings.warn(
+                    "Failed to read local file, will try reading the remote file"
+                )
                 table = self.remote.read(**kwargs)
         else:
             try:
                 table = self.remote.read(**kwargs)
-            except Exception as read_exception: #pylint: disable=W0703
+            except Exception as read_exception:  # pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception
-                warnings.warn("Failed to read data, falling back to try to read local file")
+                warnings.warn(
+                    "Failed to read data, falling back to try to read local file"
+                )
                 table = self._get_local().read()
 
         if self.cache_in_memory:
@@ -198,8 +213,7 @@ class DataObject(object):
 
         return table
 
-
-    def write(self, table, dest='remote', overwrite=False):
+    def write(self, table, dest="remote", overwrite=False):
         """
         write the data to file
 
@@ -212,20 +226,21 @@ class DataObject(object):
         overwrite : bool, optional
             if set to true, overwrite existing file
         """
-        if dest.lower() == 'remote':
+        if dest.lower() == "remote":
             f = self.remote
-        elif dest.lower() == 'local':
+        elif dest.lower() == "local":
             f = self._get_local()
         else:
             raise KeyError('dest must be "remote" or "local"')
 
         if f.isfile() and not overwrite:
-            raise FileExistsError('set overwrite to True to overwrite the file')
+            raise FileExistsError("set overwrite to True to overwrite the file")
 
         f.write(table)
 
-
-    def download(self, local_file_path=None, overwrite=False, compress=False, set_as_local=True):
+    def download(
+        self, local_file_path=None, overwrite=False, compress=False, set_as_local=True
+    ):
         """
         Download in the data as a file
 
@@ -245,9 +260,11 @@ class DataObject(object):
             except AttributeError:
                 pass
             else:
-                set_as_local = False # no need to do this again
+                set_as_local = False  # no need to do this again
 
-        self.remote.download_as_file(local_file_path, overwrite=overwrite, compress=compress)
+        self.remote.download_as_file(
+            local_file_path, overwrite=overwrite, compress=compress
+        )
 
         if set_as_local:
             kwargs = dict()
@@ -259,7 +276,6 @@ class DataObject(object):
                 except AttributeError:
                     pass
             self.local = self.local_type(local_file_path, **kwargs)
-
 
     @staticmethod
     def _copy_table(table):

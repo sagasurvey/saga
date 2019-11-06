@@ -15,7 +15,7 @@ from .. import utils
 from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
 
 
-__all__ = ['ObjectCatalog', 'get_unique_objids']
+__all__ = ["ObjectCatalog", "get_unique_objids"]
 
 
 def get_unique_objids(objid_col):
@@ -50,28 +50,42 @@ class ObjectCatalog(object):
     Here specs and base_anak are both astropy tables.
     """
 
-    _surveys = ('sdss', 'des', 'decals')
+    _surveys = ("sdss", "des", "decals")
 
     def __init__(self, database=None, host_catalog_class=HostCatalog):
         self._database = database or Database()
         self._host_catalog = host_catalog_class(self._database)
 
-
     @classmethod
-    def _annotate_catalog(cls, table, add_skycoord=False, ensure_all_objid_cols=False, fix_2df_lowz_zq=False):
-        if 'EXTINCTION_R' in table.colnames:
+    def _annotate_catalog(
+        cls,
+        table,
+        add_skycoord=False,
+        ensure_all_objid_cols=False,
+        fix_2df_lowz_zq=False,
+    ):
+        if "EXTINCTION_R" in table.colnames:
             for b in get_sdss_bands():
-                table['{}_mag'.format(b)] = table[b] - table['EXTINCTION_{}'.format(b.upper())]
+                table["{}_mag".format(b)] = (
+                    table[b] - table["EXTINCTION_{}".format(b.upper())]
+                )
 
         for color in get_all_colors():
-            if '{}_mag'.format(color[0]) not in table.colnames or '{}_mag'.format(color[1]) not in table.colnames:
+            if (
+                "{}_mag".format(color[0]) not in table.colnames
+                or "{}_mag".format(color[1]) not in table.colnames
+            ):
                 continue
-            table[color] = table['{}_mag'.format(color[0])] - table['{}_mag'.format(color[1])]
-            table['{}_err'.format(color)] = np.hypot(table['{}_err'.format(color[0])], table['{}_err'.format(color[1])])
+            table[color] = (
+                table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
+            )
+            table["{}_err".format(color)] = np.hypot(
+                table["{}_err".format(color[0])], table["{}_err".format(color[1])]
+            )
 
         if ensure_all_objid_cols:
             for s in cls._surveys:
-                col = 'OBJID_{}'.format(s)
+                col = "OBJID_{}".format(s)
                 if col not in table.colnames:
                     table[col] = -1
 
@@ -82,12 +96,15 @@ class ObjectCatalog(object):
         if fix_2df_lowz_zq:
             fill_values_by_query(
                 table,
-                Query((lambda x: ((x == '2dF') | (x == '2dFLen')), 'TELNAME'), 'ZQUALITY == 3', 'SPEC_Z < 0.05'),
-                {'ZQUALITY': 2}
+                Query(
+                    (lambda x: ((x == "2dF") | (x == "2dFLen")), "TELNAME"),
+                    "ZQUALITY == 3",
+                    "SPEC_Z < 0.05",
+                ),
+                {"ZQUALITY": 2},
             )
 
         return table
-
 
     @staticmethod
     def _slice_table(table, query=None, columns=None, add_skycoord=False):
@@ -102,8 +119,18 @@ class ObjectCatalog(object):
 
         return table
 
-
-    def load(self, hosts=None, has_spec=None, cuts=None, return_as=None, columns=None, version=None, add_skycoord=True, ensure_all_objid_cols=False, fix_2df_lowz_zq=True):
+    def load(
+        self,
+        hosts=None,
+        has_spec=None,
+        cuts=None,
+        return_as=None,
+        columns=None,
+        version=None,
+        add_skycoord=True,
+        ensure_all_objid_cols=False,
+        fix_2df_lowz_zq=True,
+    ):
         """
         load object catalogs (aka "base catalogs")
 
@@ -166,40 +193,45 @@ class ObjectCatalog(object):
         """
 
         if version is None:
-            base_key = 'base'
-        elif str(version).lower() in ('paper1', 'p1', 'v0p1', '0', '0.1'):
-            base_key = 'base_v0p1'
+            base_key = "base"
+        elif str(version).lower() in ("paper1", "p1", "v0p1", "0", "0.1"):
+            base_key = "base_v0p1"
         elif version in (1, 2):
-            base_key = 'base_v{}'.format(version)
+            base_key = "base_v{}".format(version)
         else:
-            raise ValueError('`version` must be None, \'paper1\', 1 or 2.')
+            raise ValueError("`version` must be None, 'paper1', 1 or 2.")
 
         if return_as is None:
-            return_as = 'stacked' if (has_spec and base_key == 'base_v0p1') else 'list'
+            return_as = "stacked" if (has_spec and base_key == "base_v0p1") else "list"
         return_as = return_as.lower()
-        if return_as[0] not in 'slid':
-            raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
+        if return_as[0] not in "slid":
+            raise ValueError(
+                '`return_as` should be "list", "stacked", "iter", or "dict"'
+            )
 
-        if has_spec and base_key == 'base_v0p1':
-            t = self._database['saga_spectra_May2017'].read()
+        if has_spec and base_key == "base_v0p1":
+            t = self._database["saga_spectra_May2017"].read()
 
             if hosts is not None:
-                host_ids = self._host_catalog.resolve_id(hosts, 'NSA')
-                t = self._slice_table(t, (lambda x: np.in1d(x, host_ids), 'HOST_NSAID'))
+                host_ids = self._host_catalog.resolve_id(hosts, "NSA")
+                t = self._slice_table(t, (lambda x: np.in1d(x, host_ids), "HOST_NSAID"))
 
             t = self._annotate_catalog(t)
 
-            if return_as[0] == 's':
+            if return_as[0] == "s":
                 return self._slice_table(t, cuts, columns, add_skycoord)
 
             if hosts is None:
-                host_ids = np.unique(t['HOST_NSAID'])
+                host_ids = np.unique(t["HOST_NSAID"])
             output_iterator = (
-                self._slice_table(t, Query(cuts, 'HOST_NSAID == {}'.format(i)), columns, add_skycoord)
-                for i in host_ids)
-            if return_as[0] == 'i':
+                self._slice_table(
+                    t, Query(cuts, "HOST_NSAID == {}".format(i)), columns, add_skycoord
+                )
+                for i in host_ids
+            )
+            if return_as[0] == "i":
                 return output_iterator
-            if return_as[0] == 'd':
+            if return_as[0] == "d":
                 return dict(zip(host_ids, output_iterator))
             return list(output_iterator)
 
@@ -209,7 +241,7 @@ class ObjectCatalog(object):
         elif has_spec is not None:
             q = q & (~C.has_spec)
 
-        hosts = self._host_catalog.resolve_id(hosts, 'string')
+        hosts = self._host_catalog.resolve_id(hosts, "string")
 
         output_iterator = (
             self._slice_table(
@@ -220,23 +252,24 @@ class ObjectCatalog(object):
                 ),
                 q,
                 columns,
-                (add_skycoord and return_as[0] != 's')
-            ) for host in hosts
+                (add_skycoord and return_as[0] != "s"),
+            )
+            for host in hosts
         )
 
-        if return_as.startswith('item'):
+        if return_as.startswith("item"):
             return zip(hosts, output_iterator)
-        if return_as[0] == 'd':
+        if return_as[0] == "d":
             return dict(zip(hosts, output_iterator))
-        if return_as[0] == 'i':
+        if return_as[0] == "i":
             return output_iterator
-        if return_as[0] == 's':
-            out = vstack(list(output_iterator), 'outer', 'error')
+        if return_as[0] == "s":
+            out = vstack(list(output_iterator), "outer", "error")
             if out.masked:
                 for name, (dtype, _) in out.dtype.fields.items():
-                    if dtype.kind == 'i':
+                    if dtype.kind == "i":
                         out[name].fill_value = -1
-                    if dtype.kind == 'b':
+                    if dtype.kind == "b":
                         out[name].fill_value = False
             out = out.filled()
             if add_skycoord:
@@ -244,31 +277,44 @@ class ObjectCatalog(object):
             return out
         return list(output_iterator)
 
-
-    def load_nsa(self, version='0.1.2'):
-        nsa = self._database['nsa_v{}'.format(version)].read()
+    def load_nsa(self, version="0.1.2"):
+        nsa = self._database["nsa_v{}".format(version)].read()
         remove_mask = np.zeros(len(nsa), np.bool)
         objs_to_remove = []
         fixes_dict = {}
         cols = nsa.colnames
-        if version == '0.1.2':
+        if version == "0.1.2":
             objs_to_remove = [64408]
             fixes_dict = fixes_to_nsa_v012
             cols = build.NSA_COLS_USED
-        elif version == '1.0.1':
-            remove_mask |= (nsa['DFLAGS'][:,3:6] == 24).any(axis=1) & (nsa['DFLAGS'][:,3:6]).all(axis=1)
+        elif version == "1.0.1":
+            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (
+                nsa["DFLAGS"][:, 3:6]
+            ).all(axis=1)
             objs_to_remove = [614276, 632725]
             fixes_dict = fixes_to_nsa_v101
             cols = build2.NSA_COLS_USED
-        remove_mask |= np.in1d(nsa['NSAID'], objs_to_remove, assume_unique=True)
+        remove_mask |= np.in1d(nsa["NSAID"], objs_to_remove, assume_unique=True)
         nsa = nsa[cols][~remove_mask]
         for nsaid, fixes in fixes_dict.items():
-            fill_values_by_query(nsa, 'NSAID == {}'.format(nsaid), fixes)
+            fill_values_by_query(nsa, "NSAID == {}".format(nsaid), fixes)
         nsa = utils.add_skycoord(nsa)
         return nsa
 
-
-    def build_and_write_to_database(self, hosts=None, overwrite=False, base_file_path_pattern=None, version=None, return_catalogs=False, raise_exception=False, add_specs_only_before_time=None, use_nsa=True, convert_to_sdss_filters=True, additional_specs=None, debug=None):
+    def build_and_write_to_database(
+        self,
+        hosts=None,
+        overwrite=False,
+        base_file_path_pattern=None,
+        version=None,
+        return_catalogs=False,
+        raise_exception=False,
+        add_specs_only_before_time=None,
+        use_nsa=True,
+        convert_to_sdss_filters=True,
+        additional_specs=None,
+        debug=None,
+    ):
         """
         This function builds the base catalog and writes it to the database.
 
@@ -308,32 +354,38 @@ class ObjectCatalog(object):
         if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
             overwrite = Time(overwrite)
 
-        host_ids = self._host_catalog.resolve_id(hosts, 'string')
+        host_ids = self._host_catalog.resolve_id(hosts, "string")
         if not host_ids:
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'No host to build! Abort!')
+            print(time.strftime("[%m/%d %H:%M:%S]"), "No host to build! Abort!")
             return
-        print(time.strftime('[%m/%d %H:%M:%S]'), 'Start to build {} base catalog(s).'.format(len(host_ids)))
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "Start to build {} base catalog(s).".format(len(host_ids)),
+        )
 
         if version not in (None, 1, 2):
-            raise ValueError('`version` must be None, 1 or 2.')
+            raise ValueError("`version` must be None, 1 or 2.")
         build_module = build if version == 1 else build2
 
         if use_nsa:
-            nsa = self.load_nsa('0.1.2' if version == 1 else '1.0.1')
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'NSA catalog loaded.')
+            nsa = self.load_nsa("0.1.2" if version == 1 else "1.0.1")
+            print(time.strftime("[%m/%d %H:%M:%S]"), "NSA catalog loaded.")
         else:
             nsa = None
 
-        spectra = self._database['spectra_raw_all'].read(
-            before_time=add_specs_only_before_time,
-            additional_specs=additional_specs,
+        spectra = self._database["spectra_raw_all"].read(
+            before_time=add_specs_only_before_time, additional_specs=additional_specs,
         )
-        print(time.strftime('[%m/%d %H:%M:%S]'), 'All spectra loaded.')
+        print(time.strftime("[%m/%d %H:%M:%S]"), "All spectra loaded.")
 
         manual_lists = {}
-        for survey, col in (('sdss', 'SDSS ID'), ('des', 'DES_OBJID'), ('decals', 'decals_objid')):
-            for list_type in ('remove', 'recover'):
-                key = '{}_{}'.format(survey, list_type)
+        for survey, col in (
+            ("sdss", "SDSS ID"),
+            ("des", "DES_OBJID"),
+            ("decals", "decals_objid"),
+        ):
+            for list_type in ("remove", "recover"):
+                key = "{}_{}".format(survey, list_type)
                 try:
                     val = get_unique_objids(self._database[key].read()[col])
                 except KeyError:
@@ -341,49 +393,68 @@ class ObjectCatalog(object):
                 else:
                     if len(val):
                         manual_lists[key] = val
-        print(time.strftime('[%m/%d %H:%M:%S]'), 'All other manual lists loaded.')
+        print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
         catalogs_to_return = list()
         for i, host_id in enumerate(host_ids):
             if base_file_path_pattern is None:
-                base_key = 'base' if version is None else 'base_v{}'.format(version)
+                base_key = "base" if version is None else "base_v{}".format(version)
                 data_obj = self._database[base_key, host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
             if data_obj.isfile() and overwrite is not True:
                 if overwrite is False or overwrite is None:
-                    print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog v{} for {} already exists ({}).'.format(version or 2, host_id, data_obj.path), '({}/{})'.format(i+1, len(host_ids)))
+                    print(
+                        time.strftime("[%m/%d %H:%M:%S]"),
+                        "Base catalog v{} for {} already exists ({}).".format(
+                            version or 2, host_id, data_obj.path
+                        ),
+                        "({}/{})".format(i + 1, len(host_ids)),
+                    )
                     continue
 
-                file_time = Time(os.path.getmtime(data_obj.path), format='unix')
+                file_time = Time(os.path.getmtime(data_obj.path), format="unix")
 
                 if file_time > overwrite:
-                    print(time.strftime('[%m/%d %H:%M:%S]'), 'Base catalog {} ({}) is newer than {}.'.format(host_id, file_time.isot, overwrite.isot), '({}/{})'.format(i+1, len(host_ids)))
+                    print(
+                        time.strftime("[%m/%d %H:%M:%S]"),
+                        "Base catalog {} ({}) is newer than {}.".format(
+                            host_id, file_time.isot, overwrite.isot
+                        ),
+                        "({}/{})".format(i + 1, len(host_ids)),
+                    )
                     continue
 
             host = self._host_catalog.load_single(host_id)
-            catalogs = ('sdss', 'wise') if version == 1 else ('sdss', 'des', 'decals')
+            catalogs = ("sdss", "wise") if version == 1 else ("sdss", "des", "decals")
 
             def get_catalog_or_none(catalog_name):
                 # pylint: disable=cell-var-from-loop
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
-                    print(time.strftime('[%m/%d %H:%M:%S]'), '[WARNING] Not found: {} catalog for {}.'.format(catalog_name.upper(), host_id))
+                    print(
+                        time.strftime("[%m/%d %H:%M:%S]"),
+                        "[WARNING] Not found: {} catalog for {}.".format(
+                            catalog_name.upper(), host_id
+                        ),
+                    )
                     return
-                return cat[build.WISE_COLS_USED] if catalog_name == 'wise' else cat
+                return cat[build.WISE_COLS_USED] if catalog_name == "wise" else cat
 
             catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
 
             print(
-                time.strftime('[%m/%d %H:%M:%S]'),
-                'Use {} to build base catalog v{} for {}'.format(
-                    ', '.join((k for k, v in catalog_dict.items() if v is not None)).upper(),
+                time.strftime("[%m/%d %H:%M:%S]"),
+                "Use {} to build base catalog v{} for {}".format(
+                    ", ".join(
+                        (k for k, v in catalog_dict.items() if v is not None)
+                    ).upper(),
                     (version or 2),
-                    host_id
+                    host_id,
                 ),
-                '({}/{})'.format(i+1, len(host_ids))
+                "({}/{})".format(i + 1, len(host_ids)),
             )
 
             if debug is None:
@@ -402,8 +473,11 @@ class ObjectCatalog(object):
                     **manual_lists,
                     **catalog_dict
                 )
-            except Exception as e: # pylint: disable=W0703
-                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to build base catalog for {}'.format(host_id))
+            except Exception as e:  # pylint: disable=W0703
+                print(
+                    time.strftime("[%m/%d %H:%M:%S]"),
+                    "[ERROR] Fail to build base catalog for {}".format(host_id),
+                )
                 base = None
                 if raise_exception:
                     raise e
@@ -414,11 +488,17 @@ class ObjectCatalog(object):
                 if return_catalogs:
                     catalogs_to_return.append(base)
 
-            print(time.strftime('[%m/%d %H:%M:%S]'), 'Write base catalog to {}'.format(data_obj.path))
+            print(
+                time.strftime("[%m/%d %H:%M:%S]"),
+                "Write base catalog to {}".format(data_obj.path),
+            )
             try:
                 data_obj.write(base)
             except (IOError, OSError) as e:
-                print(time.strftime('[%m/%d %H:%M:%S]'), '[ERROR] Fail to write base catalog for {}'.format(host_id))
+                print(
+                    time.strftime("[%m/%d %H:%M:%S]"),
+                    "[ERROR] Fail to write base catalog for {}".format(host_id),
+                )
                 if raise_exception:
                     raise e
                 traceback.print_exc()
@@ -427,16 +507,15 @@ class ObjectCatalog(object):
         if return_catalogs:
             return catalogs_to_return
 
-
     def generate_clean_specs(self, save_to=None, overwrite=False, **kwargs):
         """
         generate clean spectra from all good base catalogs and save to disk
         """
         defaults = dict(
-            hosts='good',
+            hosts="good",
             has_spec=True,
             cuts=C.is_clean2,
-            return_as='stack',
+            return_as="stack",
             add_skycoord=False,
             ensure_all_objid_cols=True,
         )
@@ -447,7 +526,7 @@ class ObjectCatalog(object):
 
         if save_to is not False:
             if save_to is None:
-                save_to = self._database['saga_clean_specs']
+                save_to = self._database["saga_clean_specs"]
             if not isinstance(save_to, (FileObject, DataObject)):
                 save_to = FitsTable(save_to)
             save_to.write(t, overwrite=overwrite)
@@ -459,7 +538,7 @@ class ObjectCatalog(object):
         load clean spectra from all good base catalogs
         """
         try:
-            t = self._database['saga_clean_specs'].read()
+            t = self._database["saga_clean_specs"].read()
         except IOError:
             if generate_if_not_exist:
                 t = self.generate_clean_specs(**kwargs)
@@ -471,11 +550,13 @@ class ObjectCatalog(object):
         if data is None:
             data = defaultdict(list)
 
-        data['host'].append(host)
-        base = self.load(host, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False).pop()
+        data["host"].append(host)
+        base = self.load(
+            host, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
+        ).pop()
 
-        simple_cuts = (C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut)
-        high_p_cuts = (Query('r_mag > 12') & C.high_priority_cuts)
+        simple_cuts = C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut
+        high_p_cuts = Query("r_mag > 12") & C.high_priority_cuts
 
         simple_mask = simple_cuts.mask(base)
         high_p_mask = high_p_cuts.mask(base)
@@ -483,35 +564,39 @@ class ObjectCatalog(object):
         has_spec_mask = C.has_spec.mask(base)
         sats_mask = C.is_sat.mask(base)
         low_z_mask = C.is_low_z.mask(base)
-        low_z_mask &= (~sats_mask)
+        low_z_mask &= ~sats_mask
         our_specs_mask = C.has_our_specs_only.mask(base)
         our_specs_mask &= has_spec_mask
         aat_mask = C.has_aat_spec.mask(base)
         mmt_mask = C.has_mmt_spec.mask(base)
 
-        data['need_spec'].append(np.count_nonzero(simple_mask & (~has_spec_mask)))
-        data['really_need_spec'].append(np.count_nonzero(high_p_mask & (~has_spec_mask)))
+        data["need_spec"].append(np.count_nonzero(simple_mask & (~has_spec_mask)))
+        data["really_need_spec"].append(
+            np.count_nonzero(high_p_mask & (~has_spec_mask))
+        )
 
-        data['specs_total'].append(np.count_nonzero(has_spec_mask))
-        data['low_z_total'].append(np.count_nonzero(has_spec_mask & low_z_mask))
-        data['sats_total'].append(np.count_nonzero(sats_mask))
+        data["specs_total"].append(np.count_nonzero(has_spec_mask))
+        data["low_z_total"].append(np.count_nonzero(has_spec_mask & low_z_mask))
+        data["sats_total"].append(np.count_nonzero(sats_mask))
 
-        data['specs_ours'].append(np.count_nonzero(our_specs_mask))
-        data['low_z_ours'].append(np.count_nonzero(our_specs_mask & low_z_mask))
-        data['sats_ours'].append(np.count_nonzero(our_specs_mask & sats_mask))
+        data["specs_ours"].append(np.count_nonzero(our_specs_mask))
+        data["low_z_ours"].append(np.count_nonzero(our_specs_mask & low_z_mask))
+        data["sats_ours"].append(np.count_nonzero(our_specs_mask & sats_mask))
 
-        data['specs_aat'].append(np.count_nonzero(has_spec_mask & aat_mask))
-        data['specs_mmt'].append(np.count_nonzero(has_spec_mask & mmt_mask))
+        data["specs_aat"].append(np.count_nonzero(has_spec_mask & aat_mask))
+        data["specs_mmt"].append(np.count_nonzero(has_spec_mask & mmt_mask))
 
         return data
 
-    def generate_object_stats(self, hosts=None, save_to=None, overwrite=False, generate_func=None):
+    def generate_object_stats(
+        self, hosts=None, save_to=None, overwrite=False, generate_func=None
+    ):
         """
         generate object statistics for *hosts*
         """
 
         if hosts is None:
-            hosts = sorted(self._host_catalog.resolve_id('good'))
+            hosts = sorted(self._host_catalog.resolve_id("good"))
         else:
             hosts = self._host_catalog.resolve_id(hosts)
 
@@ -524,10 +609,12 @@ class ObjectCatalog(object):
 
         data = Table(data)
 
-        host_table = self._host_catalog.load()['HOSTID', 'RA', 'Dec', 'distance', 'MK_compiled']
-        host_table.rename_column('HOSTID', 'host')
-        host_table.rename_column('MK_compiled', 'M_K')
-        data = join(data, host_table, 'host', 'left')
+        host_table = self._host_catalog.load()[
+            "HOSTID", "RA", "Dec", "distance", "MK_compiled"
+        ]
+        host_table.rename_column("HOSTID", "host")
+        host_table.rename_column("MK_compiled", "M_K")
+        data = join(data, host_table, "host", "left")
 
         if save_to is not None:
             if not isinstance(save_to, (FileObject, DataObject)):
