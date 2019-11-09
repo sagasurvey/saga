@@ -268,7 +268,7 @@ class Database(object):
             "spectra_wigglez": DataObject(
                 FitsTable(
                     os.path.join(
-                        self._shared_dir, "Spectra", "Final", "WiggleZ", "Wigglez.fits"
+                        self._shared_dir, "Spectra", "Final", "WiggleZ", "WiggleZ.fits"
                     )
                 )
             ),

@@ -96,12 +96,12 @@ class HostCatalog(object):
             index = defaultdict(set)
             if "SAGA_NAME" in hosts.colnames:
                 for i, n in enumerate(hosts["SAGA_NAME"]):
-                    n = n.strip().strip("-").replace(" ", "")
+                    n = str(n).strip().strip("-").replace(" ", "")
                     if n:
                         index[n.lower()].add(i)
             if "COMMON_NAME" in hosts.colnames:
                 for i, n in enumerate(hosts["COMMON_NAME"]):
-                    n = n.strip().strip("-").replace(" ", "")
+                    n = str(n).strip().strip("-").replace(" ", "")
                     if n:
                         m = re.match(r"^([A-Za-z]+)0*(\d+)$", n)
                         if m is None:

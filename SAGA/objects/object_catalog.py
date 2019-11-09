@@ -428,8 +428,6 @@ class ObjectCatalog(object):
                     )
                     continue
 
-            host = self._host_catalog.load_single(host_id)
-
             def _get(col):
                 # pylint: disable=cell-var-from-loop
                 try:
