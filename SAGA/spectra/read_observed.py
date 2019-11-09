@@ -52,7 +52,7 @@ def read_generic_spectra(
     cuts=None,
     postprocess=None,
     midprocess=None,
-    **kwargs,
+    **kwargs
 ):
 
     names = [usecols.get(i + 1, "_{}".format(i)) for i in range(n_cols_total)]
@@ -70,7 +70,7 @@ def read_generic_spectra(
                 guess=False,
                 names=names,
                 exclude_names=exclude_names,
-                **kwargs,
+                **kwargs
             )
         except (IOError, CParserError) as e:
             logging.warning(

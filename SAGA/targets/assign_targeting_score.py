@@ -189,7 +189,7 @@ def assign_targeting_score_v2(
     seed=123,
     remove_lists=None,
     low_priority_objids=None,
-    **kwargs,
+    **kwargs
 ):
     """
     Last updated: 09/05/2018

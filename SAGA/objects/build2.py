@@ -846,7 +846,7 @@ def build_full_stack(
     spectra=None,
     convert_to_sdss_filters=True,
     debug=None,
-    **kwargs,
+    **kwargs
 ):
     """
     This function calls all needed functions to complete the full stack of building
