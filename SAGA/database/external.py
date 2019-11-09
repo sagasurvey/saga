@@ -614,7 +614,7 @@ def download_catalogs_for_hosts(
     host_id_label="NSAID",
     host_ra_label="RA",
     host_dec_label="Dec",
-    **query_class_kwargs,
+    **query_class_kwargs
 ):
     """
     A convenience function of getting all catalogs for hosts.
