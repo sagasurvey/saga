@@ -1,14 +1,16 @@
 # Schema for SAGA Data Release 2 (DR2) Base Catalogs 
 
+## Host list (v2) schema
 
-- Data for SDSS DR14, DES DR1 and LS DR6/7 are included where
-  available.
+Label | Unit | Definition
+--- | --- | ---
+... | ... | ...
 
+## Object catalog (v2) schema 
 
+_Note: data for SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`) and LS DR6/7  (with postfix `_decals`) are included where available._
 
-### Most Often Used Schema 
-
-Quantity Label | Unit | Definition
+Label | Unit | Definition
 --- | --- | ---
 `OBJID` | - | Unique photometric object identifier, taken from SDSS, DES or LS (based on survey flag)
 `RA` | degree | Right ascension
@@ -30,7 +32,4 @@ Quantity Label | Unit | Definition
 `HOST_VHOST` | kms |  Recession velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
-
-
-
-
+... | ... | ...
