@@ -1,8 +1,9 @@
 import os
-import requests
+
 import numpy as np
-from easyquery import Query
+import requests
 from astropy.coordinates import SkyCoord
+from easyquery import Query
 
 __all__ = [
     "get_sdss_bands",
@@ -86,7 +87,7 @@ def get_decals_viewer_image(
     url = "http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
         **locals()
     )
-    content = requests.get(url).content
+    content = requests.get(url, timeout=120).content
     if out is not None:
         if not out.lower().endswith(".jpg"):
             out += ".jpg"

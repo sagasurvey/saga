@@ -1,5 +1,5 @@
-import numpy as np
 import astropy.constants
+import numpy as np
 
 __all__ = ["SPECS_COLUMNS", "SPEED_OF_LIGHT", "ensure_specs_dtype"]
 

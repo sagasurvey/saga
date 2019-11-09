@@ -1,12 +1,12 @@
 import os
-import numpy as np
-from astropy.time import Time
-from astropy.table import vstack, join
 
-from . import read_external
-from . import read_observed
-from .common import ensure_specs_dtype
+import numpy as np
+from astropy.table import join, vstack
+from astropy.time import Time
+
 from ..utils import add_skycoord
+from . import read_external, read_observed
+from .common import ensure_specs_dtype
 
 __all__ = ["SpectraData"]
 

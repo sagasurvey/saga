@@ -2,18 +2,19 @@ import os
 import time
 import traceback
 from collections import defaultdict
-import numpy as np
-from astropy.time import Time
-from astropy.table import vstack, Table, join
-from easyquery import Query
-from . import cuts as C
-from . import build, build2
-from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
-from ..database import FitsTable, Database, FileObject, DataObject, CsvTable
-from ..hosts import HostCatalog
-from .. import utils
-from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
 
+import numpy as np
+from astropy.table import Table, join, vstack
+from astropy.time import Time
+from easyquery import Query
+
+from .. import utils
+from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
+from ..hosts import HostCatalog
+from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
+from . import build, build2
+from . import cuts as C
+from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 
 __all__ = ["ObjectCatalog", "get_unique_objids"]
 
@@ -354,13 +355,14 @@ class ObjectCatalog(object):
         if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
             overwrite = Time(overwrite)
 
-        host_ids = self._host_catalog.resolve_id(hosts, "string")
-        if not host_ids:
+        host_table = self._host_catalog.load(hosts)
+        nhosts = len(host_table)
+        if not nhosts:
             print(time.strftime("[%m/%d %H:%M:%S]"), "No host to build! Abort!")
             return
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
-            "Start to build {} base catalog(s).".format(len(host_ids)),
+            "Start to build {} base catalog(s).".format(nhosts),
         )
 
         if version not in (None, 1, 2):
@@ -396,7 +398,8 @@ class ObjectCatalog(object):
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
         catalogs_to_return = list()
-        for i, host_id in enumerate(host_ids):
+        for i, host in enumerate(host_table):
+            host_id = host["HOSTID"]
             if base_file_path_pattern is None:
                 base_key = "base" if version is None else "base_v{}".format(version)
                 data_obj = self._database[base_key, host_id].remote
@@ -410,7 +413,7 @@ class ObjectCatalog(object):
                         "Base catalog v{} for {} already exists ({}).".format(
                             version or 2, host_id, data_obj.path
                         ),
-                        "({}/{})".format(i + 1, len(host_ids)),
+                        "({}/{})".format(i + 1, nhosts),
                     )
                     continue
 
@@ -422,12 +425,28 @@ class ObjectCatalog(object):
                         "Base catalog {} ({}) is newer than {}.".format(
                             host_id, file_time.isot, overwrite.isot
                         ),
-                        "({}/{})".format(i + 1, len(host_ids)),
+                        "({}/{})".format(i + 1, nhosts),
                     )
                     continue
 
-            host = self._host_catalog.load_single(host_id)
-            catalogs = ("sdss", "wise") if version == 1 else ("sdss", "des", "decals")
+            def _get(col):
+                # pylint: disable=cell-var-from-loop
+                try:
+                    return host["COVERAGE_" + col]
+                except KeyError:
+                    return 1.0
+
+            if version == 1:
+                catalogs = ("sdss", "wise")
+            else:
+                catalogs = []
+                if _get("SDSS") >= 0.95:
+                    catalogs.append("sdss")
+                if _get("DES_DR1") >= 0.95:
+                    catalogs.append("des")
+                if max(_get("DECALS_DR6"), _get("DECALS_DR7")) >= 0.95:
+                    catalogs.append("decals")
+                catalogs = tuple(catalogs)
 
             def get_catalog_or_none(catalog_name):
                 # pylint: disable=cell-var-from-loop
@@ -436,7 +455,7 @@ class ObjectCatalog(object):
                 except OSError:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "[WARNING] Not found: {} catalog for {}.".format(
+                        "[WARNING] Not found: {} catalog for {}!!.".format(
                             catalog_name.upper(), host_id
                         ),
                     )
@@ -454,7 +473,7 @@ class ObjectCatalog(object):
                     (version or 2),
                     host_id,
                 ),
-                "({}/{})".format(i + 1, len(host_ids)),
+                "({}/{})".format(i + 1, nhosts),
             )
 
             if debug is None:
@@ -471,7 +490,7 @@ class ObjectCatalog(object):
                     convert_to_sdss_filters=convert_to_sdss_filters,
                     debug=debug_this,
                     **manual_lists,
-                    **catalog_dict
+                    **catalog_dict,
                 )
             except Exception as e:  # pylint: disable=W0703
                 print(

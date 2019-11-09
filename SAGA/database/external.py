@@ -1,17 +1,19 @@
-import os
-import time
-import re
 import gzip
+import os
 import random
-import string
+import re
 import shutil
-import requests
+import string
+import time
+
 import numpy as np
+import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
-from .core import FitsTable
+
 from ..utils import makedirs_if_needed
+from .core import DownloadableBase, FitsTable
 
 _HAS_CASJOBS_ = True
 try:
@@ -31,6 +33,7 @@ __all__ = [
     "SdssQuery",
     "WiseQuery",
     "DesQuery",
+    "DecalsPrebuilt",
     "DecalsQuery",
     "download_catalogs_for_hosts",
 ]
@@ -60,11 +63,11 @@ class WiseQuery(FitsTable):
         )
         super(WiseQuery, self).__init__(path, **kwargs)
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         raise NotImplementedError
 
 
-class SdssQuery(object):
+class SdssQuery(DownloadableBase):
     """
     Examples
     --------
@@ -237,6 +240,7 @@ class SdssQuery(object):
             db_table_name = "TO_BE_REMOVED"
             select_into_mydb = False
 
+        # pylint: disable=possibly-unused-variable
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
         r_arcmin = ensure_deg(radius) * 60.0
@@ -364,7 +368,7 @@ class SdssQuery(object):
             shutil.copyfileobj(r, f_out)
 
 
-class DesQuery(object):
+class DesQuery(DownloadableBase):
 
     _query_template = """select
         d.COADD_OBJECT_ID as OBJID,
@@ -413,6 +417,7 @@ class DesQuery(object):
         query : str
             The SQL query to send to the SDSS skyserver
         """
+        # pylint: disable=possibly-unused-variable
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
         r_deg = ensure_deg(radius)
@@ -448,6 +453,7 @@ class DesQuery(object):
                 "Content-Type": "application/octet-stream",
                 "X-DL-AuthToken": "anonymous.0.0.anon_access",
             },
+            timeout=(120, 3600),
         )
         if not r.ok:
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
@@ -459,11 +465,11 @@ class DesQuery(object):
             t.write(f, format="fits")
 
 
-class DecalsPrebuilt(object):
+class DecalsPrebuilt(DownloadableBase):
 
     requires_host_id = True
 
-    def __init__(self, ra, dec, host_id):
+    def __init__(self, ra, dec, host_id):  # pylint: disable=unused-argument
         try:
             host_id = int(host_id)
         except ValueError:
@@ -484,6 +490,7 @@ class DecalsPrebuilt(object):
             ),
             headers={"Content-Type": "application/gzip"},
             stream=True,
+            timeout=(120, 3600),
         )
 
         if not r.ok:
@@ -496,7 +503,7 @@ class DecalsPrebuilt(object):
             shutil.copyfileobj(r.raw, f)
 
 
-class DecalsQuery(object):
+class DecalsQuery(DownloadableBase):
     def __init__(
         self,
         ra,
@@ -568,7 +575,7 @@ class DecalsQuery(object):
                 margin_ra=self.radius
                 * 1.01
                 / max(np.cos(np.deg2rad(self.dec)), 1.0e-8),
-                margin_dec=self.radius * 1.01
+                margin_dec=self.radius * 1.01,
             ):
                 continue
 
@@ -607,7 +614,7 @@ def download_catalogs_for_hosts(
     host_id_label="NSAID",
     host_ra_label="RA",
     host_dec_label="Dec",
-    **query_class_kwargs
+    **query_class_kwargs,
 ):
     """
     A convenience function of getting all catalogs for hosts.

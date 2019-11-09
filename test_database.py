@@ -1,6 +1,7 @@
-from SAGA.database import *
-import tempfile
 import os
+import tempfile
+
+from SAGA.database import *
 
 try:
     FileNotFoundError

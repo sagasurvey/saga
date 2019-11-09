@@ -2,8 +2,8 @@
 convenience functions for MMT catalogs
 """
 import numpy as np
-from astropy.table import Table
 from astropy.coordinates import Angle
+from astropy.table import Table
 
 
 def read_mmt_catalog(filepath, header_line_index=1):

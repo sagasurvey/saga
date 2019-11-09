@@ -1,31 +1,41 @@
+import gzip
+import logging
 import os
 import shutil
-import gzip
-import warnings
+from abc import ABC, abstractmethod
+
 import numpy as np
 import requests
-from astropy.table import Table
 from astropy.io import fits
+from astropy.table import Table
 
 from ..utils import makedirs_if_needed
 
 try:
     FileExistsError
 except NameError:
-    FileExistsError = OSError
+    FileExistsError = OSError  # pylint: disable=redefined-builtin
 
 
 __all__ = [
+    "DownloadableBase",
     "DataObject",
     "FileObject",
     "CsvTable",
+    "FastCsvTable",
     "GoogleSheets",
     "FitsTable",
     "NumpyBinary",
 ]
 
 
-class FileObject(object):
+class DownloadableBase(ABC):
+    @abstractmethod
+    def download_as_file(self, file_path, overwrite=False, compress=False):
+        pass
+
+
+class FileObject(DownloadableBase):
     """
     A simple class for file reading (to astropy Table), writing (from astropy Table),
     and download.
@@ -39,22 +49,27 @@ class FileObject(object):
         other keyword arguments to pass to astropy.table.Table.read
     """
 
+    _read_default_kwargs = dict()
+    _write_default_kwargs = dict()
+
     def __init__(self, path=None, **kwargs):
         self.path = path
         self.kwargs = kwargs
 
     def read(self):
-        return Table.read(self.path, **self.kwargs)
+        kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
+        return Table.read(self.path, **kwargs_this)
 
     def write(self, table, **kwargs):
+        kwargs_this = dict(self._write_default_kwargs, **kwargs)
         makedirs_if_needed(self.path)
-        return table.write(self.path, **kwargs)
+        return table.write(self.path, **kwargs_this)
 
     def download_as_file(self, file_path, overwrite=False, compress=False):
         makedirs_if_needed(file_path)
         if overwrite or not os.path.isfile(file_path):
             try:
-                r = requests.get(self.path, stream=True)
+                r = requests.get(self.path, stream=True, timeout=(120, 3600))
             except requests.exceptions.MissingSchema:
                 shutil.copy(self.path, file_path)
             else:
@@ -75,15 +90,14 @@ class FileObject(object):
 
 
 class CsvTable(FileObject):
-    def read(self):
-        return Table.read(self.path, format="ascii.csv", **self.kwargs)
-
-    def write(self, table, **kwargs):
-        makedirs_if_needed(self.path)
-        return table.write(self.path, format="ascii.csv", **kwargs)
+    _read_default_kwargs = _write_default_kwargs = dict(format="ascii.csv")
 
 
-class GoogleSheets(CsvTable):
+class FastCsvTable(FileObject):
+    _read_default_kwargs = _write_default_kwargs = dict(format="ascii.fast_csv")
+
+
+class GoogleSheets(FastCsvTable):
     def __init__(self, key, gid, **kwargs):
         path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
             key, gid
@@ -93,15 +107,18 @@ class GoogleSheets(CsvTable):
         )
         super(GoogleSheets, self).__init__(path, **kwargs)
 
-    def write(self, table):
+    def write(self, table, **kwargs):
         raise NotImplementedError
 
 
 class FitsTable(FileObject):
     compress_after_write = True
+    _read_default_kwargs = dict(cache=False, memmap=True)
+    _write_default_kwargs = dict(format="fits")
 
     def read(self):
-        with fits.open(self.path, cache=False, memmap=False, **self.kwargs) as hdu_list:
+        kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
+        with fits.open(self.path, **kwargs_this) as hdu_list:
             # pylint: disable=E1101
             t = Table(hdu_list[1].data, masked=False)
             del hdu_list[1].data
@@ -114,8 +131,9 @@ class FitsTable(FileObject):
             del table["coord"]
         file_open = gzip.open if self.compress_after_write else open
         makedirs_if_needed(self.path)
+        kwargs_this = dict(self._write_default_kwargs, **kwargs)
         with file_open(self.path, "wb") as f_out:
-            table.write(f_out, format="fits", **kwargs)
+            table.write(f_out, **kwargs_this)
         if coord is not None:
             table["coord"] = coord
 
@@ -166,6 +184,11 @@ class DataObject(object):
         self.cache_in_memory = cache_in_memory
         self._cached_table = None
 
+        if use_local_first and local is None:
+            raise ValueError(
+                "Must specify `local` when setting `use_local_first=True`."
+            )
+
     def _get_local(self):
         if self.local is not None and not isinstance(self.local, self.local_type):
             self.local = self.local_type(self.local)
@@ -190,11 +213,16 @@ class DataObject(object):
                 return table
 
         if self.use_local_first:
+            if not self._get_local().isfile():
+                logging.warning(
+                    "Cannot find local file; attempt to download from remote..."
+                )
+                self.download()
             try:
                 table = self._get_local().read()
             except (IOError, OSError):
-                warnings.warn(
-                    "Failed to read local file, will try reading the remote file"
+                logging.warning(
+                    "Failed to read local file; attempt to read remote file..."
                 )
                 table = self.remote.read(**kwargs)
         else:
@@ -203,9 +231,14 @@ class DataObject(object):
             except Exception as read_exception:  # pylint: disable=W0703
                 if self._get_local() is None:
                     raise read_exception
-                warnings.warn(
-                    "Failed to read data, falling back to try to read local file"
+                logging.warning(
+                    "Failed to read remote; fall back to read local file..."
                 )
+                if not self._get_local().isfile():
+                    logging.warning(
+                        "Cannot find local file; attempt to download from remote..."
+                    )
+                    self.download()
                 table = self._get_local().read()
 
         if self.cache_in_memory:
