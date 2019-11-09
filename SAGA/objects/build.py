@@ -1,28 +1,19 @@
 import logging
-import numpy as np
+
 import numexpr as ne
+import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, join
-import astropy.constants
-from astropy.cosmology import WMAP9  # pylint: disable=E0611
 from easyquery import Query
 
-_HAS_KCORRECT = True
-try:
-    import kcorrect
-except ImportError:
-    _HAS_KCORRECT = False
-
+from ..external.calc_kcor import calc_kcor
+from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
+                     get_sdss_bands)
+from ..utils.distance import d2z, v2z, z2m, z2v
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
-from ..utils import (
-    fill_values_by_query,
-    get_empty_str_array,
-    get_sdss_bands,
-    add_skycoord,
-    view_table_as_2d_array,
-)
 
+# pylint: disable=logging-format-interpolation
 
 __all__ = [
     "initialize_base_catalog",
@@ -87,7 +78,7 @@ def _get_spec_search_radius(spec_z):
     return 20.0 if spec_z < 0.2 else 10.0
 
 
-_spec_search_dz = 50.0 / astropy.constants.c.to("km/s").value  # pylint: disable=E1101
+_spec_search_dz = v2z(50.0)
 
 
 def initialize_base_catalog(base):
@@ -157,13 +148,15 @@ def add_host_info(base, host, overwrite_if_different_host=False):
         return base
 
     if (
-        "HOST_NSAID" in base.colnames and base["HOST_NSAID"][0] != host["NSAID"]
+        "HOST_ID" in base.colnames and base["HOST_ID"][0] != host["HOSTID"]
     ) and not overwrite_if_different_host:
         raise ValueError("Host info exists and differs from input host info.")
 
+    base["HOST_ID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
     base["HOST_PGC"] = np.int32(host["PGC"])
     base["HOST_NSAID"] = np.int32(host["NSAID"])
     base["HOST_NSA1ID"] = np.int32(host["NSA1ID"])
+    base["HOST_SAGA_NAME"] = get_empty_str_array(len(base), 48, host["SAGA_NAME"] or "")
     base["HOST_RA"] = np.float32(host["RA"])
     base["HOST_DEC"] = np.float32(host["DEC"])
 
@@ -171,30 +164,15 @@ def add_host_info(base, host, overwrite_if_different_host=False):
         base["HOST_DIST"] = np.float32(host["distance"])
         base["HOST_VHOST"] = np.float32(host["vhelio"])
         base["HOST_MK"] = np.float32(host["M_K"])
-        base["HOST_MR"] = np.float32(host["M_r"])
-        base["HOST_MG"] = np.float32(host["M_g"])
-        base["HOST_SAGA_NAME"] = get_empty_str_array(
-            len(base), 48, host["SAGA_name"] or ""
-        )
         base["HOST_NGC"] = np.int32(host["NGC"])
-        base["HOST_ID"] = (
-            "nsa{}".format(host["NSAID"])
-            if host["NSAID"] != -1
-            else "pgc{}".format(host["PGC"])
-        )
     else:
         base["HOST_DIST"] = np.float32(host["DIST"])
-        base["HOST_DISTMOD"] = np.float32(host["DISTMOD"])
         base["HOST_VHOST"] = np.float32(host["V_HELIO"])
         base["HOST_ZCOSMO"] = np.float32(host["Z_COSMO"])
         base["HOST_MK"] = np.float32(host["K_ABS"])
-        base["HOST_SAGA_NAME"] = get_empty_str_array(
-            len(base), 48, host["SAGA_NAME"] or ""
-        )
         base["HOST_COMMON_NAME"] = get_empty_str_array(
             len(base), 48, host["COMMON_NAME"] or ""
         )
-        base["HOST_ID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
 
     host_sc = SkyCoord(host["RA"], host["DEC"], unit="deg")
     base = add_skycoord(base)
@@ -720,7 +698,7 @@ def add_cleaned_spectra(base, spectra_clean):
         base["SPEC_REPEAT"][closest_obj_index] = _join_spec_repeat(
             spec["SPEC_REPEAT"],
             base["SPEC_REPEAT"][closest_obj_index],
-            *base["SPEC_REPEAT"][nearby_has_spec_indices]
+            *base["SPEC_REPEAT"][nearby_has_spec_indices],
         )
 
         if len(nearby_has_spec_indices) > 0:
@@ -860,10 +838,62 @@ def find_satellites(base, version=1):
     return base
 
 
-def add_stellar_mass(base, cosmology=WMAP9):
+def vhelio2virgo(vhelio, coord):
     """
-    Calculate stellar mass based only on gi colors and redshift and add to base catalog.
-    Based on GAMA data using Taylor et al (2011).
+    We use https://arxiv.org/pdf/astro-ph/9806140.pdf#page=8 to translate
+    v_helio to v_virgo
+    """
+
+    v_lg = ne.evaluate(
+        "v + 295.4*sin(al2)*cos(ab2) - 79.1*cos(al2)*cos(ab2) - 37.6*sin(ab2)",
+        {"v": vhelio, "al2": coord.galactic.l.radian, "ab2": coord.galactic.b.radian,},
+        {},
+    )
+
+    v_virgo = ne.evaluate(
+        "v_lg + 170.0*(sin(sgbo)*sin(sgb) + cos(sgbo)*cos(sgb)*cos(sglo-sgl))",
+        {
+            "v_lg": v_lg,
+            "sglo": np.deg2rad(104),
+            "sgbo": np.deg2rad(-2),
+            "sgl": coord.supergalactic.sgl.radian,
+            "sgb": coord.supergalactic.sgb.radian,
+        },
+        {},
+    )
+
+    return v_virgo
+
+
+def add_z_cosmo(base):
+
+    """
+    For hosts and sats, use z_cosmo/distance from the host
+    For the rest, use v_virgo to get z_cosmo.
+
+    """
+
+    base = add_skycoord(base)
+    has_spec_mask = C.has_spec.mask(base)
+    base["z_cosmo"] = np.nan
+    base["z_cosmo"][has_spec_mask] = v2z(
+        vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask])
+    )
+    host_or_sats_mask = (C.is_sat | "SATS == 3").mask(base)
+    base["z_cosmo"][host_or_sats_mask] = (
+        base["HOST_ZCOSMO"][host_or_sats_mask]
+        if "HOST_ZCOSMO" in base.colnames
+        else d2z(base["HOST_DIST"][host_or_sats_mask])
+    )
+
+    return base
+
+
+def add_stellar_mass(base):
+    """
+    A modified version of Bell et al (2003).
+    Additional -0.15dex is needed to match to the Zibetti+09 and GAMA relation.
+    Assuming an absolute solar $r$-band magnitude of 4.65 from Willmer+18.
 
     `base` is modified in-place.
 
@@ -875,65 +905,31 @@ def add_stellar_mass(base, cosmology=WMAP9):
     -------
     base : astropy.table.Table
     """
-    base["log_sm"] = np.nan
-
-    global _HAS_KCORRECT
-    if not _HAS_KCORRECT:
-        logging.warning("No kcorrect module. Stellar mass not calculated!")
-        return base
-
-    if "OBJID_sdss" in base.colnames:  # version 2 base catalog with SDSS
-        postfix = "_sdss"
-        to_calc_query = Query(C.has_spec, "OBJID_sdss != -1")
-    elif "EXTINCTION_U" in base.colnames:  # version 1 base catalog
-        postfix = ""
-        to_calc_query = C.has_spec
+    # add "r_mag" etc to version 1 base catalog
+    if "r_mag" not in base.colnames and "EXTINCTION_R" in base.colnames:
         for b in get_sdss_bands():
             base["{}_mag".format(b)] = base[b] - base["EXTINCTION_{}".format(b.upper())]
-    else:  # version 2 base catalog without SDSS
-        logging.warning("No SDSS bands! Stellar mass not calculated!")
-        return base
 
-    to_calc_mask = to_calc_query.mask(base)
-    if not to_calc_mask.any():
-        logging.warning("Stellar mass not calculated because no valid entry!")
-        return base
+    if "z_cosmo" not in base.colnames:
+        base = add_z_cosmo(base)
 
-    if _HAS_KCORRECT != "LOADED":
-        kcorrect.load_templates()
-        kcorrect.load_filters()
-        _HAS_KCORRECT = "LOADED"
+    ok_to_calculate = Query(
+        (np.isfinite, "z_cosmo"),
+        "z_cosmo > 0",
+        "z_cosmo < 0.5",
+        "abs(g_mag - r_mag) < 10",
+    ).mask(base)
+    g = base["g_mag"][ok_to_calculate]
+    r = base["r_mag"][ok_to_calculate]
+    gr = g - r
+    z = base["z_cosmo"][ok_to_calculate]
+    Mr = r - z2m(z) - calc_kcor("r", z, "g - r", gr)
 
-    mag = view_table_as_2d_array(
-        base,
-        ("{}_mag{}".format(b, postfix) for b in get_sdss_bands()),
-        to_calc_mask,
-        np.float32,
-    )
-    mag_err = view_table_as_2d_array(
-        base,
-        ("{}_err{}".format(b, postfix) for b in get_sdss_bands()),
-        to_calc_mask,
-        np.float32,
-    )
-    redshift = view_table_as_2d_array(base, ["SPEC_Z"], to_calc_mask, np.float32)
+    base["Mr"] = np.nan
+    base["Mr"][ok_to_calculate] = Mr
 
-    # CONVERT SDSS MAGNITUDES INTO MAGGIES
-    mgy = 10.0 ** (-0.4 * mag)
-    mgy_ivar = (0.4 * np.log(10.0) * mgy * mag_err) ** -2.0
-    kcorrect_input = np.hstack([redshift, mgy, mgy_ivar])
-
-    # USE ASTROPY TO CALCULATE LUMINOSITY DISTANCE
-    lf_distmod = cosmology.distmod(redshift.ravel()).value
-
-    # RUN KCORRECT FIT, AND CALCULATE STELLAR MASS
-    tmremain = np.array([0.601525, 0.941511, 0.607033, 0.523732, 0.763937])
-    sm_not_normed = np.fromiter(
-        (np.dot(kcorrect.fit_coeffs(x)[1:], tmremain) for x in kcorrect_input),
-        np.float64,
-        len(kcorrect_input),
-    )
-    base["log_sm"][to_calc_mask] = np.log10(sm_not_normed) + (0.4 * lf_distmod)
+    base["log_sm"] = np.nan
+    base["log_sm"][ok_to_calculate] = 1.254 + 1.0976 * gr - 0.4 * Mr
 
     return base
 
@@ -946,7 +942,7 @@ def build_full_stack(
     spectra=None,
     sdss_remove=None,
     sdss_recover=None,
-    **kwargs
+    **kwargs,
 ):
     """
     This function calls all needed functions to complete the full stack of building

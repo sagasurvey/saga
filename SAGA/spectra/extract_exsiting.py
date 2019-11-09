@@ -1,5 +1,6 @@
 import numpy as np
 from easyquery import Query
+
 from ..utils import fill_values_by_query
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
 from .manual_fixes import fixes_sdss_spec_by_objid

@@ -1,15 +1,8 @@
 import os
 
 from ..spectra import SpectraData
-from .core import (
-    CsvTable,
-    DataObject,
-    FastCsvTable,
-    FileObject,
-    FitsTable,
-    GoogleSheets,
-    NumpyBinary,
-)
+from .core import (CsvTable, DataObject, FastCsvTable, FileObject, FitsTable,
+                   GoogleSheets, NumpyBinary)
 from .external_masterlist import EddQuery, HyperledaQuery
 
 __all__ = ["known_google_sheets", "Database", "SpectraData"]
@@ -19,7 +12,7 @@ known_google_sheets = {
         "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1471095077
     ),
     "hosts_v2": GoogleSheets(
-        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1840903683
+        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1765625842
     ),
     "host_remove": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
@@ -133,7 +126,12 @@ class Database(object):
             raise ValueError("cannot locate {}".format(self._local_dir))
 
         self._tables = {
-            "masterlist": DataObject(
+            "master_list_v1": DataObject(
+                FastCsvTable(
+                    os.path.join(self._shared_dir, "HostCatalogs", "master_list_v1.csv")
+                )
+            ),
+            "master_list_v2": DataObject(
                 FastCsvTable(
                     os.path.join(self._shared_dir, "HostCatalogs", "master_list_v2.csv")
                 )
@@ -155,7 +153,7 @@ class Database(object):
                 ),
                 FastCsvTable(
                     os.path.join(
-                        self._local_dir, "masterlist_sources", "hyperleda_kt12.csv"
+                        self._local_dir, "master_list_v2_sources", "hyperleda_kt12.csv"
                     ),
                     comment="#",
                 ),
@@ -165,7 +163,7 @@ class Database(object):
                 EddQuery("SELECT pgc, K_tc, H_tc, Vhel from k2m1175"),
                 FastCsvTable(
                     os.path.join(
-                        self._local_dir, "masterlist_sources", "edd_2mrs_slim.csv"
+                        self._local_dir, "master_list_v2_sources", "edd_2mrs_slim.csv"
                     ),
                     comment="#",
                 ),
@@ -175,7 +173,7 @@ class Database(object):
                 EddQuery("SELECT PGC, Mhalo from klimgroups"),
                 FastCsvTable(
                     os.path.join(
-                        self._local_dir, "masterlist_sources", "edd_kim17_slim.csv"
+                        self._local_dir, "master_list_v2_sources", "edd_kim17_slim.csv"
                     ),
                     comment="#",
                 ),
@@ -187,7 +185,7 @@ class Database(object):
                 ),
                 FitsTable(
                     os.path.join(
-                        self._local_dir, "masterlist_sources", "hipparcos2.fits"
+                        self._local_dir, "master_list_v2_sources", "hipparcos2.fits"
                     )
                 ),
                 use_local_first=True,
@@ -381,7 +379,7 @@ class Database(object):
         for k, v in known_google_sheets.items():
             if k == "hosts_v2":
                 self._tables[k] = DataObject(
-                    # v,  #TODO: uncomment this line
+                    v,
                     CsvTable(
                         os.path.join(
                             self._shared_dir, "HostCatalogs", "host_list_v2.csv"
@@ -411,6 +409,9 @@ class Database(object):
                 )
             else:
                 self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
+
+        self._tables["hosts"] = self._tables["hosts_v2"]
+        self._tables["master_list"] = self._tables["master_list_v2"]
 
         self._file_path_pattern = {
             "base_v2": os.path.join(

@@ -1,16 +1,17 @@
-import os
 import logging
+import os
+
+import astropy.constants
 import numpy as np
-from astropy.table import Table, vstack
-from astropy.coordinates import SkyCoord, EarthLocation
-from astropy.time import Time
+from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.io import fits
 from astropy.io.ascii.cparser import CParserError  # pylint: disable=E0611
-import astropy.constants
+from astropy.table import Table, vstack
+from astropy.time import Time
 from easyquery import Query
 
+from ..database import CsvTable, FitsTable
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
-from ..database import FitsTable, CsvTable
 
 __all__ = [
     "read_mmt",
@@ -51,7 +52,7 @@ def read_generic_spectra(
     cuts=None,
     postprocess=None,
     midprocess=None,
-    **kwargs
+    **kwargs,
 ):
 
     names = [usecols.get(i + 1, "_{}".format(i)) for i in range(n_cols_total)]
@@ -69,7 +70,7 @@ def read_generic_spectra(
                 guess=False,
                 names=names,
                 exclude_names=exclude_names,
-                **kwargs
+                **kwargs,
             )
         except (IOError, CParserError) as e:
             logging.warning(

@@ -61,32 +61,47 @@ class HostCatalog(object):
 
     _ID_COLNAME = "HOSTID"
 
-    def __init__(self, database=NotImplementedError):
+    def __init__(self, database=None, version=None):
         self._database = database or Database()
         self._host_table_ = None
         self._host_index_ = None
         self._master_table_ = None
+        self._version = version or 2
 
     @property
     def _master_table(self):
         if self._master_table_ is None:
-            try:
-                self._master_table_ = self._database["masterlist"].read()
-            except:
-                logging.warning(
-                    "Cannot load master list; attempt to build from scratch..."
-                )
-                self._master_table_ = self.build()
+            if self._version == 1:
+                self._master_table_ = self._database["master_list_v1"].read()
+            else:
+                try:
+                    self._master_table_ = self._database["master_list_v2"].read()
+                except:  # pylint: disable=bare-except # noqa: E722
+                    logging.warning(
+                        "Cannot load master list; attempt to build from scratch..."
+                    )
+                    self._master_table_ = self.build_master_list()
         return self._master_table_
 
     @property
     def _host_table(self):
         if self._host_table_ is None:
-            try:
-                self._host_table_ = self._database["hosts_v2"].read()
-            except:
-                logging.warning("Cannot load host list; attempt to load master list...")
-                self._host_table_ = Query("HOST_SCORE > 0").filter(self._master_table)
+            if self._version == 1:
+                self._host_table_ = self._database["hosts_v1"].read()
+                if "Dec" in self._host_table_.colnames:
+                    self._host_table_.rename_column("Dec", "DEC")
+                if "SAGA_name" in self._host_table_.colnames:
+                    self._host_table_.rename_column("SAGA_name", "SAGA_NAME")
+            else:
+                try:
+                    self._host_table_ = self._database["hosts_v2"].read()
+                except:  # pylint: disable=bare-except # noqa: E722
+                    logging.warning(
+                        "Cannot load host list; attempt to load master list..."
+                    )
+                    self._host_table_ = Query("HOST_SCORE > 0").filter(
+                        self._master_table
+                    )
         return self._host_table_
 
     @property
@@ -282,11 +297,11 @@ class HostCatalog(object):
             raise ValueError("More than one hosts found!")
         return cat[0]
 
-    def build(self, overwrite=False):
+    def build_master_list(self, overwrite=False):
 
-        if self._database["masterlist"].remote.isfile() and not overwrite:
+        if self._database["master_list_v2"].remote.isfile() and not overwrite:
             raise ValueError(
-                "masterlist already exist and overwrite is not set to True"
+                "master list already exist and overwrite is not set to True"
             )
 
         d = build_master_list(
@@ -303,7 +318,7 @@ class HostCatalog(object):
                 if k.startswith("footprint_")
             },
         )
-        self._database["masterlist"].write(d, overwrite=True)
+        self._database["master_list_v2"].write(d, overwrite=True)
         return d
 
     def load_master_list(self):

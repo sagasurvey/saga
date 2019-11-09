@@ -4,20 +4,17 @@ SAGA.host.selection
 This file contains the functinos to build the master list and host list
 """
 
-import astropy.constants
 import astropy.units as u
 import healpy as hp
 import numpy as np
 from astropy.coordinates import Distance, SkyCoord
-from astropy.cosmology import FlatLambdaCDM  # pylint: disable:no-name-in-module
 from astropy.table import Table, join, vstack
 from astropy.time import Time
 from easyquery import Query, QueryMaker
 
 from ..external.calc_kcor import calc_kcor
 from ..utils import add_skycoord, fill_values_by_query
-
-cosmo = FlatLambdaCDM(70, 0.27)  # same as HyperLEDA
+from ..utils.distance import d2z, m2d, v2z, z2m
 
 SAGA_NAMES = {
     37845: "Alice",
@@ -44,18 +41,6 @@ def notnull(d):
         return ~d.mask
     except AttributeError:
         return ~np.isnan(d)
-
-
-def mod2dist(mod):
-    return 10.0 ** ((mod - 25.0) / 5.0)
-
-
-def dist2mod(dist):
-    return np.log10(dist) * 5.0 + 25.0
-
-
-def v2redshift(v):
-    return v / astropy.constants.c.to("km/s").value  # pylint: disable=no-member
 
 
 def join_by_pgc(d, to_join, join_type="left", postfix=None):
@@ -88,7 +73,7 @@ def add_nsa(d, nsa):
         nsa.rename_column("PETRO_TH50", "PETROTH50")
         nsa.rename_column("NSAID", "NSA1ID")
 
-    nsa["modz_nsa"] = cosmo.distmod(nsa["ZDIST"])
+    nsa["modz_nsa"] = z2m(nsa["ZDIST"])
     nsa = add_skycoord(nsa)
 
     q_dmod = Query("abs(modz_nsa - modz_better) < 0.5")
@@ -147,11 +132,8 @@ def calc_needed_quantities(d):
         d["modbest"],
         d["modz_nsa"],
     )
-    d["DIST"] = mod2dist(d["DISTMOD"])
-
-    z = np.linspace(0, 0.02, 2e5 + 1)
-    dl = cosmo.luminosity_distance(z)
-    d["Z_COSMO"] = np.interp(d["DIST"], dl, z)
+    d["DIST"] = m2d(d["DISTMOD"])
+    d["Z_COSMO"] = d2z(d)
 
     d["kcorrection"] = calc_kcor(
         "Ks2", d["Z_COSMO"].data, "H2 - Ks2", d["H_tc"].data - d["K_tc"].data
@@ -230,7 +212,7 @@ def clean_up_columns(d):
     d.rename_column("b2", "GLAT")
     d.rename_column("Mhalo", "M_HALO")
 
-    d["Z_HELIO"] = v2redshift(d["V_HELIO"])
+    d["Z_HELIO"] = v2z(d["V_HELIO"])
     d["RA"] = np.remainder(d["al2000"] * 15.0, 360.0)
     d["NSAID"] = d["NSAID"].filled(-1)
     d["NSA1ID"] = d["NSA1ID"].filled(-1)
@@ -355,7 +337,6 @@ def build_master_list(
     remove_list=None,
     stars=None,
     coverage_maps=None,
-    **kwargs
 ):
 
     d = hyperleda.copy()

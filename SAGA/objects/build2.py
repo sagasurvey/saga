@@ -2,33 +2,25 @@
 base catalog building pipeline 2.0
 """
 import logging
-from itertools import chain, count
 from collections import Counter
-import numpy as np
-import numexpr as ne
-from easyquery import Query
-from fast3tree import find_friends_of_friends
-from astropy.coordinates import SkyCoord, search_around_sky
-from astropy.table import join, vstack
+from itertools import chain, count
+
 import astropy.constants
 import astropy.units
+import numexpr as ne
+import numpy as np
+from astropy.coordinates import SkyCoord, search_around_sky
+from astropy.table import join, vstack
+from easyquery import Query
+from fast3tree import find_friends_of_friends
 
+from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
+                       extract_nsa_spectra, extract_sdss_spectra)
+from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
+                     get_remove_flag, get_sdss_bands, group_by)
 from . import build
-from ..utils import (
-    fill_values_by_query,
-    get_empty_str_array,
-    get_remove_flag,
-    get_sdss_bands,
-    add_skycoord,
-    group_by,
-)
-from ..spectra import (
-    extract_nsa_spectra,
-    extract_sdss_spectra,
-    ensure_specs_dtype,
-    SPECS_COLUMNS,
-    SPEED_OF_LIGHT,
-)
+
+# pylint: disable=logging-format-interpolation
 
 __all__ = [
     "prepare_sdss_catalog_for_merging",
@@ -424,6 +416,7 @@ def merge_catalogs(debug=None, **catalog_dict):
 
     merged_catalog = Query("chosen == 2").filter(stacked_catalog)
     for name in catalog_dict:
+        # pylint: disable=undefined-loop-variable
         merged_catalog = join(
             merged_catalog,
             Query("chosen > 0", (lambda x: x == name, "survey")).filter(
@@ -733,6 +726,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 global_dict={},
             )
 
+            # pylint: disable=cell-var-from-loop
             no_spec_z_or_close = Query("ZQUALITY < 3")
             no_spec_z_or_close |= Query(
                 (lambda z: np.fabs(z - nsa_obj["Z"]) < 200.0 / SPEED_OF_LIGHT, "SPEC_Z")
@@ -852,7 +846,7 @@ def build_full_stack(
     spectra=None,
     convert_to_sdss_filters=True,
     debug=None,
-    **kwargs
+    **kwargs,
 ):
     """
     This function calls all needed functions to complete the full stack of building

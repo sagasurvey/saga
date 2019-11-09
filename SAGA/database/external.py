@@ -1,17 +1,19 @@
-import os
-import time
-import re
 import gzip
+import os
 import random
-import string
+import re
 import shutil
-import requests
+import string
+import time
+
 import numpy as np
+import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
-from .core import FitsTable, DownloadableBase
+
 from ..utils import makedirs_if_needed
+from .core import DownloadableBase, FitsTable
 
 _HAS_CASJOBS_ = True
 try:
@@ -573,7 +575,7 @@ class DecalsQuery(DownloadableBase):
                 margin_ra=self.radius
                 * 1.01
                 / max(np.cos(np.deg2rad(self.dec)), 1.0e-8),
-                margin_dec=self.radius * 1.01
+                margin_dec=self.radius * 1.01,
             ):
                 continue
 
@@ -612,7 +614,7 @@ def download_catalogs_for_hosts(
     host_id_label="NSAID",
     host_ra_label="RA",
     host_dec_label="Dec",
-    **query_class_kwargs
+    **query_class_kwargs,
 ):
     """
     A convenience function of getting all catalogs for hosts.

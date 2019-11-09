@@ -2,22 +2,16 @@
 module assign_targeting_score
 """
 from itertools import chain
+
 import numpy as np
 from easyquery import Query
-from ..objects import cuts as C
+
 from .. import utils
-from ..utils import (
-    fill_values_by_query,
-    get_sdss_bands,
-    get_sdss_colors,
-    get_all_colors,
-)
-from .gmm import (
-    calc_gmm_satellite_probability,
-    calc_log_likelihood,
-    get_input_data,
-    param_labels_nosat,
-)
+from ..objects import cuts as C
+from ..utils import (fill_values_by_query, get_all_colors, get_sdss_bands,
+                     get_sdss_colors)
+from .gmm import (calc_gmm_satellite_probability, calc_log_likelihood,
+                  get_input_data, param_labels_nosat)
 
 __all__ = [
     "assign_targeting_score_v1",
@@ -195,7 +189,7 @@ def assign_targeting_score_v2(
     seed=123,
     remove_lists=None,
     low_priority_objids=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Last updated: 09/05/2018
@@ -265,7 +259,7 @@ def assign_targeting_score_v2(
                 *get_input_data(
                     base_this, bands=bands, mag_err_postfix="_err" + postfix,
                 ),
-                *(gmm_parameters_this[n] for n in param_labels_nosat)
+                *(gmm_parameters_this[n] for n in param_labels_nosat),
             )
         else:
             base_this["P_GMM"] = 0

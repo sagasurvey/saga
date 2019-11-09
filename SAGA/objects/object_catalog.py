@@ -2,18 +2,19 @@ import os
 import time
 import traceback
 from collections import defaultdict
-import numpy as np
-from astropy.time import Time
-from astropy.table import vstack, Table, join
-from easyquery import Query
-from . import cuts as C
-from . import build, build2
-from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
-from ..database import FitsTable, Database, FileObject, DataObject, CsvTable
-from ..hosts import HostCatalog
-from .. import utils
-from ..utils import get_sdss_bands, get_all_colors, fill_values_by_query
 
+import numpy as np
+from astropy.table import Table, join, vstack
+from astropy.time import Time
+from easyquery import Query
+
+from .. import utils
+from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
+from ..hosts import HostCatalog
+from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
+from . import build, build2
+from . import cuts as C
+from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 
 __all__ = ["ObjectCatalog", "get_unique_objids"]
 
@@ -489,7 +490,7 @@ class ObjectCatalog(object):
                     convert_to_sdss_filters=convert_to_sdss_filters,
                     debug=debug_this,
                     **manual_lists,
-                    **catalog_dict
+                    **catalog_dict,
                 )
             except Exception as e:  # pylint: disable=W0703
                 print(

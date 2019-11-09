@@ -1,9 +1,9 @@
 import numpy as np
 from easyquery import Query
 
-from .common import SPEED_OF_LIGHT, ensure_specs_dtype
-from ..database import FitsTable, FileObject
+from ..database import FileObject, FitsTable
 from ..utils import fill_values_by_query
+from .common import SPEED_OF_LIGHT, ensure_specs_dtype
 
 __all__ = [
     "read_gama",

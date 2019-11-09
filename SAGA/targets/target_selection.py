@@ -2,19 +2,18 @@
 TargetSelection class
 """
 from itertools import chain
+
 import numpy as np
-from easyquery import Query
-from astropy.table import vstack, Table
 from astropy import units as u
-from astropy.coordinates import SkyCoord, Angle
+from astropy.coordinates import Angle, SkyCoord
+from astropy.table import Table, vstack
+from easyquery import Query
+
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
 from ..utils import add_skycoord
-from .assign_targeting_score import (
-    assign_targeting_score_v1,
-    assign_targeting_score_v2,
-    COLUMNS_USED,
-)
+from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
+                                     assign_targeting_score_v2)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -201,7 +200,7 @@ class TargetSelection(object):
                     manual_selected_objids=self._manual_selected_objids,
                     gmm_parameters=self._gmm_parameters,
                     remove_lists=self._remove_lists,
-                    **self.assign_targeting_score_kwargs
+                    **self.assign_targeting_score_kwargs,
                 )
 
         if return_as[0] == "n":

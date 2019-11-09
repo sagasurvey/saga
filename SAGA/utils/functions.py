@@ -1,8 +1,9 @@
 import os
-import requests
+
 import numpy as np
-from easyquery import Query
+import requests
 from astropy.coordinates import SkyCoord
+from easyquery import Query
 
 __all__ = [
     "get_sdss_bands",

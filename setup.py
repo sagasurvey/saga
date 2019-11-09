@@ -8,7 +8,8 @@ http://opensource.org/licenses/MIT
 """
 
 import os
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 with open(os.path.join(os.path.dirname(__file__), "SAGA", "version.py")) as f:
     exec(f.read())  # pylint: disable=W0122
@@ -28,17 +29,19 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Astronomy",
+        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
     ],
     keywords="SAGA",
     packages=find_packages(),
     install_requires=[
-        "numpy>=1.9",
-        "numexpr>=2.0",
+        "numpy>=1.11",
+        "scipy>=0.17" "numexpr>=2.0",
         "astropy>=2.0",
         "easyquery>=0.1.5",
         "requests>=2.0",
         "fast3tree>=0.3.1",
-        "healpy>=1.11.0",
+        "healpy>=1.11",
     ],
 )
