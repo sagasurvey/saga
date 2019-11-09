@@ -152,7 +152,7 @@ def add_host_info(base, host, overwrite_if_different_host=False):
     """
     if "field_id" in host.colnames:  # for LOWZ survey
         base["FIELD_RA"] = np.float32(host["RA"])
-        base["FIELD_DEC"] = np.float32(host["Dec"])
+        base["FIELD_DEC"] = np.float32(host["DEC"])
         base["FIELD_ID"] = get_empty_str_array(len(base), 48, host["field_id"])
         return base
 
@@ -161,29 +161,46 @@ def add_host_info(base, host, overwrite_if_different_host=False):
     ) and not overwrite_if_different_host:
         raise ValueError("Host info exists and differs from input host info.")
 
+    base["HOST_PGC"] = np.int32(host["PGC"])
     base["HOST_NSAID"] = np.int32(host["NSAID"])
     base["HOST_NSA1ID"] = np.int32(host["NSA1ID"])
     base["HOST_RA"] = np.float32(host["RA"])
-    base["HOST_DEC"] = np.float32(host["Dec"])
-    base["HOST_DIST"] = np.float32(host["distance"])
-    base["HOST_VHOST"] = np.float32(host["vhelio"])
-    base["HOST_MK"] = np.float32(host["M_K"])
-    base["HOST_MR"] = np.float32(host["M_r"])
-    base["HOST_MG"] = np.float32(host["M_g"])
-    base["HOST_SAGA_NAME"] = get_empty_str_array(len(base), 48, host["SAGA_name"] or "")
-    base["HOST_NGC"] = np.int32(host["NGC"])
-    base["HOST_PGC"] = np.int32(host["PGC"])
-    base["HOST_ID"] = (
-        "nsa{}".format(host["NSAID"])
-        if host["NSAID"] != -1
-        else "pgc{}".format(host["PGC"])
-    )
+    base["HOST_DEC"] = np.float32(host["DEC"])
 
-    host_sc = SkyCoord(host["RA"], host["Dec"], unit="deg")
+    if "distance" in host.colnames:
+        base["HOST_DIST"] = np.float32(host["distance"])
+        base["HOST_VHOST"] = np.float32(host["vhelio"])
+        base["HOST_MK"] = np.float32(host["M_K"])
+        base["HOST_MR"] = np.float32(host["M_r"])
+        base["HOST_MG"] = np.float32(host["M_g"])
+        base["HOST_SAGA_NAME"] = get_empty_str_array(
+            len(base), 48, host["SAGA_name"] or ""
+        )
+        base["HOST_NGC"] = np.int32(host["NGC"])
+        base["HOST_ID"] = (
+            "nsa{}".format(host["NSAID"])
+            if host["NSAID"] != -1
+            else "pgc{}".format(host["PGC"])
+        )
+    else:
+        base["HOST_DIST"] = np.float32(host["DIST"])
+        base["HOST_DISTMOD"] = np.float32(host["DISTMOD"])
+        base["HOST_VHOST"] = np.float32(host["V_HELIO"])
+        base["HOST_ZCOSMO"] = np.float32(host["Z_COSMO"])
+        base["HOST_MK"] = np.float32(host["K_ABS"])
+        base["HOST_SAGA_NAME"] = get_empty_str_array(
+            len(base), 48, host["SAGA_NAME"] or ""
+        )
+        base["HOST_COMMON_NAME"] = get_empty_str_array(
+            len(base), 48, host["COMMON_NAME"] or ""
+        )
+        base["HOST_ID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
+
+    host_sc = SkyCoord(host["RA"], host["DEC"], unit="deg")
     base = add_skycoord(base)
     sep = base["coord"].separation(host_sc)
     base["RHOST_ARCM"] = sep.arcmin.astype(np.float32)
-    base["RHOST_KPC"] = (np.sin(sep.radian) * (1000.0 * host["distance"])).astype(
+    base["RHOST_KPC"] = (np.sin(sep.radian) * (1000.0 * base["HOST_DIST"][0])).astype(
         np.float32
     )
 
@@ -862,7 +879,7 @@ def add_stellar_mass(base, cosmology=WMAP9):
 
     global _HAS_KCORRECT
     if not _HAS_KCORRECT:
-        logging.warn("No kcorrect module. Stellar mass not calculated!")
+        logging.warning("No kcorrect module. Stellar mass not calculated!")
         return base
 
     if "OBJID_sdss" in base.colnames:  # version 2 base catalog with SDSS
@@ -874,12 +891,12 @@ def add_stellar_mass(base, cosmology=WMAP9):
         for b in get_sdss_bands():
             base["{}_mag".format(b)] = base[b] - base["EXTINCTION_{}".format(b.upper())]
     else:  # version 2 base catalog without SDSS
-        logging.warn("No SDSS bands! Stellar mass not calculated!")
+        logging.warning("No SDSS bands! Stellar mass not calculated!")
         return base
 
     to_calc_mask = to_calc_query.mask(base)
     if not to_calc_mask.any():
-        logging.warn("Stellar mass not calculated because no valid entry!")
+        logging.warning("Stellar mass not calculated because no valid entry!")
         return base
 
     if _HAS_KCORRECT != "LOADED":

@@ -1,11 +1,32 @@
 import os
-from .core import DataObject, CsvTable, GoogleSheets, FitsTable, NumpyBinary, FileObject
+
 from ..spectra import SpectraData
+from .core import (
+    CsvTable,
+    DataObject,
+    FastCsvTable,
+    FileObject,
+    FitsTable,
+    GoogleSheets,
+    NumpyBinary,
+)
+from .external_masterlist import EddQuery, HyperledaQuery
 
 __all__ = ["known_google_sheets", "Database", "SpectraData"]
 
 known_google_sheets = {
-    "hosts": GoogleSheets("1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1471095077),
+    "hosts_v1": GoogleSheets(
+        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1471095077
+    ),
+    "hosts_v2": GoogleSheets(
+        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1840903683
+    ),
+    "host_remove": GoogleSheets(
+        "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
+        1133875164,
+        header_start=1,
+        include_names=["NSAID", "flag"],
+    ),
     "sdss_remove": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         1379081675,
@@ -112,6 +133,11 @@ class Database(object):
             raise ValueError("cannot locate {}".format(self._local_dir))
 
         self._tables = {
+            "masterlist": DataObject(
+                FastCsvTable(
+                    os.path.join(self._shared_dir, "HostCatalogs", "master_list_v2.csv")
+                )
+            ),
             "saga_spectra_May2017": DataObject(
                 FitsTable(
                     os.path.join(
@@ -121,6 +147,50 @@ class Database(object):
             ),
             "saga_clean_specs": DataObject(
                 FitsTable(os.path.join(self._local_dir, "saga_clean_specs.fits.gz"))
+            ),
+            "hyperleda_kt12": DataObject(
+                HyperledaQuery(
+                    "v IS NOT NULL and modbest IS NOT NULL and kt<12 and objtype='G'",
+                    "pgc,objname,al2000,de2000,l2,b2,bt,kt,vopt,v,vvir,modz,mod0,modbest,e_modbest",
+                ),
+                FastCsvTable(
+                    os.path.join(
+                        self._local_dir, "masterlist_sources", "hyperleda_kt12.csv"
+                    ),
+                    comment="#",
+                ),
+                use_local_first=True,
+            ),
+            "edd_2mrs_slim": DataObject(
+                EddQuery("SELECT pgc, K_tc, H_tc, Vhel from k2m1175"),
+                FastCsvTable(
+                    os.path.join(
+                        self._local_dir, "masterlist_sources", "edd_2mrs_slim.csv"
+                    ),
+                    comment="#",
+                ),
+                use_local_first=True,
+            ),
+            "edd_kim17_slim": DataObject(
+                EddQuery("SELECT PGC, Mhalo from klimgroups"),
+                FastCsvTable(
+                    os.path.join(
+                        self._local_dir, "masterlist_sources", "edd_kim17_slim.csv"
+                    ),
+                    comment="#",
+                ),
+                use_local_first=True,
+            ),
+            "hipparcos2": DataObject(
+                FitsTable(
+                    "http://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/fits?I/311/hip2.dat.gz"
+                ),
+                FitsTable(
+                    os.path.join(
+                        self._local_dir, "masterlist_sources", "hipparcos2.fits"
+                    )
+                ),
+                use_local_first=True,
             ),
             "nsa_v1.0.1": DataObject(
                 FitsTable(
@@ -297,12 +367,35 @@ class Database(object):
                         NumpyBinary(os.path.join(gmm_dir, fname))
                     )
 
+        footprint_dir = os.path.join(self._shared_dir, "AuxiliaryData", "footprints")
+        if os.path.isdir(footprint_dir):
+            for fname in os.listdir(footprint_dir):
+                if "_footprint_" in fname and fname.endswith(".npy"):
+                    name, _, info = fname.partition("_footprint_")
+                    nside, order = info[:-4].split("_")
+                    obj = NumpyBinary(os.path.join(footprint_dir, fname))
+                    obj.nside = int(nside)
+                    obj.order = order.upper()
+                    self._tables["footprint_" + name] = DataObject(obj)
+
         for k, v in known_google_sheets.items():
-            if k == "hosts":
+            if k == "hosts_v2":
+                self._tables[k] = DataObject(
+                    # v,  #TODO: uncomment this line
+                    CsvTable(
+                        os.path.join(
+                            self._shared_dir, "HostCatalogs", "host_list_v2.csv"
+                        )
+                    ),
+                    cache_in_memory=True,
+                )
+            elif k == "hosts_v1":
                 self._tables[k] = DataObject(
                     v,
                     CsvTable(
-                        os.path.join(self._shared_dir, "HostCatalogs", "host_list.csv")
+                        os.path.join(
+                            self._shared_dir, "HostCatalogs", "host_list_v1.csv"
+                        )
                     ),
                     cache_in_memory=True,
                 )
@@ -427,7 +520,7 @@ class Database(object):
             return default
 
     def keys(self):
-        return self._tables.keys()
+        return sorted((k for k in self._tables if not isinstance(k, tuple)))
 
     def _ipython_key_completions_(self):
         return list(self.keys())

@@ -3,7 +3,7 @@
 Code to access, create and edit SAGA Survey data catalogs.
 Project website: http://sagasurvey.org/
 The MIT License (MIT)
-Copyright (c) 2018 The SAGA Survey
+Copyright (c) 2018-2019 The SAGA Survey
 http://opensource.org/licenses/MIT
 """
 
@@ -39,5 +39,6 @@ setup(
         "easyquery>=0.1.5",
         "requests>=2.0",
         "fast3tree>=0.3.1",
+        "healpy>=1.11.0",
     ],
 )
