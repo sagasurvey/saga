@@ -33,6 +33,7 @@ _list_by_pgc = {
     # fmt: on
 }
 
+good = Query('HAS_IMAGE > 0', 'HOST_SCORE >= 3')
 hostlist_v1 = QueryMaker.in1d("PGC", _list_by_pgc["hostlist_v1"])
 paper1_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_complete"])
 paper1_incomplete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_incomplete"])

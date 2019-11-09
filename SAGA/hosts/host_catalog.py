@@ -137,7 +137,7 @@ class HostCatalog(object):
 
     def _resolve_indices(self, hosts=None):
 
-        if hosts is None:
+        if hosts is None or hosts == "all":
             return list(range(len(self._host_table)))
 
         if _is_string_like(hosts):
