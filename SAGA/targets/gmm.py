@@ -9,7 +9,7 @@ from ..utils import get_sdss_bands, view_table_as_2d_array
 try:
     from sklearn.mixture import GaussianMixture
     from extreme_deconvolution.extreme_deconvolution import extreme_deconvolution
-except (ImportErrorm, OSError):
+except (ImportError, OSError):
     _XDGMM_AVAILABLE = False
 else:
     _XDGMM_AVAILABLE = True
