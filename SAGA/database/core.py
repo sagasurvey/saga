@@ -77,11 +77,14 @@ class FileObject(DownloadableBase):
                 file_open = gzip.open if compress else open
                 try:
                     with file_open(file_path, "wb") as f:
-                        shutil.copyfileobj(r.raw, f)
+                        for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
+                            f.write(chunk)
                 except:
                     if os.path.isfile(file_path):
                         os.unlink(file_path)
                     raise
+            finally:
+                r.close()
 
     def isfile(self):
         if self.path:

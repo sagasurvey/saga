@@ -460,6 +460,8 @@ class DesQuery(DownloadableBase):
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
 
         t = Table.read(r.text, format="ascii.fast_tab", names=cols)
+        r.close()
+
         file_open = gzip.open if compress else open
         makedirs_if_needed(file_path)
         with file_open(file_path, "wb") as f:
@@ -501,7 +503,9 @@ class DecalsPrebuilt(DownloadableBase):
 
         makedirs_if_needed(file_path)
         with open(file_path, "wb") as f:
-            shutil.copyfileobj(r.raw, f)
+            for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
+                f.write(chunk)
+        r.close()
 
 
 class DecalsQuery(DownloadableBase):
