@@ -37,7 +37,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy>=1.11",
-        "scipy>=0.17" "numexpr>=2.0",
+        "scipy>=0.17",
+        "numexpr>=2.0",
         "astropy>=2.0",
         "easyquery>=0.1.5",
         "requests>=2.0",
