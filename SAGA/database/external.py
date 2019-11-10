@@ -666,7 +666,7 @@ def download_catalogs_for_hosts(
 
         try:
             query_obj.download_as_file(path, overwrite=overwrite, compress=compress)
-        except (IOError, OSError, RuntimeError, requests.RequestException) as e:
+        except Exception as e:
             print(e)
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
