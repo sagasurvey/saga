@@ -59,23 +59,21 @@ When using `SAGA`, your code would almost always start with this block:
 
 ```python
 import SAGA
-saga_database = SAGA.Database('/path/to/saga/dropbox/folder', '/path/to/saga/local/folder')
-saga_host_catalog = SAGA.HostCatalog(saga_database)
-saga_object_catalog = SAGA.ObjectCatalog(saga_database)
+saga = SAGA.QuickStart('/path/to/saga/dropbox/folder', '/path/to/saga/local/folder')
 ```
 
-```python
-from SAGA import ObjectCuts as C
+You can then load various datasets:
 
+```python
 # load host list
-hosts = saga_host_catalog.load()
+hosts = saga.host_catalog.load()
 
 # load base catalogs of Paper I hosts
-base_paper1 = saga_object_catalog.load(hosts='paper1', return_as='list')
+base_paper1 = saga.object_catalog.load(hosts='paper1', return_as='list')
 
 # count number of satellites
 for base in base_paper1:
-    print(base['HOST_ID'][0], '# of satellites =', C.is_sat.count(base))
+    print(base['HOST_ID'][0], '# of satellites =', saga.is_sat.count(base))
 ```
 
 You can find more examples at https://github.com/sagasurvey/examples/tree/master/notebooks

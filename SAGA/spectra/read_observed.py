@@ -70,7 +70,7 @@ def read_generic_spectra(
                 guess=False,
                 names=names,
                 exclude_names=exclude_names,
-                **kwargs
+                **kwargs,
             )
         except (IOError, CParserError) as e:
             logging.warning(

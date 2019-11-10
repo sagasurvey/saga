@@ -53,9 +53,18 @@ class ObjectCatalog(object):
 
     _surveys = ("sdss", "des", "decals")
 
-    def __init__(self, database=None, host_catalog_class=HostCatalog):
+    def __init__(
+        self, database=None, host_catalog_class=HostCatalog, host_catalog_instance=None
+    ):
         self._database = database or Database()
-        self._host_catalog = host_catalog_class(self._database)
+        if host_catalog_instance is not None:
+            if not isinstance(host_catalog_instance, host_catalog_class):
+                raise ValueError(
+                    "`host_catalog_instance` must be an instance of `host_catalog_class`."
+                )
+            self._host_catalog = host_catalog_instance
+        else:
+            self._host_catalog = host_catalog_class(self._database)
 
     @classmethod
     def _annotate_catalog(

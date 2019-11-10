@@ -51,11 +51,31 @@ class TargetSelection(object):
         manual_selected_objids=None,
         version=None,
         assign_targeting_score_kwargs=None,
+        host_catalog_instance=None,
+        object_catalog_instance=None,
     ):
         self._version = version
         self._database = database
-        self._host_catalog = host_catalog_class(self._database)
-        self._object_catalog = ObjectCatalog(self._database, host_catalog_class)
+
+        if host_catalog_instance is not None:
+            if not isinstance(host_catalog_instance, host_catalog_class):
+                raise ValueError(
+                    "`host_catalog_instance` must be an instance of `host_catalog_class`."
+                )
+            self._host_catalog = host_catalog_instance
+        else:
+            self._host_catalog = host_catalog_class(self._database)
+
+        if object_catalog_instance is not None:
+            if not isinstance(object_catalog_instance, ObjectCatalog):
+                raise ValueError(
+                    "`object_catalog_instance` must be an instance of `ObjectCatalog`."
+                )
+            self._object_catalog = object_catalog_instance
+        else:
+            self._object_catalog = ObjectCatalog(
+                self._database, host_catalog_class, self._host_catalog
+            )
 
         self.target_catalogs = dict()
 
@@ -431,7 +451,7 @@ def prepare_mmt_catalog(
                 format="ascii.fast_no_header",
                 formats={
                     "ra": lambda x: Angle(x, "deg")
-                    .wrap_at(360 * u.deg)
+                    .wrap_at(360 * u.deg)  # pylint: disable=no-member
                     .to_string("hr", sep=":", precision=3),  # pylint: disable=E1101
                     "dec": lambda x: Angle(x, "deg").to_string(
                         "deg", sep=":", precision=3
