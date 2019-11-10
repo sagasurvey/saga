@@ -446,8 +446,9 @@ class DesQuery(DownloadableBase):
 
         cols = self.get_colnames_from_query(self.query)
 
+        # taken from https://github.com/noaodatalab/datalab/blob/master/dl/queryClient.py#L1791
         r = requests.get(
-            "https://dlsvcs.datalab.noao.edu/query/query",
+            "https://datalab.noao.edu/query/query",
             {"sql": self.query, "ofmt": "ascii", "async": False},
             headers={
                 "Content-Type": "application/octet-stream",
