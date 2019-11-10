@@ -611,9 +611,9 @@ def download_catalogs_for_hosts(
     overwrite=False,
     compress=True,
     file_size_check=1e6,
-    host_id_label="NSAID",
+    host_id_label="HOSTID",
     host_ra_label="RA",
-    host_dec_label="Dec",
+    host_dec_label="DEC",
     **query_class_kwargs
 ):
     """
