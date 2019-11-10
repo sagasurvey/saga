@@ -241,7 +241,7 @@ class TargetSelection(object):
         if return_as[0] == "l":
             return list(output_iter)
         if return_as[0] == "s":
-            out = vstack(list(output_iter), "outer", "error")
+            out = vstack(list(output_iter), "outer")
             if out.masked:
                 for name, (dtype, _) in out.dtype.fields.items():
                     if dtype.kind == "i":

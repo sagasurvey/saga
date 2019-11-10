@@ -61,21 +61,27 @@ class HostCatalog(object):
 
     _ID_COLNAME = "HOSTID"
 
-    def __init__(self, database=None, version=None):
+    def __init__(self, database=None, version=None, use_master=False):
         self._database = database or Database()
         self._host_table_ = None
         self._host_index_ = None
         self._master_table_ = None
-        self._version = version or 2
+        self._master_index_ = None
+        self._version = version
+        self.use_master = bool(use_master)
 
     @property
     def _master_table(self):
         if self._master_table_ is None:
             if self._version == 1:
                 self._master_table_ = self._database["master_list_v1"].read()
+                if "Dec" in self._master_table_.colnames:
+                    self._master_table_.rename_column("Dec", "DEC")
+                if "PGC#" in self._master_table_.colnames:
+                    self._master_table_.rename_column("PGC#", "PGC")
             else:
                 try:
-                    self._master_table_ = self._database["master_list_v2"].read()
+                    self._master_table_ = self._database["master_list"].read()
                 except:  # pylint: disable=bare-except # noqa: E722
                     logging.warning(
                         "Cannot load master list; attempt to build from scratch..."
@@ -94,7 +100,7 @@ class HostCatalog(object):
                     self._host_table_.rename_column("SAGA_name", "SAGA_NAME")
             else:
                 try:
-                    self._host_table_ = self._database["hosts_v2"].read()
+                    self._host_table_ = self._database["hosts"].read()
                 except:  # pylint: disable=bare-except # noqa: E722
                     logging.warning(
                         "Cannot load host list; attempt to load master list..."
@@ -104,70 +110,97 @@ class HostCatalog(object):
                     )
         return self._host_table_
 
+    @staticmethod
+    def _index_ids(hosts):
+        index = defaultdict(set)
+        if "SAGA_NAME" in hosts.colnames:
+            for i, n in enumerate(hosts["SAGA_NAME"]):
+                n = str(n).strip().strip("-").replace(" ", "")
+                if n:
+                    index[n.lower()].add(i)
+        if "COMMON_NAME" in hosts.colnames:
+            for i, n in enumerate(hosts["COMMON_NAME"]):
+                n = str(n).strip().strip("-").replace(" ", "")
+                if n:
+                    m = re.match(r"^([A-Za-z]+)0*(\d+)$", n)
+                    if m is None:
+                        index[n.lower()].add(i)
+                    else:
+                        prefix, number = m.groups()
+                        index["{}{}".format(prefix.lower(), number)].add(i)
+        for col in ["NSAID", "PGC", "NGC", "UGC"]:
+            if col in hosts.colnames:
+                for i, n in enumerate(hosts[col]):
+                    n = int(n)
+                    if n > -1:
+                        index["{}{}".format(col[:3].lower(), n)].add(i)
+                        if col == "PGC":
+                            index[n].add(i)
+        return {k: tuple(v) for k, v in index.items()}
+
     @property
     def _host_index(self):
         if self._host_index_ is None:
-            hosts = self._host_table
-            index = defaultdict(set)
-            if "SAGA_NAME" in hosts.colnames:
-                for i, n in enumerate(hosts["SAGA_NAME"]):
-                    n = str(n).strip().strip("-").replace(" ", "")
-                    if n:
-                        index[n.lower()].add(i)
-            if "COMMON_NAME" in hosts.colnames:
-                for i, n in enumerate(hosts["COMMON_NAME"]):
-                    n = str(n).strip().strip("-").replace(" ", "")
-                    if n:
-                        m = re.match(r"^([A-Za-z]+)0*(\d+)$", n)
-                        if m is None:
-                            index[n.lower()].add(i)
-                        else:
-                            prefix, number = m.groups()
-                            index["{}{}".format(prefix.lower(), number)].add(i)
-            for col in ["NSAID", "PGC", "NGC", "UGC"]:
-                if col in hosts.colnames:
-                    for i, n in enumerate(hosts[col]):
-                        n = int(n)
-                        if n > -1:
-                            index["{}{}".format(col[:3].lower(), n)].add(i)
-                            if col == "PGC":
-                                index[n].add(i)
-            self._host_index_ = {k: tuple(v) for k, v in index.items()}
+            self._host_index_ = self._index_ids(self._host_table)
         return self._host_index_
 
-    def _resolve_indices(self, hosts=None):
+    @property
+    def _master_index(self):
+        if self._master_index_ is None:
+            self._master_index_ = self._index_ids(self._master_table)
+        return self._master_index_
+
+    def _check_use_master(self, use_master=None):
+        return bool(use_master or (use_master is None and self.use_master))
+
+    def _get_table(self, use_master=None):
+        if use_master:
+            return self._master_table
+        return self._host_table
+
+    def _get_index(self, use_master=None):
+        if use_master:
+            return self._master_index
+        return self._host_index
+
+    def _resolve_indices(self, hosts=None, use_master=None):
+
+        use_master = self._check_use_master(use_master)
 
         if hosts is None or hosts == "all":
-            return list(range(len(self._host_table)))
+            return list(range(len(self._get_table(use_master))))
+
+        if isinstance(hosts, int):
+            hosts = str(hosts)
 
         if _is_string_like(hosts):
-            hosts_key = hosts.strip().replace(" ", "").replace("_", "").lower()
+            if hosts.isdigit():
+                hosts_key = int(hosts)
+            else:
+                hosts_key = hosts.strip().replace(" ", "").replace("_", "").lower()
 
             try:
-                hosts_key = int(hosts_key)
-            except ValueError:
+                return list(self._get_index(use_master)[hosts_key])
+            except KeyError:
                 pass
 
-            if hosts_key in self._host_index:
-                return list(self._host_index[hosts_key])
-
-            hosts = getattr(cuts, hosts_key, None) or Query(hosts)
+            if "," in hosts:
+                hosts = hosts.split(",")
+            elif not hosts.isdigit():
+                hosts = getattr(cuts, hosts, None) or Query(hosts)
 
         if isinstance(hosts, Query):
-            return np.flatnonzero(hosts.mask(self._host_table)).tolist()
+            return np.flatnonzero(hosts.mask(self._get_table(use_master))).tolist()
 
-        if isinstance(hosts, int) and hosts in self._host_index:
-            return list(self._host_index[hosts])
-
-        if hasattr(hosts, "__iter__"):
+        if hasattr(hosts, "__iter__") and not _is_string_like(hosts):
             indices = []
             for host in iter(hosts):
-                indices.extend(self._resolve_indices(host))
+                indices.extend(self._resolve_indices(host, use_master=use_master))
             return indices
 
         return []
 
-    def resolve_id(self, hosts, id_to_return=None):
+    def resolve_id(self, hosts, id_to_return=None, use_master=None):
         """
         Get a list of host IDs from SAGA names or some short-hand names (e.g. 'paper1')
 
@@ -194,7 +227,7 @@ class HostCatalog(object):
         [61945]
 
         """
-        indices = self._resolve_indices(hosts)
+        indices = self._resolve_indices(hosts, use_master=use_master)
 
         if not indices:
             raise KeyError("Can not find {}".format(hosts))
@@ -203,7 +236,7 @@ class HostCatalog(object):
         id_to_return = id_to_return.upper()
 
         if id_to_return[:2] in ("", "ST", "ID", "HO", "FI"):
-            return self._host_table[self._ID_COLNAME][indices].tolist()
+            return self._get_table(use_master)[self._ID_COLNAME][indices].tolist()
 
         if id_to_return[:2] == "IN":
             return indices
@@ -214,8 +247,8 @@ class HostCatalog(object):
                 col += "A_NAME"
             if col == "NSA":
                 col += "ID"
-            if col in self._host_table.colnames:
-                return self._host_table[col][indices].tolist()
+            if col in self._get_table(use_master).colnames:
+                return self._get_table(use_master)[col][indices].tolist()
 
         raise ValueError("`id_to_return` not known!")
 
@@ -233,10 +266,10 @@ class HostCatalog(object):
         """
         names = self.resolve_id(host_id, "SAGA")
         if len(names) > 1:
-            raise ValueError("more than one names found!")
+            raise ValueError("More than one matched host found!")
         return names[0] or ""
 
-    def load(self, hosts=None, add_coord=True):
+    def load(self, hosts=None, add_coord=True, use_master=None):
         """
         load a host catalog
 
@@ -256,10 +289,10 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_host_catalog.load('no_flags')
         >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
-        d = self._host_table[self.resolve_id(hosts, "internal")]
+        d = self._get_table(use_master)[self.resolve_id(hosts, "internal", use_master)]
         return add_skycoord(d) if add_coord else d
 
-    def load_single(self, host, add_coord=True):
+    def load_single(self, host, add_coord=True, use_master=None):
         """
         Gets the catalog row corresponding to a specific named host.
 
@@ -277,29 +310,33 @@ class HostCatalog(object):
         --------
         >>> anak = saga_host_catalog.load_single('AnaK')
         """
-        indices = self.resolve_id(host, "internal")
+        indices = self.resolve_id(host, "internal", use_master)
         if len(indices) != 1:
-            raise ValueError("More than one hosts found!")
-        cat = self._host_table[indices]
+            raise ValueError("More than one matched host found! Use `load` instead!")
+        cat = self._get_table(use_master)[indices]
         cat = add_skycoord(cat) if add_coord else cat
         return cat[0]
 
-    def load_single_near_ra_dec(self, ra, dec):
+    def load_single_near_ra_dec(self, ra, dec, sep=3600, use_master=None):
         """
         ra, dec in degrees
         """
-        add_skycoord(self._host_table)
-        cat = find_near_ra_dec(self._host_table, ra, dec, 3603.0)
-        del self._host_table["coord"]
+        table = add_skycoord(self._get_table(use_master))
+        cat = find_near_ra_dec(table, ra, dec, sep)
+        del table["coord"]
         if len(cat) == 0:
-            raise KeyError("No hosts found!")
+            raise KeyError("No host near ({:.6f}, {:.6f}) found!".format(ra, dec))
         if len(cat) != 1:
-            raise ValueError("More than one hosts found!")
+            raise ValueError(
+                "More than one hosts near ({:.6f}, {:.6f}) found! Use smaller `sep`!".format(
+                    ra, dec
+                )
+            )
         return cat[0]
 
     def build_master_list(self, overwrite=False):
 
-        if self._database["master_list_v2"].remote.isfile() and not overwrite:
+        if self._database["master_list"].remote.isfile() and not overwrite:
             raise ValueError(
                 "master list already exist and overwrite is not set to True"
             )
@@ -318,11 +355,11 @@ class HostCatalog(object):
                 if k.startswith("footprint_")
             },
         )
-        self._database["master_list_v2"].write(d, overwrite=True)
+        self._database["master_list"].write(d, overwrite=True)
         return d
 
-    def load_master_list(self):
-        return self._master_table
+    def load_master_list(self, hosts=None, add_coord=True):
+        return self.load(hosts, add_coord, use_master=True)
 
 
 class FieldCatalog(HostCatalog):
@@ -351,5 +388,16 @@ class FieldCatalog(HostCatalog):
             )
         return self._host_index_
 
+    @property
+    def _master_table(self):
+        raise AttributeError
+
+    @property
+    def _master_index(self):
+        raise AttributeError
+
+    def _check_use_master(self, use_master=None):
+        return False
+
     def build(self, overwrite=False):
-        raise NotImplementedError
+        raise AttributeError

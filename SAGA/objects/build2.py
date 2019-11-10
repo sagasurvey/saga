@@ -361,7 +361,7 @@ def merge_catalogs(debug=None, **catalog_dict):
         del idx
 
     else:
-        stacked_catalog = vstack(list(catalog_dict.values()), "exact", "error")
+        stacked_catalog = vstack(list(catalog_dict.values()), "exact")
         stacked_catalog["survey"] = get_empty_str_array(
             len(stacked_catalog), max(6, max(len(s) for s in catalog_dict))
         )
@@ -899,7 +899,7 @@ def build_full_stack(
 
     base = add_columns_for_spectra(base)
     if all_spectra:
-        all_spectra = vstack(all_spectra, "exact", "error")
+        all_spectra = vstack(all_spectra, "exact")
     if len(all_spectra):
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra

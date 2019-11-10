@@ -89,7 +89,7 @@ def read_generic_spectra(
             this = midprocess(this)
         output.append(this)
 
-    output = vstack(output, "exact", "error")
+    output = vstack(output, "exact")
     output["TELNAME"] = telname
     if postprocess:
         output = postprocess(output)
@@ -238,7 +238,7 @@ def read_wiyn(dir_path):
         this["MASKNAME"] = f
         output.append(this)
 
-    output = vstack(output, "exact", "error")
+    output = vstack(output, "exact")
 
     output.rename_column("FID", "SPECOBJID")
     output.rename_column("Z", "SPEC_Z")

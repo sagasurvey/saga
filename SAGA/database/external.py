@@ -498,12 +498,17 @@ class DecalsPrebuilt(DownloadableBase):
 
         if not r.ok:
             raise requests.RequestException(
-                'Decals-prebuilt download failed: "{}"'.format(r.text)
+                "Decals-prebuilt download failed: '{}'".format(r.text)
             )
 
         makedirs_if_needed(file_path)
+        chunk_size = 16 * 1024 * 1024
         with open(file_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
+            # here we don't use iter_content because we want to keep gzipped
+            while True:
+                chunk = r.raw.read(chunk_size)
+                if not chunk:
+                    break
                 f.write(chunk)
         r.close()
 
@@ -598,7 +603,7 @@ class DecalsQuery(DownloadableBase):
         if not output:
             return Table()
 
-        output = vstack(output, "exact", "error")
+        output = vstack(output, "exact")
         return self.annotate_catalog(output)
 
     def download_as_file(self, file_path, overwrite=False, compress=True):

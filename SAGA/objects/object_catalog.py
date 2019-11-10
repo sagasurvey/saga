@@ -274,7 +274,7 @@ class ObjectCatalog(object):
         if return_as[0] == "i":
             return output_iterator
         if return_as[0] == "s":
-            out = vstack(list(output_iterator), "outer", "error")
+            out = vstack(list(output_iterator), "outer")
             if out.masked:
                 for name, (dtype, _) in out.dtype.fields.items():
                     if dtype.kind == "i":
@@ -574,13 +574,13 @@ class ObjectCatalog(object):
                 raise
         return t
 
-    def _generate_object_stats_single_host(self, host, data=None):
+    def _generate_object_stats_single_host(self, host_id, data=None):
         if data is None:
             data = defaultdict(list)
 
-        data["host"].append(host)
+        data["HOSTID"].append(host_id)
         base = self.load(
-            host, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
+            host_id, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
         ).pop()
 
         simple_cuts = C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut
@@ -637,12 +637,16 @@ class ObjectCatalog(object):
 
         data = Table(data)
 
-        host_table = self._host_catalog.load()[
-            "HOSTID", "RA", "Dec", "distance", "MK_compiled"
-        ]
-        host_table.rename_column("HOSTID", "host")
-        host_table.rename_column("MK_compiled", "M_K")
-        data = join(data, host_table, "host", "left")
+        host_table = self._host_catalog.load(hosts)
+        if "distance" in host_table.colnames:
+            cols = ["HOSTID", "PGC", "RA", "DEC", "distance", "MK_compiled"]
+        else:
+            cols = ["HOSTID", "PGC", "RA", "DEC", "DIST", "K_ABS", "HOST_SCORE"]
+        host_table = host_table[cols]
+        if "distance" in host_table.colnames:
+            host_table.rename_column("distance", "DIST")
+            host_table.rename_column("MK_compiled", "K_ABS")
+        data = join(data, host_table, "HOSTID", "left")
 
         if save_to is not None:
             if not isinstance(save_to, (FileObject, DataObject)):

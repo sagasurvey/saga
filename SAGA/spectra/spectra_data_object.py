@@ -69,7 +69,7 @@ class SpectraData(object):
         if additional_specs:
             all_specs.extend(ensure_specs_dtype(spec) for spec in additional_specs)
 
-        all_specs = vstack(all_specs, "exact", "error")
+        all_specs = vstack(all_specs, "exact")
 
         if self.halpha_data_obj is not None and self.halpha_data_obj.remote.isfile():
             halpha = self.halpha_data_obj.read()[

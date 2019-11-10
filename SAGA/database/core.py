@@ -24,6 +24,7 @@ __all__ = [
     "CsvTable",
     "FastCsvTable",
     "GoogleSheets",
+    "FitsTableGeneric",
     "FitsTable",
     "NumpyBinary",
 ]
@@ -73,7 +74,6 @@ class FileObject(DownloadableBase):
             except requests.exceptions.MissingSchema:
                 shutil.copy(self.path, file_path)
             else:
-                r.raw.decode_content = True
                 file_open = gzip.open if compress else open
                 try:
                     with file_open(file_path, "wb") as f:
@@ -114,6 +114,11 @@ class GoogleSheets(FastCsvTable):
         raise NotImplementedError
 
 
+class FitsTableGeneric(FileObject):
+    _read_default_kwargs = dict(memmap=True)
+    _write_default_kwargs = dict(format="fits")
+
+
 class FitsTable(FileObject):
     compress_after_write = True
     _read_default_kwargs = dict(cache=False, memmap=True)
@@ -121,10 +126,20 @@ class FitsTable(FileObject):
 
     def read(self):
         kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
-        with fits.open(self.path, **kwargs_this) as hdu_list:
-            # pylint: disable=E1101
+
+        try:
+            hdu_list = fits.open(self.path, **kwargs_this)
+        except OSError:
+            # this helps fits.open guess the compression better
+            hdu_list = fits.open(open(self.path, "rb"), **kwargs_this)
+
+        try:
             t = Table(hdu_list[1].data, masked=False)
+        finally:
             del hdu_list[1].data
+            hdu_list.close()
+            del hdu_list
+
         return t
 
     def write(self, table, **kwargs):
