@@ -674,7 +674,7 @@ def download_catalogs_for_hosts(
                 "Fail to get catalog for host {}".format(host_id),
             )
             failed[i] = True
-        else:
+        finally:
             if os.path.getsize(path) < file_size_check:
                 print(
                     time.strftime("[%m/%d %H:%M:%S]"),

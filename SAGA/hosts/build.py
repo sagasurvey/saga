@@ -176,7 +176,7 @@ def find_nearby_brightest(d, other, mag_label, output_prefix, radii=(0.3, 0.6)):
     return d
 
 
-def add_image_coverage(d, coverage_map, name, nside=1024, nest=True):
+def add_image_coverage(d, coverage_map, name, nest=True):
     frac = []
     nside = hp.npix2nside(len(coverage_map))
     for obj in d:
