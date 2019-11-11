@@ -16,13 +16,23 @@ class QuickStart:
             or globals().get("SAGA_DROPBOX")
             or globals().get("saga_dropbox")
             or os.getenv("SAGA_DROPBOX")
+            or os.getenv("saga_dropbox")
+            or os.getcwd()
         )
+
+        print("SAGA `shared_dir` set to", self._shared_dir)
+
         self._local_dir = (
             local_dir
             or globals().get("SAGA_DIR")
             or globals().get("saga_dir")
             or os.getenv("SAGA_DIR")
+            or os.getenv("saga_dir")
+            or os.getcwd()
         )
+
+        print("SAGA `local_dir`  set to", self._local_dir)
+
         self._database = None
         self._host_catalog = None
         self._object_catalog = None
