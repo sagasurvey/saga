@@ -37,7 +37,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy>=1.11",
-        "scipy>=0.17",
         "numexpr>=2.0",
         "astropy>=2.0",
         "easyquery>=0.1.5",
@@ -45,4 +44,7 @@ setup(
         "fast3tree>=0.3.1",
         "healpy>=1.11",
     ],
+    extras_require={
+        'full': ['ipython', 'scikit-learn'],
+    },
 )

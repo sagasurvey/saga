@@ -2,7 +2,6 @@
 GMM related routines
 """
 import numpy as np
-from scipy.special import logsumexp
 
 from ..utils import get_sdss_bands, view_table_as_2d_array
 
@@ -24,9 +23,14 @@ __all__ = [
     "calc_model1_prob",
 ]
 
-
 param_labels_sat = ("xmean_sat", "xcovar_sat", "xamp_sat")
 param_labels_nosat = ("xmean_nosat", "xcovar_nosat", "xamp_nosat")
+
+
+def logsumexp(a, axis=None, b=None, keepdims=False):
+    # pylint: disable=no-member
+    tmp = np.add(a, np.log(b)) if b is not None else a
+    return np.logaddexp.reduce(tmp, axis=axis, keepdims=keepdims)
 
 
 class XDGMM(object):
