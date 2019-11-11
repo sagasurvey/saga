@@ -87,6 +87,7 @@ class HostCatalog(object):
                         "Cannot load master list; attempt to build from scratch..."
                     )
                     self._master_table_ = self.build_master_list()
+            self._master_index_ = None
         return self._master_table_
 
     @property
@@ -105,9 +106,8 @@ class HostCatalog(object):
                     logging.warning(
                         "Cannot load host list; attempt to load master list..."
                     )
-                    self._host_table_ = Query("HOST_SCORE > 0").filter(
-                        self._master_table
-                    )
+                    self._host_table_ = cuts.potential_hosts.filter(self._master_table)
+            self._host_index_ = None
         return self._host_table_
 
     @staticmethod
@@ -334,14 +334,16 @@ class HostCatalog(object):
             )
         return cat[0]
 
-    def build_master_list(self, overwrite=False):
+    def build_master_list(self, overwrite=False, overwrite_host_list=False):
+        if self._version == 1:
+            raise NotImplementedError("cannot build v1 master list!")
 
         if self._database["master_list"].remote.isfile() and not overwrite:
             raise ValueError(
                 "master list already exist and overwrite is not set to True"
             )
 
-        d = build_master_list(
+        self._master_table_ = build_master_list(
             hyperleda=self._database["hyperleda_kt12"].read(),
             edd_2mrs=self._database["edd_2mrs_slim"].read(),
             edd_kim17=self._database["edd_kim17_slim"].read(),
@@ -355,8 +357,19 @@ class HostCatalog(object):
                 if k.startswith("footprint_")
             },
         )
-        self._database["master_list"].write(d, overwrite=True)
-        return d
+        self._master_index_ = None
+
+        self._host_table_ = cuts.potential_hosts.filter(self._master_table_)
+        self._host_index_ = None
+
+        self._database["master_list"].write(self._master_table_, overwrite=True)
+
+        if self._database["hosts"].local is not None and (
+            overwrite_host_list or not self._database["hosts"].local.isfile()
+        ):
+            self._database["hosts"].local.write(self._host_table_, overwrite=True)
+
+        return self._master_table_
 
     def load_master_list(self, hosts=None, add_coord=True):
         return self.load(hosts, add_coord, use_master=True)

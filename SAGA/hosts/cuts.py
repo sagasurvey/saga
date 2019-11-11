@@ -37,6 +37,8 @@ has_sdss_image = Query("COVERAGE_SDSS >= 0.95")
 
 has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
+
+potential_hosts = Query("HOST_SCORE > 0")
 good_hosts = Query("HOST_SCORE >= 3")
 preferred_hosts = Query("HOST_SCORE >= 4")
 good = good_hosts & has_image

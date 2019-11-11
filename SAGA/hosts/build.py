@@ -133,7 +133,7 @@ def calc_needed_quantities(d):
         d["modz_nsa"],
     )
     d["DIST"] = m2d(d["DISTMOD"])
-    d["Z_COSMO"] = d2z(d)
+    d["Z_COSMO"] = d2z(d["DIST"])
 
     d["kcorrection"] = calc_kcor(
         "Ks2", d["Z_COSMO"].data, "H2 - Ks2", d["H_tc"].data - d["K_tc"].data

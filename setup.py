@@ -44,7 +44,5 @@ setup(
         "fast3tree>=0.3.1",
         "healpy>=1.11",
     ],
-    extras_require={
-        'full': ['ipython', 'scikit-learn'],
-    },
+    extras_require={"full": ["ipython", "scikit-learn"],},
 )
