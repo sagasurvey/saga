@@ -78,4 +78,4 @@ for base in base_paper1:
 
 You can find more examples at https://github.com/sagasurvey/examples/tree/master/notebooks
 
-You can also find the schema for the host list and for object catalogs at [SCHEMA.md].
+You can also find the schema for the host list and for object catalogs at [SCHEMA.md](SCHEMA.md).
