@@ -64,6 +64,7 @@ fibermag_r_cut = Query("FIBERMAG_R <= 23.0")
 faint_end_limit = Query("r_mag < 20.75")
 sdss_limit = Query("r_mag < 17.77")
 lowz_mag_cut = Query("r_mag > 18", "r_mag < 20")
+r_abs_limit = Query("Mr < -12.295")
 
 sat_vcut = Query("abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0")
 sat_rcut = Query("RHOST_KPC < 300.0")

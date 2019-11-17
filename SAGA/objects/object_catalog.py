@@ -202,14 +202,8 @@ class ObjectCatalog(object):
         >>> bases_table = saga_object_catalog.load(hosts='paper1', cuts=C.basic_cut, return_as='stacked')
         """
 
-        if version is None:
-            base_key = "base"
-        elif str(version).lower() in ("paper1", "p1", "v0p1", "0", "0.1"):
-            base_key = "base_v0p1"
-        elif version in (1, 2):
-            base_key = "base_v{}".format(version)
-        else:
-            raise ValueError("`version` must be None, 'paper1', 1 or 2.")
+        _, version_postfix = self._database.resolve_base_version(version)
+        base_key = "base" + version_postfix
 
         if return_as is None:
             return_as = "stacked" if (has_spec and base_key == "base_v0p1") else "list"
@@ -313,7 +307,7 @@ class ObjectCatalog(object):
 
     def build_and_write_to_database(
         self,
-        hosts=None,
+        hosts="build_default",
         overwrite=False,
         base_file_path_pattern=None,
         version=None,
@@ -360,6 +354,9 @@ class ObjectCatalog(object):
         >>> saga_object_catalog.build_and_write_to_database('paper1', base_file_path_pattern='/other/base/catalog/dir/nsa{}.fits.gz')
 
         """
+        build_version, version_postfix = self._database.resolve_base_version(version)
+        if build_version == 0:
+            raise ValueError("Cannot build v0 base catalogs")
 
         if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
             overwrite = Time(overwrite)
@@ -374,12 +371,18 @@ class ObjectCatalog(object):
             "Start to build {} base catalog(s).".format(nhosts),
         )
 
-        if version not in (None, 1, 2):
-            raise ValueError("`version` must be None, 1 or 2.")
-        build_module = build if version == 1 else build2
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "base_file_path_pattern =",
+            self._database.base_file_path_pattern
+            if base_file_path_pattern is None
+            else base_file_path_pattern,
+        )
+
+        build_module = build if build_version < 2 else build2
 
         if use_nsa:
-            nsa = self.load_nsa("0.1.2" if version == 1 else "1.0.1")
+            nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
             print(time.strftime("[%m/%d %H:%M:%S]"), "NSA catalog loaded.")
         else:
             nsa = None
@@ -410,7 +413,7 @@ class ObjectCatalog(object):
         for i, host in enumerate(host_table):
             host_id = host["HOSTID"]
             if base_file_path_pattern is None:
-                base_key = "base" if version is None else "base_v{}".format(version)
+                base_key = "base" + version_postfix
                 data_obj = self._database[base_key, host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
@@ -419,8 +422,8 @@ class ObjectCatalog(object):
                 if overwrite is False or overwrite is None:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "Base catalog v{} for {} already exists ({}).".format(
-                            version or 2, host_id, data_obj.path
+                        "Base catalog {} for {} already exists ({}).".format(
+                            version_postfix.lstrip("_"), host_id, data_obj.path
                         ),
                         "({}/{})".format(i + 1, nhosts),
                     )
@@ -445,7 +448,7 @@ class ObjectCatalog(object):
                 except KeyError:
                     return 1.0
 
-            if version == 1:
+            if build_version < 2:
                 catalogs = ("sdss", "wise")
             else:
                 catalogs = []
@@ -475,11 +478,11 @@ class ObjectCatalog(object):
 
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
-                "Use {} to build base catalog v{} for {}".format(
+                "Use {} to build base catalog {} for {}".format(
                     ", ".join(
                         (k for k, v in catalog_dict.items() if v is not None)
                     ).upper(),
-                    (version or 2),
+                    version_postfix.lstrip("_"),
                     host_id,
                 ),
                 "({}/{})".format(i + 1, nhosts),
@@ -540,7 +543,7 @@ class ObjectCatalog(object):
         generate clean spectra from all good base catalogs and save to disk
         """
         defaults = dict(
-            hosts="good",
+            hosts="build_default",
             has_spec=True,
             cuts=C.is_clean2,
             return_as="stack",
@@ -550,13 +553,22 @@ class ObjectCatalog(object):
 
         defaults.update(kwargs)
 
-        t = self.load(**defaults)
+        nhosts = len(self._host_catalog.resolve_id(defaults["hosts"]))
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "Generate clean specs for {} hosts".format(nhosts),
+        )
 
         if save_to is not False:
             if save_to is None:
                 save_to = self._database["saga_clean_specs"]
             if not isinstance(save_to, (FileObject, DataObject)):
                 save_to = FitsTable(save_to)
+            print(time.strftime("[%m/%d %H:%M:%S]"), "save to path", save_to.path)
+
+        t = self.load(**defaults)
+
+        if save_to is not False:
             save_to.write(t, overwrite=overwrite)
 
         return t
@@ -591,6 +603,7 @@ class ObjectCatalog(object):
         high_p_mask &= simple_mask
         has_spec_mask = C.has_spec.mask(base)
         sats_mask = C.is_sat.mask(base)
+        sats_r_abs_limit_mask = sats_mask & C.r_abs_limit.mask(base)
         low_z_mask = C.is_low_z.mask(base)
         low_z_mask &= ~sats_mask
         our_specs_mask = C.has_our_specs_only.mask(base)
@@ -606,6 +619,7 @@ class ObjectCatalog(object):
         data["specs_total"].append(np.count_nonzero(has_spec_mask))
         data["low_z_total"].append(np.count_nonzero(has_spec_mask & low_z_mask))
         data["sats_total"].append(np.count_nonzero(sats_mask))
+        data["sats_total_Mr_limit"].append(np.count_nonzero(sats_r_abs_limit_mask))
 
         data["specs_ours"].append(np.count_nonzero(our_specs_mask))
         data["low_z_ours"].append(np.count_nonzero(our_specs_mask & low_z_mask))
@@ -617,16 +631,23 @@ class ObjectCatalog(object):
         return data
 
     def generate_object_stats(
-        self, hosts=None, save_to=None, overwrite=False, generate_func=None
+        self, hosts="build_default", save_to=None, overwrite=False, generate_func=None
     ):
         """
         generate object statistics for *hosts*
         """
+        hosts = self._host_catalog.resolve_id(hosts)
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "Generate object stats for {} hosts".format(len(hosts)),
+        )
 
-        if hosts is None:
-            hosts = sorted(self._host_catalog.resolve_id("good"))
-        else:
-            hosts = self._host_catalog.resolve_id(hosts)
+        if save_to is not False:
+            if save_to is None:
+                save_to = self._database["host_stats"]
+            if not isinstance(save_to, (FileObject, DataObject)):
+                save_to = CsvTable(save_to)
+            print(time.strftime("[%m/%d %H:%M:%S]"), "Save to path:", save_to.path)
 
         if generate_func is None:
             generate_func = self._generate_object_stats_single_host
@@ -648,9 +669,20 @@ class ObjectCatalog(object):
             host_table.rename_column("MK_compiled", "K_ABS")
         data = join(data, host_table, "HOSTID", "left")
 
-        if save_to is not None:
-            if not isinstance(save_to, (FileObject, DataObject)):
-                save_to = CsvTable(save_to)
+        if save_to is not False:
             save_to.write(data, overwrite=overwrite)
 
         return data
+
+    def load_object_stats(self, generate_if_not_exist=True, **kwargs):
+        """
+        load object stats from all good base catalogs
+        """
+        try:
+            t = self._database["host_stats"].read()
+        except IOError:
+            if generate_if_not_exist:
+                t = self.generate_object_stats(**kwargs)
+            else:
+                raise
+        return t

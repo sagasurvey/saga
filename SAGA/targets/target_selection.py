@@ -54,8 +54,9 @@ class TargetSelection(object):
         host_catalog_instance=None,
         object_catalog_instance=None,
     ):
-        self._version = version
         self._database = database
+        self._version = version
+        self._build_version, _ = self._database.resolve_base_version(self._version)
 
         if host_catalog_instance is not None:
             if not isinstance(host_catalog_instance, host_catalog_class):
@@ -82,7 +83,7 @@ class TargetSelection(object):
         if assign_targeting_score_func is None:
             self.assign_targeting_score = (
                 assign_targeting_score_v1
-                if self._version == 1
+                if self._build_version < 2
                 else assign_targeting_score_v2
             )
         else:
@@ -123,7 +124,7 @@ class TargetSelection(object):
                     self._remove_lists[survey] = objids
 
         self._cuts = cuts
-        if self._version == 1:
+        if self._build_version < 2:
             self.columns = list(
                 set(
                     chain(

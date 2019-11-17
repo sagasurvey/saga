@@ -42,6 +42,7 @@ potential_hosts = Query("HOST_SCORE > 0")
 good_hosts = Query("HOST_SCORE >= 3")
 preferred_hosts = Query("HOST_SCORE >= 4")
 good = good_hosts & has_image
+build_default = potential_hosts & has_image
 
 hostlist_v1 = QueryMaker.in1d("PGC", _list_by_pgc["hostlist_v1"])
 paper1_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_complete"])
