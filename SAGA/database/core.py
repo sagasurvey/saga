@@ -79,7 +79,7 @@ class FileObject(DownloadableBase):
                     with file_open(file_path, "wb") as f:
                         for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
                             f.write(chunk)
-                except:
+                except:  # noqa: E722
                     if os.path.isfile(file_path):
                         os.unlink(file_path)
                     raise
@@ -195,9 +195,9 @@ class DataObject(object):
     def __init__(
         self, remote, local=None, cache_in_memory=False, use_local_first=False
     ):
+        self._local = None
         self.remote = remote
         self.local = local
-        self.local_type = type(remote) if local is None else type(local)
         self.use_local_first = use_local_first
         self.cache_in_memory = cache_in_memory
         self._cached_table = None
@@ -207,10 +207,22 @@ class DataObject(object):
                 "Must specify `local` when setting `use_local_first=True`."
             )
 
-    def _get_local(self):
-        if self.local is not None and not isinstance(self.local, self.local_type):
-            self.local = self.local_type(self.local)
-        return self.local
+    @property
+    def local(self):
+        return self._local
+
+    @local.setter
+    def local(self, value):
+        if value is None:
+            self._local = None
+        elif isinstance(value, FileObject):
+            self._local = value
+        elif isinstance(self._local, FileObject):
+            self._local = type(self._local)(value, **self._local.kwargs)
+        elif isinstance(self.remote, FileObject):
+            self._local = type(self.remote)(value, **self.remote.kwargs)
+        else:
+            self._local = FileObject(value)
 
     def read(self, reload=False, **kwargs):
         """
@@ -231,13 +243,13 @@ class DataObject(object):
                 return table
 
         if self.use_local_first:
-            if not self._get_local().isfile():
+            if not self.local.isfile():
                 logging.warning(
                     "Cannot find local file; attempt to download from remote..."
                 )
                 self.download()
             try:
-                table = self._get_local().read()
+                table = self.local.read()
             except (IOError, OSError):
                 logging.warning(
                     "Failed to read local file; attempt to read remote file..."
@@ -247,24 +259,24 @@ class DataObject(object):
             try:
                 table = self.remote.read(**kwargs)
             except Exception as read_exception:  # pylint: disable=W0703
-                if self._get_local() is None:
+                if self.local is None:
                     raise read_exception
                 logging.warning(
                     "Failed to read remote; fall back to read local file..."
                 )
-                if not self._get_local().isfile():
+                if not self.local.isfile():
                     logging.warning(
                         "Cannot find local file; attempt to download from remote..."
                     )
                     self.download()
-                table = self._get_local().read()
+                table = self.local.read()
 
         if self.cache_in_memory:
             self.store_cache(table)
 
         return table
 
-    def write(self, table, dest="remote", overwrite=False):
+    def write(self, table, dest=None, overwrite=False):
         """
         write the data to file
 
@@ -277,10 +289,12 @@ class DataObject(object):
         overwrite : bool, optional
             if set to true, overwrite existing file
         """
+        if dest is None:
+            dest = "local" if self.use_local_first else "remote"
         if dest.lower() == "remote":
             f = self.remote
         elif dest.lower() == "local":
-            f = self._get_local()
+            f = self.local
         else:
             raise KeyError('dest must be "remote" or "local"')
 
@@ -307,7 +321,7 @@ class DataObject(object):
         """
         if local_file_path is None:
             try:
-                local_file_path = self._get_local().path
+                local_file_path = self.local.path
             except AttributeError:
                 pass
             else:
@@ -318,15 +332,7 @@ class DataObject(object):
         )
 
         if set_as_local:
-            kwargs = dict()
-            try:
-                kwargs = self._get_local().kwargs
-            except AttributeError:
-                try:
-                    kwargs = self.remote.kwargs
-                except AttributeError:
-                    pass
-            self.local = self.local_type(local_file_path, **kwargs)
+            self.local = local_file_path
 
     @staticmethod
     def _copy_table(table):
@@ -342,3 +348,10 @@ class DataObject(object):
 
     def store_cache(self, table):
         self._cached_table = self._copy_table(table)
+
+    @property
+    def path(self):
+        return self.local.path if self.use_local_first else self.remote.path
+
+    def isfile(self):
+        return self.local.isfile() if self.use_local_first else self.remote.isfile()

@@ -14,6 +14,9 @@ known_google_sheets = {
     "hosts_v2": GoogleSheets(
         "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1765625842
     ),
+    "host_stats": GoogleSheets(
+        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1217798377
+    ),
     "host_remove": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         1133875164,
@@ -142,9 +145,6 @@ class Database(object):
                         self._shared_dir, "Products", "saga_spectra_May2017.fits.gz"
                     )
                 )
-            ),
-            "saga_clean_specs": DataObject(
-                FitsTable(os.path.join(self._local_dir, "saga_clean_specs.fits.gz"))
             ),
             "hyperleda_kt12": DataObject(
                 HyperledaQuery(
@@ -377,43 +377,27 @@ class Database(object):
                     self._tables["footprint_" + name] = DataObject(obj)
 
         for k, v in known_google_sheets.items():
-            if k == "hosts_v2":
-                self._tables[k] = DataObject(
-                    v,
-                    CsvTable(
-                        os.path.join(
-                            self._shared_dir, "HostCatalogs", "host_list_v2.csv"
-                        )
-                    ),
-                    cache_in_memory=True,
-                )
-            elif k == "hosts_v1":
-                self._tables[k] = DataObject(
-                    v,
-                    CsvTable(
-                        os.path.join(
-                            self._shared_dir, "HostCatalogs", "host_list_v1.csv"
-                        )
-                    ),
-                    cache_in_memory=True,
-                )
-            elif k == "lowz_fields":
-                self._tables[k] = DataObject(
-                    v,
-                    CsvTable(
-                        os.path.join(
-                            self._shared_dir, "HostCatalogs", "lowz_fields.csv"
-                        )
-                    ),
-                    cache_in_memory=True,
-                )
-            else:
-                self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
+            self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
+
+        self._tables["hosts_v2"].local = CsvTable(
+            os.path.join(self._shared_dir, "HostCatalogs", "host_list_v2.csv")
+        )
+
+        self._tables["hosts_v1"].local = CsvTable(
+            os.path.join(self._shared_dir, "HostCatalogs", "host_list_v1.csv")
+        )
+
+        self._tables["lowz_fields"].local = CsvTable(
+            os.path.join(self._shared_dir, "HostCatalogs", "lowz_fields.csv")
+        )
 
         self._tables["hosts"] = self._tables["hosts_v2"]
         self._tables["master_list"] = self._tables["master_list_v2"]
 
         self._file_path_pattern = {
+            "base_v2p1": os.path.join(
+                self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"
+            ),
             "base_v2": os.path.join(
                 self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"
             ),
@@ -439,9 +423,38 @@ class Database(object):
                 self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
             ),
         }
-        self._file_path_pattern["base"] = self._file_path_pattern["base_v2"]
+
+        self._possible_base_versions = tuple(
+            k.partition("_v")[2]
+            for k in self._file_path_pattern
+            if k.startswith("base_")
+        )
         self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
         self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+        self.set_default_base_version()
+
+    def _add_derived_data(self):
+        t = FitsTable(self.base_file_path_pattern.format("saga_clean_specs"))
+        if "saga_clean_specs" in self._tables:
+            self._tables["saga_clean_specs"].remote = t
+        else:
+            self._tables["saga_clean_specs"] = DataObject(t)
+
+        t = FastCsvTable(
+            self.base_file_path_pattern.format("host_stats").replace(".fits.gz", ".csv")
+        )
+
+        if "host_stats" in self._tables:
+            self._tables["host_stats"].local = t
+            self._tables["host_stats"].use_local_first = True
+            self._tables["host_stats"].clear_cache()
+        else:
+            self._tables["host_stats"] = DataObject(
+                known_google_sheets["host_stats"],
+                t,
+                use_local_first=True,
+                cache_in_memory=True,
+            )
 
     def _set_file_path_pattern(self, key, value):
         self._file_path_pattern[key] = value
@@ -452,6 +465,8 @@ class Database(object):
         ]
         for k in keys_to_del:
             del self._tables[k]
+        if key == "base":
+            self._add_derived_data()
 
     @property
     def base_file_path_pattern(self):
@@ -525,3 +540,27 @@ class Database(object):
 
     def _ipython_key_completions_(self):
         return list(self.keys())
+
+    def resolve_base_version(self, version=None):
+        """
+        resolve `version` into `build_version` and `version_postfix`
+        """
+
+        if version is None:
+            return 2, ""
+        version = str(version).lower().strip().lstrip("v")
+        if version in ("paper1", "p1"):
+            return 0, "_v0p1"
+        while version.endswith(".0"):
+            version = version[:-2]
+        version.replace(".", "p")
+        if version not in self._possible_base_versions:
+            raise ValueError("version value unknown!")
+        return int(version[0]), "_v" + version
+
+    def set_default_base_version(self, version=None):
+        _, version_postfix = self.resolve_base_version(version)
+        if not version_postfix:
+            version_postfix = '_v2p1'
+        self._file_path_pattern["base"] = self._file_path_pattern["base" + version_postfix]
+        self._add_derived_data()

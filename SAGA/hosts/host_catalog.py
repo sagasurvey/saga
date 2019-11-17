@@ -8,6 +8,7 @@ import re
 from collections import defaultdict
 
 import numpy as np
+from astropy.table import join
 from easyquery import Query
 
 from ..database import Database
@@ -87,6 +88,8 @@ class HostCatalog(object):
                         "Cannot load master list; attempt to build from scratch..."
                     )
                     self._master_table_ = self.build_master_list()
+                self._master_table_['SAGA_NAME'].fill_value = ""
+                self._master_table_ = self._master_table_.filled()
             self._master_index_ = None
         return self._master_table_
 
@@ -107,6 +110,8 @@ class HostCatalog(object):
                         "Cannot load host list; attempt to load master list..."
                     )
                     self._host_table_ = cuts.potential_hosts.filter(self._master_table)
+                self._host_table_['SAGA_NAME'].fill_value = ""
+                self._host_table_ = self._host_table_.filled()
             self._host_index_ = None
         return self._host_table_
 
@@ -153,19 +158,17 @@ class HostCatalog(object):
     def _check_use_master(self, use_master=None):
         return bool(use_master or (use_master is None and self.use_master))
 
-    def _get_table(self, use_master=None):
-        if use_master:
+    def _get_table(self, use_master=None, add_coord=False, include_stats=False):
+        if self._check_use_master(use_master):
             return self._master_table
         return self._host_table
 
     def _get_index(self, use_master=None):
-        if use_master:
+        if self._check_use_master(use_master):
             return self._master_index
         return self._host_index
 
     def _resolve_indices(self, hosts=None, use_master=None):
-
-        use_master = self._check_use_master(use_master)
 
         if hosts is None or hosts == "all":
             return list(range(len(self._get_table(use_master))))
@@ -269,7 +272,30 @@ class HostCatalog(object):
             raise ValueError("More than one matched host found!")
         return names[0] or ""
 
-    def load(self, hosts=None, add_coord=True, use_master=None):
+    def _annotate_table(self, d, add_coord=False, include_stats=False):
+        if include_stats:
+            d = self.add_object_stats(d)
+        if add_coord:
+            d = add_skycoord(d)
+        return d
+
+    def add_object_stats(self, host_table):
+        stats = self._database["host_stats"].read()
+        cols_to_keep = [
+            c for c in stats.colnames if c not in host_table.colnames or c == "HOSTID"
+        ]
+        stats = stats[cols_to_keep]
+        d = join(host_table, stats, "HOSTID", "left")
+        for col in cols_to_keep:
+            if col == "HOSTID":
+                continue
+            if 'need_spec' in col:
+                d[col].fill_value = 999999
+            else:
+                d[col].fill_value = -1
+        return d.filled()
+
+    def load(self, hosts=None, add_coord=True, use_master=None, include_stats=False):
         """
         load a host catalog
 
@@ -289,10 +315,12 @@ class HostCatalog(object):
         >>> hosts_no_flag = saga_host_catalog.load('no_flags')
         >>> hosts_no_sdss_flag = saga_host_catalog.load('no_sdss_flags')
         """
-        d = self._get_table(use_master)[self.resolve_id(hosts, "internal", use_master)]
-        return add_skycoord(d) if add_coord else d
+        indices = self.resolve_id(hosts, "internal", use_master)
+        d = self._get_table(use_master)[indices]
+        d = self._annotate_table(d, add_coord=add_coord, include_stats=include_stats)
+        return d
 
-    def load_single(self, host, add_coord=True, use_master=None):
+    def load_single(self, host, add_coord=True, use_master=None, include_stats=False):
         """
         Gets the catalog row corresponding to a specific named host.
 
@@ -313,17 +341,17 @@ class HostCatalog(object):
         indices = self.resolve_id(host, "internal", use_master)
         if len(indices) != 1:
             raise ValueError("More than one matched host found! Use `load` instead!")
-        cat = self._get_table(use_master)[indices]
-        cat = add_skycoord(cat) if add_coord else cat
-        return cat[0]
+        d = self._get_table(use_master)[indices]
+        d = self._annotate_table(d, add_coord=add_coord, include_stats=include_stats)
+        return d[0]
 
-    def load_single_near_ra_dec(self, ra, dec, sep=3600, use_master=None):
+    def load_single_near_ra_dec(self, ra, dec, sep=3600, use_master=None, add_coord=True, include_stats=False):
         """
         ra, dec in degrees
         """
-        table = add_skycoord(self._get_table(use_master))
-        cat = find_near_ra_dec(table, ra, dec, sep)
-        del table["coord"]
+        d = add_skycoord(self._get_table(use_master))
+        cat = find_near_ra_dec(d, ra, dec, sep)
+        del d["coord"]
         if len(cat) == 0:
             raise KeyError("No host near ({:.6f}, {:.6f}) found!".format(ra, dec))
         if len(cat) != 1:
@@ -332,6 +360,7 @@ class HostCatalog(object):
                     ra, dec
                 )
             )
+        cat = self._annotate_table(cat, add_coord=add_coord, include_stats=include_stats)
         return cat[0]
 
     def build_master_list(self, overwrite=False, overwrite_host_list=False):
@@ -414,3 +443,6 @@ class FieldCatalog(HostCatalog):
 
     def build(self, overwrite=False):
         raise AttributeError
+
+    def add_object_stats(self, host_table):
+        return host_table
