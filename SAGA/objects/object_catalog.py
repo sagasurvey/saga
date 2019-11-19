@@ -412,6 +412,7 @@ class ObjectCatalog(object):
                         manual_lists[key] = val
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
+        failed_count = 0
         catalogs_to_return = list()
         for i, host in enumerate(host_table):
             host_id = host["HOSTID"]
@@ -516,6 +517,7 @@ class ObjectCatalog(object):
                 if raise_exception:
                     raise e
                 traceback.print_exc()
+                failed_count += 1
                 continue
             finally:
                 del catalog_dict
@@ -536,7 +538,15 @@ class ObjectCatalog(object):
                 if raise_exception:
                     raise e
                 traceback.print_exc()
+                failed_count += 1
                 continue
+
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "All done building base catalogs for {}/{} hosts.".format(
+                nhosts - failed_count, nhosts
+            ),
+        )
 
         if return_catalogs:
             return catalogs_to_return
