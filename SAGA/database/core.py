@@ -93,11 +93,13 @@ class FileObject(DownloadableBase):
 
 
 class CsvTable(FileObject):
-    _read_default_kwargs = _write_default_kwargs = dict(format="ascii.csv")
+    _read_default_kwargs = dict(format="ascii.csv")
+    _write_default_kwargs = dict(format="ascii.csv", overwrite=True)
 
 
 class FastCsvTable(FileObject):
-    _read_default_kwargs = _write_default_kwargs = dict(format="ascii.fast_csv")
+    _read_default_kwargs = dict(format="ascii.fast_csv")
+    _write_default_kwargs = dict(format="ascii.fast_csv", overwrite=True)
 
 
 class GoogleSheets(FastCsvTable):
@@ -116,13 +118,13 @@ class GoogleSheets(FastCsvTable):
 
 class FitsTableGeneric(FileObject):
     _read_default_kwargs = dict(memmap=True)
-    _write_default_kwargs = dict(format="fits")
+    _write_default_kwargs = dict(format="fits", overwrite=True)
 
 
 class FitsTable(FileObject):
     compress_after_write = True
     _read_default_kwargs = dict(cache=False, memmap=True)
-    _write_default_kwargs = dict(format="fits")
+    _write_default_kwargs = dict(format="fits", overwrite=True)
 
     def read(self):
         kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
