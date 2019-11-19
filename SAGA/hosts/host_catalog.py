@@ -88,7 +88,7 @@ class HostCatalog(object):
                         "Cannot load master list; attempt to build from scratch..."
                     )
                     self._master_table_ = self.build_master_list()
-                self._master_table_['SAGA_NAME'].fill_value = ""
+                self._master_table_["SAGA_NAME"].fill_value = ""
                 self._master_table_ = self._master_table_.filled()
             self._master_index_ = None
         return self._master_table_
@@ -110,7 +110,7 @@ class HostCatalog(object):
                         "Cannot load host list; attempt to load master list..."
                     )
                     self._host_table_ = cuts.potential_hosts.filter(self._master_table)
-                self._host_table_['SAGA_NAME'].fill_value = ""
+                self._host_table_["SAGA_NAME"].fill_value = ""
                 self._host_table_ = self._host_table_.filled()
             self._host_index_ = None
         return self._host_table_
@@ -289,7 +289,7 @@ class HostCatalog(object):
         for col in cols_to_keep:
             if col == "HOSTID":
                 continue
-            if 'need_spec' in col:
+            if "need_spec" in col:
                 d[col].fill_value = 999999
             else:
                 d[col].fill_value = -1
@@ -345,7 +345,9 @@ class HostCatalog(object):
         d = self._annotate_table(d, add_coord=add_coord, include_stats=include_stats)
         return d[0]
 
-    def load_single_near_ra_dec(self, ra, dec, sep=3600, use_master=None, add_coord=True, include_stats=False):
+    def load_single_near_ra_dec(
+        self, ra, dec, sep=3600, use_master=None, add_coord=True, include_stats=False
+    ):
         """
         ra, dec in degrees
         """
@@ -360,7 +362,9 @@ class HostCatalog(object):
                     ra, dec
                 )
             )
-        cat = self._annotate_table(cat, add_coord=add_coord, include_stats=include_stats)
+        cat = self._annotate_table(
+            cat, add_coord=add_coord, include_stats=include_stats
+        )
         return cat[0]
 
     def build_master_list(self, overwrite=False, overwrite_host_list=False):

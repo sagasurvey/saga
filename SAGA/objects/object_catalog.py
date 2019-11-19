@@ -86,12 +86,16 @@ class ObjectCatalog(object):
                 or "{}_mag".format(color[1]) not in table.colnames
             ):
                 continue
-            table[color] = (
-                table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
-            )
-            table["{}_err".format(color)] = np.hypot(
-                table["{}_err".format(color[0])], table["{}_err".format(color[1])]
-            )
+            with np.errstate(invalid="ignore"):
+                table[color] = (
+                    table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
+                )
+                table["{}_err".format(color)] = np.hypot(
+                    table["{}_err".format(color[0])], table["{}_err".format(color[1])]
+                )
+
+        if "HOST_ID" in table.colnames:
+            table.rename_column("HOST_ID", "HOSTID")
 
         if ensure_all_objid_cols:
             for s in cls._surveys:
@@ -409,6 +413,7 @@ class ObjectCatalog(object):
                         manual_lists[key] = val
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
+        failed_count = 0
         catalogs_to_return = list()
         for i, host in enumerate(host_table):
             host_id = host["HOSTID"]
@@ -513,6 +518,7 @@ class ObjectCatalog(object):
                 if raise_exception:
                     raise e
                 traceback.print_exc()
+                failed_count += 1
                 continue
             finally:
                 del catalog_dict
@@ -533,7 +539,15 @@ class ObjectCatalog(object):
                 if raise_exception:
                     raise e
                 traceback.print_exc()
+                failed_count += 1
                 continue
+
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "All done building base catalogs for {}/{} hosts.".format(
+                nhosts - failed_count, nhosts
+            ),
+        )
 
         if return_catalogs:
             return catalogs_to_return
