@@ -93,6 +93,9 @@ class ObjectCatalog(object):
                 table["{}_err".format(color[0])], table["{}_err".format(color[1])]
             )
 
+        if "HOST_ID" in table.colnames:
+            table.rename_column("HOST_ID", "HOSTID")
+
         if ensure_all_objid_cols:
             for s in cls._surveys:
                 col = "OBJID_{}".format(s)

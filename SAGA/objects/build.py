@@ -148,11 +148,11 @@ def add_host_info(base, host, overwrite_if_different_host=False):
         return base
 
     if (
-        "HOST_ID" in base.colnames and base["HOST_ID"][0] != host["HOSTID"]
+        "HOSTID" in base.colnames and base["HOSTID"][0] != host["HOSTID"]
     ) and not overwrite_if_different_host:
         raise ValueError("Host info exists and differs from input host info.")
 
-    base["HOST_ID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
+    base["HOSTID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
     base["HOST_PGC"] = np.int32(host["PGC"])
     base["HOST_NSAID"] = np.int32(host["NSAID"])
     base["HOST_NSA1ID"] = np.int32(host["NSA1ID"])

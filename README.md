@@ -73,7 +73,7 @@ base_paper1 = saga.object_catalog.load(hosts='paper1', return_as='list')
 
 # count number of satellites
 for base in base_paper1:
-    print(base['HOST_ID'][0], '# of satellites =', saga.is_sat.count(base))
+    print(base['HOSTID'][0], '# of satellites =', saga.is_sat.count(base))
 ```
 
 You can find more examples at https://github.com/sagasurvey/examples/tree/master/notebooks
