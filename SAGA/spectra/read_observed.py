@@ -23,6 +23,8 @@ __all__ = [
     "read_palomar",
 ]
 
+# pylint: disable=logging-format-interpolation
+
 
 def heliocentric_correction(
     fits_filepath,
@@ -62,6 +64,13 @@ def read_generic_spectra(
 
     for f in os.listdir(dir_path):
         if not f.endswith(extension):
+            continue
+        if "conflicted copy" in f:
+            logging.warning(
+                "SKIPPING spectra file {}/{} - it's a conflicted copy; check if something went wrong!".format(
+                    dir_path, f
+                )
+            )
             continue
         try:
             this = Table.read(
