@@ -86,12 +86,13 @@ class ObjectCatalog(object):
                 or "{}_mag".format(color[1]) not in table.colnames
             ):
                 continue
-            table[color] = (
-                table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
-            )
-            table["{}_err".format(color)] = np.hypot(
-                table["{}_err".format(color[0])], table["{}_err".format(color[1])]
-            )
+            with np.errstate(invalid="ignore"):
+                table[color] = (
+                    table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
+                )
+                table["{}_err".format(color)] = np.hypot(
+                    table["{}_err".format(color[0])], table["{}_err".format(color[1])]
+                )
 
         if "HOST_ID" in table.colnames:
             table.rename_column("HOST_ID", "HOSTID")
