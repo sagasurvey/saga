@@ -561,6 +561,8 @@ class Database(object):
     def set_default_base_version(self, version=None):
         _, version_postfix = self.resolve_base_version(version)
         if not version_postfix:
-            version_postfix = '_v2p1'
-        self._file_path_pattern["base"] = self._file_path_pattern["base" + version_postfix]
+            version_postfix = "_v2p1"
+        self._file_path_pattern["base"] = self._file_path_pattern[
+            "base" + version_postfix
+        ]
         self._add_derived_data()
