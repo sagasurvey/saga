@@ -30,7 +30,7 @@ There are two optional dependencies that require manual installation:
 
 1. casjobs OR sciserver
 
-   You need to install [casjobs](https://github.com/dfm/casjobs) or [sciservevr](https://github.com/sciserver/SciScript-Python) to download SDSS catalogs.
+   You need to install [casjobs](https://github.com/dfm/casjobs) or [sciserver](https://github.com/sciserver/SciScript-Python) to download SDSS catalogs.
 
    * To install casjobs:
      ```sh
