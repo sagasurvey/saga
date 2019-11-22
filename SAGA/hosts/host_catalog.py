@@ -158,7 +158,7 @@ class HostCatalog(object):
     def _check_use_master(self, use_master=None):
         return bool(use_master or (use_master is None and self.use_master))
 
-    def _get_table(self, use_master=None, add_coord=False, include_stats=False):
+    def _get_table(self, use_master=None):
         if self._check_use_master(use_master):
             return self._master_table
         return self._host_table
