@@ -28,9 +28,9 @@ but has mainly been tested with Python 3.6.
 All required dependencies will be installed automatically.
 There are two optional dependencies that require manual installation:
 
-1. casjobs OR sciservevr
+1. casjobs OR sciserver
 
-   You need to install [casjobs](https://github.com/dfm/casjobs) or [sciservevr](https://github.com/sciserver/SciScript-Python) to download SDSS catalogs.
+   You need to install [casjobs](https://github.com/dfm/casjobs) or [sciserver](https://github.com/sciserver/SciScript-Python) to download SDSS catalogs.
 
    * To install casjobs:
      ```sh
@@ -38,7 +38,7 @@ There are two optional dependencies that require manual installation:
      ```
      (Note: Do *NOT* use `pip install casjobs` as the version on PyPI is outdated.)
 
-   * To install sciservevr (recommended):
+   * To install sciserver (recommended):
      ```sh
      pip install -e "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.13#egg=sciserver&subdirectory=py3"
      ```
