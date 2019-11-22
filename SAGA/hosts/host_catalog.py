@@ -170,7 +170,7 @@ class HostCatalog(object):
 
     def _resolve_indices(self, hosts=None, use_master=None):
 
-        if hosts is None or hosts == "all":
+        if hosts is None or (_is_string_like(hosts) and hosts.lower() == "all"):
             return list(range(len(self._get_table(use_master))))
 
         if isinstance(hosts, int):
