@@ -85,11 +85,14 @@ high_priority_cuts = Query(
 )
 
 is_sat = Query("SATS == 1")
+is_host = Query("SATS == 3")
 
-is_high_z = Query("SPEC_Z >= 0.03")
-is_low_z = Query("SPEC_Z >= 0.0038", "SPEC_Z <= 0.015")
+is_high_z = Query("SPEC_Z >= 0.02")
+is_low_z = Query("SPEC_Z >= 0.003", ~is_high_z)
+is_very_low_z = Query("SPEC_Z >= 0.003", "SPEC_Z < 0.013")
 
-obj_is_host = Query("OBJ_NSAID == HOST_NSAID")
+obj_is_host = Query("OBJ_NSAID == HOST_NSAID", "OBJ_NSAID != -1")
+obj_is_host2 = Query("OBJ_NSAID == HOST_NSA1ID", "OBJ_NSAID != -1")
 
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut

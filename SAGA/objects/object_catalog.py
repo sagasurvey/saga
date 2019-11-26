@@ -618,7 +618,7 @@ class ObjectCatalog(object):
         has_spec_mask = C.has_spec.mask(base)
         sats_mask = C.is_sat.mask(base)
         sats_r_abs_limit_mask = sats_mask & C.r_abs_limit.mask(base)
-        low_z_mask = C.is_low_z.mask(base)
+        low_z_mask = C.is_very_low_z.mask(base)
         low_z_mask &= ~sats_mask
         our_specs_mask = C.has_our_specs_only.mask(base)
         our_specs_mask &= has_spec_mask
