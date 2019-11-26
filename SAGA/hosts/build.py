@@ -300,12 +300,17 @@ def add_selection_flags(d):
 
     image_allowed = Query(
         (
-            lambda *cols: np.max(np.vstack([cols]), axis=0) >= 0.99,
+            lambda *cols: np.amax(np.vstack(cols), axis=0) >= 0.99,
             "COVERAGE_DECALS_DR6",
             "COVERAGE_DECALS_DR7",
             "COVERAGE_DES_DR1",
             "COVERAGE_SDSS",
-        )
+        ),
+        (
+            lambda *cols: np.maximum(*cols) >= 0.85,
+            "COVERAGE_DES_DR1",
+            "COVERAGE_SDSS",
+        ),
     )
 
     image_preferred = Query(
