@@ -855,6 +855,16 @@ def find_satellites(base, version=1):
     base["REMOVE"][host_idx] = 0
     base["is_galaxy"][host_idx] = True
 
+    if base["ZQUALITY"][host_idx] < 3:
+        base["ZQUALITY"][host_idx] = 3
+        base["SPEC_Z"][host_idx] = v2z(base["HOST_VHOST"][host_idx])
+        base["SPEC_Z_ERR"][host_idx] = v2z(60)
+        base["TELNAME"][host_idx] = "HOST"
+        base["MASKNAME"][host_idx] = "HOST"
+        base["HELIO_CORR"][host_idx] = True
+        base["SPEC_REPEAT"][host_idx] = "HOST"
+        base["SPEC_REPEAT_ALL"][host_idx] = "+".join((base["SPEC_REPEAT_ALL"][host_idx], "HOST"))
+
     return base
 
 
