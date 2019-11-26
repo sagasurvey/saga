@@ -139,7 +139,12 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         "BINNED1 == 0",
         "SATURATED != 0",
         "BAD_COUNTS_ERROR != 0",
-        (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, "g_err", "r_err", "i_err"),
+        (
+            lambda *x: np.median(np.abs(np.vstack(x)), axis=0) > 0.5,
+            "g_err",
+            "r_err",
+            "i_err",
+        ),
         "abs(r_mag - i_mag) > 10",
         "abs(g_mag - r_mag) > 10",
         "FIBERMAG_R > 23",
@@ -769,8 +774,6 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 / nsa_sersic_flux
                 / np.sqrt(nsa_obj["SERSIC_FLUX_IVAR"])
             )
-            mag[invalid_mag] = 99.0
-            mag_err[invalid_mag] = 99.0
 
             for i, b in enumerate(get_sdss_bands()):
                 j = i + 2  # first two bands not needed
