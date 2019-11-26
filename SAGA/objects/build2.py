@@ -211,6 +211,12 @@ def prepare_des_catalog_for_merging(
         "imaflags_iso_r != 0",
         "flags_r >= 4",
         "r_mag >= 25",
+        (
+            lambda *x: np.median(np.abs(np.vstack(x)), axis=0) > 0.5,
+            "g_err",
+            "r_err",
+            "i_err",
+        ),
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
