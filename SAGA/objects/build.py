@@ -819,7 +819,7 @@ def find_satellites(base, version=1):
 
     # clean objects
     clean_obj = is_galaxy & C.has_spec & is_clean
-    fill_values_by_query(base, clean_obj & C.is_high_z , {"SATS": 0})
+    fill_values_by_query(base, clean_obj & C.is_high_z, {"SATS": 0})
     fill_values_by_query(base, clean_obj & C.is_low_z, {"SATS": 2})
     fill_values_by_query(base, clean_obj & C.is_very_low_z, {"SATS": 4})
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {"SATS": 1})
@@ -864,7 +864,9 @@ def find_satellites(base, version=1):
         base["MASKNAME"][host_idx] = "HOST"
         base["HELIO_CORR"][host_idx] = True
         base["SPEC_REPEAT"][host_idx] = "HOST"
-        base["SPEC_REPEAT_ALL"][host_idx] = "+".join((base["SPEC_REPEAT_ALL"][host_idx], "HOST"))
+        base["SPEC_REPEAT_ALL"][host_idx] = "+".join(
+            (base["SPEC_REPEAT_ALL"][host_idx], "HOST")
+        )
 
     return base
 

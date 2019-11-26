@@ -551,9 +551,13 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs["OBJ_NSAID"] = np.int32(-1)
     specs["chosen"] = False
 
-    # pylint: disable=dangerous-default-value
-    def get_tel_rank(tel, _ranks=dict(MMT=0, AAT=1, PAL=2, NSA=3, SDSS=5)):
-        return _ranks.get(tel, 4)
+    def get_tel_rank(
+        tel, ranks=tuple("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS")
+    ):
+        try:
+            return ranks.index(tel)
+        except ValueError:
+            return ranks.index("_OTHERS")
 
     for group_slice in group_by(specs["matched_idx"], True):
         # matched_idx < 0 means there is no match, so nothing to do
