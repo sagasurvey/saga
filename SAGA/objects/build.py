@@ -829,11 +829,31 @@ def find_satellites(base, version=1):
     fill_values_by_query(base, removed_obj & ~C.is_high_z, {"SATS": 92})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {"SATS": 91})
 
-    # host itself!
+    # identify host for version 1
     if version == 1:
         fill_values_by_query(base, C.obj_is_host, {"SATS": 3, "REMOVE": -1})
+        return base
+
+    # identify host for version 2+
+    is_host = Query("HOST_NSA1ID == OBJ_NSAID", "OBJ_NSAID != -1")
+    done = fill_values_by_query(base, is_host, {"SATS": 3, "REMOVE": 0})
+    if done:
+        return base
+
+    is_host_candidate = Query("RHOST_ARCM < 0.5", "r_mag < 14")
+    candidate_idx = np.flatnonzero(
+        (is_host_candidate & C.has_spec & C.sat_vcut).mask(base)
+    )
+    if not len(candidate_idx):
+        candidate_idx = np.flatnonzero(is_host_candidate.mask(base))
+    if len(candidate_idx):
+        host_idx = candidate_idx[base["RHOST_ARCM"][candidate_idx].argmin()]
     else:
-        base["SATS"][base["RHOST_ARCM"].argmin()] = 3
+        host_idx = base["RHOST_ARCM"].argmin()
+
+    base["SATS"][host_idx] = 3
+    base["REMOVE"][host_idx] = 0
+    base["is_galaxy"][host_idx] = True
 
     return base
 
@@ -846,7 +866,7 @@ def vhelio2virgo(vhelio, coord):
 
     v_lg = ne.evaluate(
         "v + 295.4*sin(al2)*cos(ab2) - 79.1*cos(al2)*cos(ab2) - 37.6*sin(ab2)",
-        {"v": vhelio, "al2": coord.galactic.l.radian, "ab2": coord.galactic.b.radian,},
+        {"v": vhelio, "al2": coord.galactic.l.radian, "ab2": coord.galactic.b.radian},
         {},
     )
 
