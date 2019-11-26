@@ -187,6 +187,7 @@ def prepare_des_catalog_for_merging(
 
     if convert_to_sdss_filters:
         gi = catalog["g_mag"] - catalog["i_mag"]
+        gi[np.abs(gi) > 5] = (catalog["g_mag"] - catalog["r_mag"]) * 1.4
         catalog["g_mag"] += -0.0009 + 0.055 * gi
         catalog["r_mag"] += -0.0048 + 0.0703 * gi
         catalog["i_mag"] += -0.0065 - 0.0036 * gi + 0.02672 * gi * gi
