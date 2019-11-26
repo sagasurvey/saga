@@ -766,10 +766,13 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             mag_err[invalid_mag] = 99.0
 
             for i, b in enumerate(get_sdss_bands()):
+                j = i + 2  # first two bands not needed
+                if invalid_mag[j]:
+                    continue
                 values_to_rewrite["{}_mag".format(b)] = (
-                    mag[i + 2] - nsa_obj["EXTINCTION"][i + 2]
+                    mag[j] - nsa_obj["EXTINCTION"][j]
                 )
-                values_to_rewrite["{}_err".format(b)] = mag_err[i + 2]
+                values_to_rewrite["{}_err".format(b)] = mag_err[j]
 
             for k, v in values_to_rewrite.items():
                 base[k][idx] = v
