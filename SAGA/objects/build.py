@@ -831,43 +831,11 @@ def find_satellites(base, version=1):
     fill_values_by_query(base, removed_obj & C.is_very_low_z, {"SATS": 94})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {"SATS": 91})
 
-    # identify host for version 1
-    if version == 1:
-        fill_values_by_query(base, C.obj_is_host, {"SATS": 3, "REMOVE": -1})
-        return base
+    return base
 
-    # identify host for version 2+
-    done = fill_values_by_query(base, C.obj_is_host2, {"SATS": 3, "REMOVE": 0})
-    if done:
-        return base
 
-    is_host_candidate = Query("RHOST_ARCM < 0.5", "r_mag < 14")
-    candidate_idx = np.flatnonzero(
-        (is_host_candidate & C.has_spec & C.sat_vcut).mask(base)
-    )
-    if not len(candidate_idx):
-        candidate_idx = np.flatnonzero(is_host_candidate.mask(base))
-    if len(candidate_idx):
-        host_idx = candidate_idx[base["RHOST_ARCM"][candidate_idx].argmin()]
-    else:
-        host_idx = base["RHOST_ARCM"].argmin()
-
-    base["SATS"][host_idx] = 3
-    base["REMOVE"][host_idx] = 0
-    base["is_galaxy"][host_idx] = True
-
-    if base["ZQUALITY"][host_idx] < 3:
-        base["ZQUALITY"][host_idx] = 3
-        base["SPEC_Z"][host_idx] = v2z(base["HOST_VHOST"][host_idx])
-        base["SPEC_Z_ERR"][host_idx] = v2z(60)
-        base["TELNAME"][host_idx] = "HOST"
-        base["MASKNAME"][host_idx] = "HOST"
-        base["HELIO_CORR"][host_idx] = True
-        base["SPEC_REPEAT"][host_idx] = "HOST"
-        base["SPEC_REPEAT_ALL"][host_idx] = "+".join(
-            (base["SPEC_REPEAT_ALL"][host_idx], "HOST")
-        )
-
+def identify_host(base):
+    fill_values_by_query(base, C.obj_is_host, {"SATS": 3, "REMOVE": -1})
     return base
 
 
@@ -967,7 +935,7 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(
+def build_full_stack(  # pylint: disable=unused-argument
     sdss,
     host,
     wise=None,
@@ -1035,6 +1003,7 @@ def build_full_stack(
     base = clean_sdss_spectra(base)
     base = remove_shreds_with_highz(base)
     base = find_satellites(base)
+    base = identify_host(base)
     base = add_stellar_mass(base)
 
     return base
