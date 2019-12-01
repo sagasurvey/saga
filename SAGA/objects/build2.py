@@ -18,7 +18,9 @@ from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
                        extract_nsa_spectra, extract_sdss_spectra)
 from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
                      get_remove_flag, get_sdss_bands, group_by)
+from ..utils.distance import v2z
 from . import build
+from . import cuts as C
 
 # pylint: disable=logging-format-interpolation
 
@@ -551,9 +553,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs["OBJ_NSAID"] = np.int32(-1)
     specs["chosen"] = False
 
-    def get_tel_rank(
-        tel, ranks=tuple("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS")
-    ):
+    def get_tel_rank(tel, ranks=("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS")):
         try:
             return ranks.index(tel)
         except ValueError:
@@ -850,7 +850,46 @@ def add_surface_brightness(base):
     return base
 
 
-def build_full_stack(
+def identify_host(base):
+    for q in (
+        C.obj_is_host2,
+        Query("RHOST_ARCM < 0.5", "r_mag < 14", C.has_spec, C.sat_vcut),
+        Query("RHOST_ARCM < 0.5", "r_mag < 14"),
+        Query("RHOST_ARCM < 0.3", "r_mag < 16", C.has_spec, C.sat_vcut),
+        Query("RHOST_ARCM < 0.3", "r_mag < 16"),
+    ):
+        candidate_idx = np.flatnonzero(q.mask(base))
+        if len(candidate_idx):
+            host_idx = candidate_idx[base["RHOST_ARCM"][candidate_idx].argmin()]
+            break
+    else:
+        host_idx = base["RHOST_ARCM"].argmin()
+
+    base["SATS"][host_idx] = 3
+    base["REMOVE"][host_idx] = 0
+    base["is_galaxy"][host_idx] = True
+    base["RA_spec"][host_idx] = base["HOST_RA"][host_idx]
+    base["DEC_spec"][host_idx] = base["HOST_DEC"][host_idx]
+    base["SPEC_Z"][host_idx] = v2z(base["HOST_VHOST"][host_idx])
+    base["SPEC_Z_ERR"][host_idx] = v2z(60)
+    base["SPECOBJID"][host_idx] = str(base["HOST_PGC"][host_idx])
+    base["MASKNAME"][host_idx] = "HOST"
+    base["TELNAME"][host_idx] = "HOST"
+    base["HELIO_CORR"][host_idx] = True
+
+    if base["ZQUALITY"][host_idx] < 3:
+        base["SPEC_REPEAT"][host_idx] = "HOST"
+    else:
+        current = str(base["SPEC_REPEAT"][host_idx])
+        base["SPEC_REPEAT"][host_idx] = (current + "+HOST") if current else "HOST"
+    current = str(base["SPEC_REPEAT_ALL"][host_idx])
+    base["SPEC_REPEAT_ALL"][host_idx] = (current + "+HOST") if current else "HOST"
+    base["ZQUALITY"][host_idx] = 4
+
+    return base
+
+
+def build_full_stack(  # pylint: disable=unused-argument
     host,
     sdss=None,
     des=None,
@@ -928,6 +967,7 @@ def build_full_stack(
     if "RHOST_KPC" in base.colnames:  # has host info
         base = remove_too_close_to_host(base)
         base = build.find_satellites(base, version=2)
+        base = identify_host(base)
 
     base = add_surface_brightness(base)
     base = build.add_stellar_mass(base)
