@@ -18,7 +18,9 @@ from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
                        extract_nsa_spectra, extract_sdss_spectra)
 from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
                      get_remove_flag, get_sdss_bands, group_by)
+from ..utils.distance import v2z
 from . import build
+from . import cuts as C
 
 # pylint: disable=logging-format-interpolation
 
@@ -139,7 +141,12 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         "BINNED1 == 0",
         "SATURATED != 0",
         "BAD_COUNTS_ERROR != 0",
-        (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, "g_err", "r_err", "i_err"),
+        (
+            lambda *x: np.median(np.abs(np.vstack(x)), axis=0) > 0.5,
+            "g_err",
+            "r_err",
+            "i_err",
+        ),
         "abs(r_mag - i_mag) > 10",
         "abs(g_mag - r_mag) > 10",
         "FIBERMAG_R > 23",
@@ -187,6 +194,9 @@ def prepare_des_catalog_for_merging(
 
     if convert_to_sdss_filters:
         gi = catalog["g_mag"] - catalog["i_mag"]
+        gi = np.where(np.abs(gi) < 5, gi, (catalog["g_mag"] - catalog["r_mag"]) * 1.4)
+        gi = np.where(np.abs(gi) < 5, gi, (catalog["r_mag"] - catalog["i_mag"]) * 3.5)
+        gi = np.where(np.abs(gi) < 20, gi, 1.5)
         catalog["g_mag"] += -0.0009 + 0.055 * gi
         catalog["r_mag"] += -0.0048 + 0.0703 * gi
         catalog["i_mag"] += -0.0065 - 0.0036 * gi + 0.02672 * gi * gi
@@ -210,6 +220,12 @@ def prepare_des_catalog_for_merging(
         "imaflags_iso_r != 0",
         "flags_r >= 4",
         "r_mag >= 25",
+        (
+            lambda *x: np.median(np.abs(np.vstack(x)), axis=0) > 0.5,
+            "g_err",
+            "r_err",
+            "i_err",
+        ),
     ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
@@ -537,9 +553,11 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs["OBJ_NSAID"] = np.int32(-1)
     specs["chosen"] = False
 
-    # pylint: disable=dangerous-default-value
-    def get_tel_rank(tel, _ranks=dict(MMT=0, AAT=1, PAL=2, NSA=3, SDSS=5)):
-        return _ranks.get(tel, 4)
+    def get_tel_rank(tel, ranks=("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS")):
+        try:
+            return ranks.index(tel)
+        except ValueError:
+            return ranks.index("_OTHERS")
 
     for group_slice in group_by(specs["matched_idx"], True):
         # matched_idx < 0 means there is no match, so nothing to do
@@ -762,14 +780,15 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 / nsa_sersic_flux
                 / np.sqrt(nsa_obj["SERSIC_FLUX_IVAR"])
             )
-            mag[invalid_mag] = 99.0
-            mag_err[invalid_mag] = 99.0
 
             for i, b in enumerate(get_sdss_bands()):
+                j = i + 2  # first two bands not needed
+                if invalid_mag[j]:
+                    continue
                 values_to_rewrite["{}_mag".format(b)] = (
-                    mag[i + 2] - nsa_obj["EXTINCTION"][i + 2]
+                    mag[j] - nsa_obj["EXTINCTION"][j]
                 )
-                values_to_rewrite["{}_err".format(b)] = mag_err[i + 2]
+                values_to_rewrite["{}_err".format(b)] = mag_err[j]
 
             for k, v in values_to_rewrite.items():
                 base[k][idx] = v
@@ -831,7 +850,46 @@ def add_surface_brightness(base):
     return base
 
 
-def build_full_stack(
+def identify_host(base):
+    for q in (
+        C.obj_is_host2,
+        Query("RHOST_ARCM < 0.5", "r_mag < 14", C.has_spec, C.sat_vcut),
+        Query("RHOST_ARCM < 0.5", "r_mag < 14"),
+        Query("RHOST_ARCM < 0.3", "r_mag < 16", C.has_spec, C.sat_vcut),
+        Query("RHOST_ARCM < 0.3", "r_mag < 16"),
+    ):
+        candidate_idx = np.flatnonzero(q.mask(base))
+        if len(candidate_idx):
+            host_idx = candidate_idx[base["RHOST_ARCM"][candidate_idx].argmin()]
+            break
+    else:
+        host_idx = base["RHOST_ARCM"].argmin()
+
+    base["SATS"][host_idx] = 3
+    base["REMOVE"][host_idx] = 0
+    base["is_galaxy"][host_idx] = True
+    base["RA_spec"][host_idx] = base["HOST_RA"][host_idx]
+    base["DEC_spec"][host_idx] = base["HOST_DEC"][host_idx]
+    base["SPEC_Z"][host_idx] = v2z(base["HOST_VHOST"][host_idx])
+    base["SPEC_Z_ERR"][host_idx] = v2z(60)
+    base["SPECOBJID"][host_idx] = str(base["HOST_PGC"][host_idx])
+    base["MASKNAME"][host_idx] = "HOST"
+    base["TELNAME"][host_idx] = "HOST"
+    base["HELIO_CORR"][host_idx] = True
+
+    if base["ZQUALITY"][host_idx] < 3:
+        base["SPEC_REPEAT"][host_idx] = "HOST"
+    else:
+        current = str(base["SPEC_REPEAT"][host_idx])
+        base["SPEC_REPEAT"][host_idx] = (current + "+HOST") if current else "HOST"
+    current = str(base["SPEC_REPEAT_ALL"][host_idx])
+    base["SPEC_REPEAT_ALL"][host_idx] = (current + "+HOST") if current else "HOST"
+    base["ZQUALITY"][host_idx] = 4
+
+    return base
+
+
+def build_full_stack(  # pylint: disable=unused-argument
     host,
     sdss=None,
     des=None,
@@ -909,6 +967,7 @@ def build_full_stack(
     if "RHOST_KPC" in base.colnames:  # has host info
         base = remove_too_close_to_host(base)
         base = build.find_satellites(base, version=2)
+        base = identify_host(base)
 
     base = add_surface_brightness(base)
     base = build.add_stellar_mass(base)

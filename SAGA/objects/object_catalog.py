@@ -285,6 +285,15 @@ class ObjectCatalog(object):
             return out
         return list(output_iterator)
 
+    def load_single(self, host, **kwargs):
+        if "hosts" in kwargs:
+            raise TypeError("load_single() got an unexpected keyword argument 'hosts'")
+        if "return_as" in kwargs:
+            raise TypeError(
+                "load_single() got an unexpected keyword argument 'return_as'"
+            )
+        return self.load(hosts=host, **kwargs).pop()
+
     def load_nsa(self, version="0.1.2"):
         nsa = self._database["nsa_v{}".format(version)].read()
         remove_mask = np.zeros(len(nsa), np.bool)
@@ -618,7 +627,7 @@ class ObjectCatalog(object):
         has_spec_mask = C.has_spec.mask(base)
         sats_mask = C.is_sat.mask(base)
         sats_r_abs_limit_mask = sats_mask & C.r_abs_limit.mask(base)
-        low_z_mask = C.is_low_z.mask(base)
+        low_z_mask = C.is_very_low_z.mask(base)
         low_z_mask &= ~sats_mask
         our_specs_mask = C.has_our_specs_only.mask(base)
         our_specs_mask &= has_spec_mask

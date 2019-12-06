@@ -794,13 +794,13 @@ def find_satellites(base, version=1):
     """
     Add `SATS` column to the base catalog.
 
-    -1 - default value
-     0 - high-z galaxies
+    -1 - default value (no redshift available)
+     0 - high-z galaxies (z >= 0.02)
      1 - Satellites!!!
-     2 - low-z galaxies
+     2 - low-z galaxies (0.003 <= z < 0.02)
      3 - host galaxy itself
-    91 - removed objects but otherwise satisfying satellite cut
-    92 - removed objects but otherwise satisfying low-z galaxy cut
+     4 - very low-z galaxies itself (0.003 <= z < 0.013)
+    +90 for removed objects but otherwise satisfying above cuts
 
     `base` is modified in-place.
 
@@ -812,8 +812,7 @@ def find_satellites(base, version=1):
     -------
     base : astropy.table.Table
     """
-    if "SATS" not in base.colnames:
-        base["SATS"] = np.int16(-1)
+    base["SATS"] = np.int16(-1)
 
     is_galaxy = C.is_galaxy if version == 1 else C.is_galaxy2
     is_clean = C.is_clean if version == 1 else C.is_clean2
@@ -821,20 +820,22 @@ def find_satellites(base, version=1):
     # clean objects
     clean_obj = is_galaxy & C.has_spec & is_clean
     fill_values_by_query(base, clean_obj & C.is_high_z, {"SATS": 0})
-    fill_values_by_query(base, clean_obj & ~C.is_high_z, {"SATS": 2})
+    fill_values_by_query(base, clean_obj & C.is_low_z, {"SATS": 2})
+    fill_values_by_query(base, clean_obj & C.is_very_low_z, {"SATS": 4})
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {"SATS": 1})
 
     # removed objects
     removed_obj = is_galaxy & C.has_spec & (~is_clean)
-    fill_values_by_query(base, removed_obj & ~C.is_high_z, {"SATS": 92})
+    fill_values_by_query(base, removed_obj & C.is_high_z, {"SATS": 90})
+    fill_values_by_query(base, removed_obj & C.is_low_z, {"SATS": 92})
+    fill_values_by_query(base, removed_obj & C.is_very_low_z, {"SATS": 94})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {"SATS": 91})
 
-    # host itself!
-    if version == 1:
-        fill_values_by_query(base, C.obj_is_host, {"SATS": 3, "REMOVE": -1})
-    else:
-        base["SATS"][base["RHOST_ARCM"].argmin()] = 3
+    return base
 
+
+def identify_host(base):
+    fill_values_by_query(base, C.obj_is_host, {"SATS": 3, "REMOVE": -1})
     return base
 
 
@@ -846,7 +847,7 @@ def vhelio2virgo(vhelio, coord):
 
     v_lg = ne.evaluate(
         "v + 295.4*sin(al2)*cos(ab2) - 79.1*cos(al2)*cos(ab2) - 37.6*sin(ab2)",
-        {"v": vhelio, "al2": coord.galactic.l.radian, "ab2": coord.galactic.b.radian,},
+        {"v": vhelio, "al2": coord.galactic.l.radian, "ab2": coord.galactic.b.radian},
         {},
     )
 
@@ -934,7 +935,7 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(
+def build_full_stack(  # pylint: disable=unused-argument
     sdss,
     host,
     wise=None,
@@ -1002,6 +1003,7 @@ def build_full_stack(
     base = clean_sdss_spectra(base)
     base = remove_shreds_with_highz(base)
     base = find_satellites(base)
+    base = identify_host(base)
     base = add_stellar_mass(base)
 
     return base
