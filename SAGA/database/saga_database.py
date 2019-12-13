@@ -330,6 +330,21 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
+            "spectra_alfalfa": DataObject(
+                FastCsvTable(
+                    "http://egg.astro.cornell.edu/alfalfa/data/a100files/a100.code12.table2.190808.csv",
+                ),
+                FastCsvTable(
+                    os.path.join(
+                        self._shared_dir,
+                        "Spectra",
+                        "Final",
+                        "ALFALFA",
+                        "a100.code12.table2.190808.dat",
+                    )
+                ),
+                use_local_first=True,
+            ),
             "spectra_halpha": DataObject(
                 FileObject(
                     os.path.join(self._shared_dir, "Spectra", "saga_halpha.dat"),
