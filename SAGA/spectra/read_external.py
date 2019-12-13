@@ -1,7 +1,7 @@
 import numpy as np
 from easyquery import Query
 
-from ..database import FileObject, FitsTable
+from ..database import FastCsvTable, FileObject, FitsTable
 from ..utils import fill_values_by_query
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
 
@@ -249,6 +249,48 @@ def read_slackers(file_path):
     specs.rename_column("WFCCD_SLITID", "SPECOBJID")
 
     specs["TELNAME"] = "slack"
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs)
+
+
+def read_alfalfa(file_path):
+
+    if not hasattr(file_path, "read"):
+        file_path = FastCsvTable(file_path)
+
+    specs = file_path.read()[
+        "AGCNr",
+        "RAdeg_HI",
+        "DECdeg_HI",
+        "RAdeg_OC",
+        "DECdeg_OC",
+        "Vhelio",
+        "W50",
+        "HIcode",
+    ]
+
+    specs.rename_column("AGCNr", "SPECOBJID")
+
+    valid_oc_coord = Query(
+        "abs(RAdeg_OC) + abs(DECdeg_OC) > 0",
+        Query(np.isfinite, "RAdeg_OC"),
+        Query(np.isfinite, "DECdeg_OC"),
+    )
+
+    specs["RA"] = np.where(valid_oc_coord, specs["RAdeg_OC"], specs["RAdeg_HI"])
+    specs["DEC"] = np.where(valid_oc_coord, specs["DECdeg_OC"], specs["DECdeg_HI"])
+    del specs["RAdeg_OC"], specs["RAdeg_HI"], specs["DECdeg_OC"], specs["DECdeg_HI"]
+
+    specs["SPEC_Z"] = specs["Vhelio"].astype(np.float64) / SPEED_OF_LIGHT
+    specs["SPEC_Z_ERR"] = (
+        specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
+    )
+    specs["ZQUALITY"] = np.where(specs["HIcode"] == 1, 4, 3)
+    del specs["Vhelio"], specs["W50"], specs["HIcode"]
+
+    specs["TELNAME"] = "ALFALF"
+    specs["MASKNAME"] = "ALFALFA"
     specs["HELIO_CORR"] = True
 
     return ensure_specs_dtype(specs)
