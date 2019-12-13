@@ -367,6 +367,7 @@ class Database(object):
                     "ukst": self._tables["spectra_ukst"],
                     "slackers": self._tables["spectra_slackers"],
                     "palomar": self._tables["spectra_palomar"],
+                    "alfalfa": self._tables["spectra_alfalfa"],
                 },
                 self._tables["spectra_halpha"],
             )
