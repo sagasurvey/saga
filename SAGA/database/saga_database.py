@@ -169,11 +169,11 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
-            "edd_kim17_slim": DataObject(
+            "edd_lim17_slim": DataObject(
                 EddQuery("SELECT PGC, Mhalo from klimgroups"),
                 FastCsvTable(
                     os.path.join(
-                        self._local_dir, "master_list_v2_sources", "edd_kim17_slim.csv"
+                        self._local_dir, "master_list_v2_sources", "edd_lim17_slim.csv"
                     ),
                     comment="#",
                 ),

@@ -379,7 +379,7 @@ class HostCatalog(object):
         self._master_table_ = build_master_list(
             hyperleda=self._database["hyperleda_kt12"].read(),
             edd_2mrs=self._database["edd_2mrs_slim"].read(),
-            edd_kim17=self._database["edd_kim17_slim"].read(),
+            edd_lim17=self._database["edd_lim17_slim"].read(),
             nsa=self._database["nsa_v0.1.2"].read(),
             nsa1=self._database["nsa_v1.0.1"].read(),
             remove_list=self._database["host_remove"].read(),

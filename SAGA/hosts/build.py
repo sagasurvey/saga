@@ -332,7 +332,7 @@ def add_selection_flags(d):
 def build_master_list(
     hyperleda,
     edd_2mrs,
-    edd_kim17,
+    edd_lim17,
     nsa,
     nsa1,
     remove_list=None,
@@ -348,10 +348,10 @@ def build_master_list(
     d = join_by_pgc(d, edd_2mrs)
     del edd_2mrs
 
-    edd_kim17 = edd_kim17["PGC", "Mhalo"]
-    edd_kim17.rename_column("PGC", "pgc")
-    d = join_by_pgc(d, edd_kim17)
-    del edd_kim17
+    edd_lim17 = edd_lim17["PGC", "Mhalo"]
+    edd_lim17.rename_column("PGC", "pgc")
+    d = join_by_pgc(d, edd_lim17["pgc", "Mhalo"])
+    del edd_lim17
 
     d = add_skycoord(d, "al2000", "de2000", unit=("hourangle", "deg"))
 
