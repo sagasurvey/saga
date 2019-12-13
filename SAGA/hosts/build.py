@@ -8,6 +8,7 @@ import astropy.units as u
 import healpy as hp
 import numpy as np
 from astropy.coordinates import Distance, SkyCoord
+from astropy.cosmology import WMAP9  # pylint: disable=no-name-in-module
 from astropy.table import Table, join, vstack
 from astropy.time import Time
 from easyquery import Query, QueryMaker
@@ -350,6 +351,7 @@ def build_master_list(
 
     edd_lim17 = edd_lim17["PGC", "Mhalo"]
     edd_lim17.rename_column("PGC", "pgc")
+    edd_lim17["Mhalo"] -= np.log10(WMAP9.h)
     d = join_by_pgc(d, edd_lim17["pgc", "Mhalo"])
     del edd_lim17
 
