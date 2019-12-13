@@ -159,7 +159,15 @@ def add_skycoord_stars(stars):
     return stars
 
 
-def find_nearby_brightest(d, other, mag_label, output_prefix, radii=(0.3, 0.6)):
+def find_nearby_brightest(
+    d,
+    other,
+    mag_label,
+    output_prefix,
+    radii=(0.3, 0.6),
+    density_prefix=None,
+    density_mag_limit=None,
+):
     radii = np.asarray(radii)
     output = []
     for obj in d:
@@ -169,11 +177,20 @@ def find_nearby_brightest(d, other, mag_label, output_prefix, radii=(0.3, 0.6)):
         for r in radii_radian:
             mask = (sep > last_r) & (sep <= r)
             output.append(other[mag_label][mask].min() if mask.any() else 99.0)
+            if density_prefix:
+                if density_mag_limit is not None:
+                    mask &= other[mag_label] < density_mag_limit
+                area = (np.rad2deg(r) ** 2 - np.rad2deg(last_r) ** 2) * np.pi
+                output.append(np.count_nonzero(mask) / area)
             last_r = r
 
-    output = np.array(output).reshape(len(d), len(radii)).T
+    output = np.array(output).reshape(len(d), -1).T
     for i, v in enumerate(output):
-        d["{}_R{}".format(output_prefix, i + 1)] = v
+        j = (i // len(radii) + 1) if density_prefix else (i + 1)
+        if density_prefix and (i % 2):
+            d["{}_R{}".format(density_prefix, j)] = v
+            continue
+        d["{}_R{}".format(output_prefix, j)] = v
     return d
 
 
@@ -252,7 +269,9 @@ def clean_up_columns(d):
         (
             col.upper()
             for col in d.colnames
-            if col.startswith("BRIGHTEST_") or col.startswith("COVERAGE_")
+            if col.startswith("BRIGHTEST_")
+            or col.startswith("COVERAGE_")
+            or col.startswith("STAR_DENSITY_")
         )
     )
 
@@ -380,7 +399,14 @@ def build_master_list(
     if stars is not None:
         stars = Query("Plx > 0", (notnull, "Plx"), (notnull, "Hpmag")).filter(stars)
         stars = add_skycoord_stars(stars)
-        d = find_nearby_brightest(d, stars, "Hpmag", "BRIGHTEST_STAR")
+        d = find_nearby_brightest(
+            d,
+            stars,
+            "Hpmag",
+            "BRIGHTEST_STAR",
+            density_prefix="STAR_DENSITY",
+            density_mag_limit=7,
+        )
         del stars
     else:
         d["BRIGHTEST_STAR"] = 99.0
