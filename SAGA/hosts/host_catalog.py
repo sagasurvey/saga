@@ -371,15 +371,10 @@ class HostCatalog(object):
         if self._version == 1:
             raise NotImplementedError("cannot build v1 master list!")
 
-        if self._database["master_list"].remote.isfile() and not overwrite:
-            raise ValueError(
-                "master list already exist and overwrite is not set to True"
-            )
-
         self._master_table_ = build_master_list(
             hyperleda=self._database["hyperleda_kt12"].read(),
             edd_2mrs=self._database["edd_2mrs_slim"].read(),
-            edd_kim17=self._database["edd_kim17_slim"].read(),
+            edd_lim17=self._database["edd_lim17_slim"].read(),
             nsa=self._database["nsa_v0.1.2"].read(),
             nsa1=self._database["nsa_v1.0.1"].read(),
             remove_list=self._database["host_remove"].read(),
@@ -395,7 +390,8 @@ class HostCatalog(object):
         self._host_table_ = cuts.potential_hosts.filter(self._master_table_)
         self._host_index_ = None
 
-        self._database["master_list"].write(self._master_table_, overwrite=True)
+        if not self._database["master_list"].remote.isfile() or overwrite:
+            self._database["master_list"].write(self._master_table_, overwrite=True)
 
         if self._database["hosts"].local is not None and (
             overwrite_host_list or not self._database["hosts"].local.isfile()

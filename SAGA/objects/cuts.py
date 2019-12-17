@@ -118,6 +118,7 @@ _known_telnames = {
     "UKST",
     "LCRS",
     "slack",
+    "ALFALF",
 }
 has_our_specs_only = QueryMaker.vectorize(
     lambda x: x and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT"

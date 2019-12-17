@@ -651,6 +651,9 @@ class ObjectCatalog(object):
         data["specs_aat"].append(np.count_nonzero(has_spec_mask & aat_mask))
         data["specs_mmt"].append(np.count_nonzero(has_spec_mask & mmt_mask))
 
+        data["specs_total_highp"].append(np.count_nonzero(has_spec_mask & high_p_mask))
+        data["specs_ours_highp"].append(np.count_nonzero(our_specs_mask & high_p_mask))
+
         return data
 
     def generate_object_stats(

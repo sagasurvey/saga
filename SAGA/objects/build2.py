@@ -553,7 +553,9 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     specs["OBJ_NSAID"] = np.int32(-1)
     specs["chosen"] = False
 
-    def get_tel_rank(tel, ranks=("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS")):
+    def get_tel_rank(
+        tel, ranks=("MMT", "AAT", "PAL", "NSA", "_OTHERS", "SDSS", "ALFALF", "WIYN")
+    ):
         try:
             return ranks.index(tel)
         except ValueError:

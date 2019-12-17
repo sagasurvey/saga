@@ -169,11 +169,11 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
-            "edd_kim17_slim": DataObject(
+            "edd_lim17_slim": DataObject(
                 EddQuery("SELECT PGC, Mhalo from klimgroups"),
                 FastCsvTable(
                     os.path.join(
-                        self._local_dir, "master_list_v2_sources", "edd_kim17_slim.csv"
+                        self._local_dir, "master_list_v2_sources", "edd_lim17_slim.csv"
                     ),
                     comment="#",
                 ),
@@ -330,6 +330,21 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
+            "spectra_alfalfa": DataObject(
+                FastCsvTable(
+                    "http://egg.astro.cornell.edu/alfalfa/data/a100files/a100.code12.table2.190808.csv",
+                ),
+                FastCsvTable(
+                    os.path.join(
+                        self._shared_dir,
+                        "Spectra",
+                        "Final",
+                        "ALFALFA",
+                        "a100.code12.table2.190808.dat",
+                    )
+                ),
+                use_local_first=True,
+            ),
             "spectra_halpha": DataObject(
                 FileObject(
                     os.path.join(self._shared_dir, "Spectra", "saga_halpha.dat"),
@@ -352,6 +367,7 @@ class Database(object):
                     "ukst": self._tables["spectra_ukst"],
                     "slackers": self._tables["spectra_slackers"],
                     "palomar": self._tables["spectra_palomar"],
+                    "alfalfa": self._tables["spectra_alfalfa"],
                 },
                 self._tables["spectra_halpha"],
             )
