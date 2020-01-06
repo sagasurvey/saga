@@ -425,7 +425,7 @@ class FieldCatalog(HostCatalog):
                         f.replace("_", "").lower()
                         for f in self._host_table[self._ID_COLNAME]
                     ),
-                    range(len(self._host_table)),
+                    [(i,) for i in range(len(self._host_table))],
                 )
             )
         return self._host_index_

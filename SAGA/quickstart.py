@@ -9,7 +9,7 @@ __all__ = ["QuickStart"]
 
 
 class QuickStart:
-    def __init__(self, shared_dir=None, local_dir=None, host_catalog_class=HostCatalog):
+    def __init__(self, shared_dir=None, local_dir=None, lowz=False):
 
         self._shared_dir = (
             shared_dir
@@ -33,11 +33,12 @@ class QuickStart:
 
         print("SAGA `local_dir`  set to", self._local_dir)
 
+        self._lowz = bool(lowz)
         self._database = None
         self._host_catalog = None
         self._object_catalog = None
         self._target_selection = None
-        self._host_catalog_class = host_catalog_class
+        self._host_catalog_class = FieldCatalog if self._lowz else HostCatalog
         self._host_catalog_options = dict()
         self._target_selection_options = dict()
 
@@ -65,6 +66,8 @@ class QuickStart:
     def database(self):
         if self._database is None:
             self._database = Database(self._shared_dir, self._local_dir)
+            if self._lowz:
+                self._database.set_default_base_version('v2')
         return self._database
 
     @property

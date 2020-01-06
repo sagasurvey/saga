@@ -456,7 +456,7 @@ class DesQuery(DownloadableBase):
             },
             timeout=(120, 3600),
         )
-        if not r.ok:
+        if not r.ok or not r.text:
             raise requests.RequestException('DES query failed: "{}"'.format(r.text))
 
         t = Table.read(r.text, format="ascii.fast_tab", names=cols)
@@ -684,7 +684,7 @@ def download_catalogs_for_hosts(
             )
             failed[i] = True
         finally:
-            if os.path.getsize(path) < file_size_check:
+            if os.path.isfile(path) and os.path.getsize(path) < file_size_check:
                 print(
                     time.strftime("[%m/%d %H:%M:%S]"),
                     "Downloaded catalog corrupted for host {} !!".format(host_id),
