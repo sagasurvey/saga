@@ -23,7 +23,6 @@ __all__ = [
     "calc_simple_satellite_probability_grz",
 ]
 
-
 COLUMNS_USED = list(
     set(
         chain(
@@ -158,7 +157,7 @@ def assign_targeting_score_v1(
     if len(need_random_selection) > 50:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
         random_mask[:50] = True
-        np.random.RandomState(123).shuffle(random_mask)
+        np.random.RandomState(123).shuffle(random_mask)  # pylint: disable=no-member
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 600
 
@@ -355,7 +354,7 @@ def assign_targeting_score_v2(
     if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
         random_mask[:n_random] = True
-        np.random.RandomState(seed).shuffle(random_mask)
+        np.random.RandomState(seed).shuffle(random_mask)  # pylint: disable=no-member
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] -= 300
 
