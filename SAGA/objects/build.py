@@ -880,12 +880,14 @@ def add_z_cosmo(base):
     base["z_cosmo"][has_spec_mask] = v2z(
         vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask])
     )
-    host_or_sats_mask = (C.is_sat | "SATS == 3").mask(base)
-    base["z_cosmo"][host_or_sats_mask] = (
-        base["HOST_ZCOSMO"][host_or_sats_mask]
-        if "HOST_ZCOSMO" in base.colnames
-        else d2z(base["HOST_DIST"][host_or_sats_mask])
-    )
+
+    if "SATS" in base.colnames:
+        host_or_sats_mask = (C.is_sat | "SATS == 3").mask(base)
+        base["z_cosmo"][host_or_sats_mask] = (
+            base["HOST_ZCOSMO"][host_or_sats_mask]
+            if "HOST_ZCOSMO" in base.colnames
+            else d2z(base["HOST_DIST"][host_or_sats_mask])
+        )
 
     return base
 
