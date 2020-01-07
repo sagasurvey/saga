@@ -28,6 +28,21 @@ try:
 except ImportError:
     _HAS_SCISERVER_ = False
 
+# fix astropy six
+try:
+    import astropy.extern.six
+except ImportError:
+    import sys
+    import six
+
+    sys.modules["astropy.extern.six"] = six
+
+_HAS_DATALAB_ = True
+try:
+    import dl.queryClient
+except ImportError:
+    _HAS_DATALAB_ = False
+
 
 __all__ = [
     "SdssQuery",
@@ -440,9 +455,10 @@ class DesQuery(DownloadableBase):
             cols.append(name.strip())
         return cols
 
-    def download_as_file(self, file_path, overwrite=False, compress=True):
-        if os.path.isfile(file_path) and not overwrite:
-            return
+    def run_query(self):
+        if _HAS_DATALAB_:
+            raw = dl.queryClient.query(sql=self.query)
+            return Table.read(raw, format="ascii.fast_csv")
 
         cols = self.get_colnames_from_query(self.query)
 
@@ -462,6 +478,12 @@ class DesQuery(DownloadableBase):
         t = Table.read(r.text, format="ascii.fast_tab", names=cols)
         r.close()
 
+        return t
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if os.path.isfile(file_path) and not overwrite:
+            return
+        t = self.run_query()
         file_open = gzip.open if compress else open
         makedirs_if_needed(file_path)
         with file_open(file_path, "wb") as f:

@@ -375,6 +375,10 @@ class ObjectCatalog(object):
             overwrite = Time(overwrite)
 
         host_table = self._host_catalog.load(hosts)
+        HOSTID_COLNAME = (
+            self._host_catalog._ID_COLNAME
+        )  # pylint: disable=protected-access
+
         nhosts = len(host_table)
         if not nhosts:
             print(time.strftime("[%m/%d %H:%M:%S]"), "No host to build! Abort!")
@@ -425,7 +429,7 @@ class ObjectCatalog(object):
         failed_count = 0
         catalogs_to_return = list()
         for i, host in enumerate(host_table):
-            host_id = host["HOSTID"]
+            host_id = host[HOSTID_COLNAME]
             if base_file_path_pattern is None:
                 base_key = "base" + version_postfix
                 data_obj = self._database[base_key, host_id].remote
@@ -464,6 +468,12 @@ class ObjectCatalog(object):
 
             if build_version < 2:
                 catalogs = ("sdss", "wise")
+            elif HOSTID_COLNAME == "field_id":
+                host_id = host[HOSTID_COLNAME]
+                if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet")):
+                    catalogs = ("decals",)
+                else:
+                    catalogs = ("des",)
             else:
                 catalogs = []
                 if _get("SDSS") >= 0.95:

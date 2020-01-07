@@ -92,6 +92,9 @@ def ensure_proper_prob(p):
     return p
 
 
+# pylint: disable=unused-argument
+
+
 def assign_targeting_score_v1(
     base, manual_selected_objids=None, gmm_parameters=None, **kwargs
 ):
