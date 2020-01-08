@@ -347,9 +347,11 @@ def assign_targeting_score_v2(
         ]
 
         if debug:
-            for col, fill_value in (("P_GMM", -1.0),
-                                    ("log_L_GMM", np.nan),
-                                    ("TARGETING_SCORE", 9999)):
+            for col, fill_value in (
+                ("P_GMM", -1.0),
+                ("log_L_GMM", np.nan),
+                ("TARGETING_SCORE", 9999),
+            ):
                 base[col + postfix] = fill_value
                 base[col + postfix][base_this["index"]] = base_this[col]
 
