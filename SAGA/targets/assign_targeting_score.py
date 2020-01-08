@@ -347,8 +347,10 @@ def assign_targeting_score_v2(
         ]
 
         if debug:
-            for col in ("P_GMM", "log_L_GMM", "TARGETING_SCORE"):
-                base[col + postfix] = -1 if col == "TARGETING_SCORE" else np.nan
+            for col, fill_value in (("P_GMM", -1.0),
+                                    ("log_L_GMM", np.nan),
+                                    ("TARGETING_SCORE", 9999)):
+                base[col + postfix] = fill_value
                 base[col + postfix][base_this["index"]] = base_this[col]
 
     need_random_selection = np.flatnonzero(
