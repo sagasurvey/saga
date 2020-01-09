@@ -103,6 +103,8 @@ class FastCsvTable(FileObject):
 
 
 class GoogleSheets(FastCsvTable):
+    _read_default_kwargs = dict(FastCsvTable._read_default_kwargs, cache=False)
+
     def __init__(self, key, gid, **kwargs):
         path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
             key, gid
