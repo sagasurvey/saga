@@ -1,9 +1,10 @@
 import numpy as np
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from ..database import FastCsvTable, FileObject, FitsTable
 from ..utils import fill_values_by_query
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
+from .manual_fixes import fixes_2df_spec_by_objid
 
 __all__ = [
     "read_gama",
@@ -64,6 +65,9 @@ def read_2df(file_path):
     specs["TELNAME"] = "2dF"
     specs["MASKNAME"] = "2dF"
     specs["HELIO_CORR"] = True
+
+    for objid, fixes in fixes_2df_spec_by_objid.items():
+        fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
     return ensure_specs_dtype(specs)
 
