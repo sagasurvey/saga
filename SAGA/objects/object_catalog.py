@@ -106,18 +106,6 @@ class ObjectCatalog(object):
         if add_skycoord:
             table = utils.add_skycoord(table)
 
-        # TODO: remove this in the future:
-        if fix_2df_lowz_zq:
-            fill_values_by_query(
-                table,
-                Query(
-                    (lambda x: ((x == "2dF") | (x == "2dFLen")), "TELNAME"),
-                    "ZQUALITY == 3",
-                    "SPEC_Z < 0.05",
-                ),
-                {"ZQUALITY": 2},
-            )
-
         return table
 
     @staticmethod
