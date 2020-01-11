@@ -7,5 +7,5 @@ fixes_sdss_spec_by_objid = {
 }
 
 fixes_2df_spec_by_objid = {
-    "TGS905Z093": {"ZQUALITY", 3},
+    "TGS905Z093": {"ZQUALITY": 3},
 }
