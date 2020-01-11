@@ -8,6 +8,7 @@ import numpy as np
 import requests
 from astropy.io import fits
 from astropy.table import Table
+from astropy.utils.data import clear_download_cache
 
 from ..utils import makedirs_if_needed
 
@@ -103,8 +104,6 @@ class FastCsvTable(FileObject):
 
 
 class GoogleSheets(FastCsvTable):
-    _read_default_kwargs = dict(FastCsvTable._read_default_kwargs, cache=False)
-
     def __init__(self, key, gid, **kwargs):
         path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
             key, gid
@@ -113,6 +112,10 @@ class GoogleSheets(FastCsvTable):
             key, gid
         )
         super(GoogleSheets, self).__init__(path, **kwargs)
+
+    def read(self):
+        clear_download_cache(self.path)
+        return super(GoogleSheets, self).read()
 
     def write(self, table, **kwargs):
         raise NotImplementedError
