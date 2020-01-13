@@ -4,7 +4,7 @@ module assign_targeting_score
 from itertools import chain
 
 import numpy as np
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from .. import utils
 from ..objects import cuts as C
@@ -267,28 +267,15 @@ def assign_targeting_score_v2(
             base_this["P_GMM"] = 0
             base_this["log_L_GMM"] = 0
 
-        priority_cut = Query("gr - abs(gr_err) < (1.55 - 0.05*r_mag)")
-        if survey in ("sdss", "des"):
-            priority_cut &= Query("(gr-abs(gr_err))*0.65+(ri-abs(ri_err)) < 0.6")
-        if survey == "sdss":
-            priority_cut &= Query(
-                "-(ug+abs(ug_err))*0.15+(ri-abs(ri_err)) < 0.08",
-                "-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5",
-            )
-
         veryhigh_p = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
         high_p = Query("P_GMM >= 0.6", "log_L_GMM >= -7") | Query(
             "log_L_GMM < -7", "ri-abs(ri_err) < -0.25"
         )
-        sb_cut = Query("sb_r > 0.6 * (r_mag - abs(r_err)) + 10.1")
         bright = C.sdss_limit
+        exclusion_cuts = Query()
 
         if low_priority_objids is not None:
-            not_low_priority = Query(
-                (lambda x: np.in1d(x, low_priority_objids, invert=True), "OBJID")
-            )
-            bright = Query(bright, not_low_priority)
-            sb_cut = Query(sb_cut, not_low_priority)
+            exclusion_cuts &= QueryMaker.in1d("OBJID", low_priority_objids, invert=True)
 
         if survey == "sdss" and ("decals" in surveys or "des" in surveys):
             deep_survey = "des" if "des" in surveys else "decals"
@@ -300,15 +287,15 @@ def assign_targeting_score_v2(
                 has_good_deep, "r_mag_{} > 20.8".format(deep_survey)
             )
             over_subtraction |= Query(~has_good_deep, "u_mag > r_mag + 3.5")
-            bright = Query(bright, ~over_subtraction)
-            sb_cut = Query(sb_cut, ~over_subtraction)
+            exclusion_cuts &= ~over_subtraction
 
         # remove bright DES stars
         if survey == "des":
             bright_stars = Query(
                 "0.7 * (r_mag + 10.2) > sb_r", "gr < 0.6", "r_mag < 17"
             )
-            bright = bright & (~bright_stars)
+            bright &= ~bright_stars
+            exclusion_cuts &= ~bright_stars
 
         base_this["TARGETING_SCORE"] = 1000
         fill_values_by_query(base_this, C.faint_end_limit, {"TARGETING_SCORE": 900})
@@ -316,15 +303,23 @@ def assign_targeting_score_v2(
             base_this, C.sat_rcut & C.faint_end_limit, {"TARGETING_SCORE": 800}
         )
         fill_values_by_query(base_this, bright, {"TARGETING_SCORE": 700})
-        fill_values_by_query(base_this, veryhigh_p & sb_cut, {"TARGETING_SCORE": 600})
         fill_values_by_query(
             base_this,
-            C.sat_rcut & priority_cut & sb_cut & C.faint_end_limit,
+            veryhigh_p & C.high_priority_sb & exclusion_cuts,
+            {"TARGETING_SCORE": 600},
+        )
+        fill_values_by_query(
+            base_this,
+            C.sat_rcut & C.high_priority_cuts & exclusion_cuts & C.faint_end_limit,
             {"TARGETING_SCORE": 400},
         )
         fill_values_by_query(
             base_this,
-            C.sat_rcut & high_p & sb_cut & C.faint_end_limit,
+            C.sat_rcut
+            & high_p
+            & C.high_priority_sb
+            & exclusion_cuts
+            & C.faint_end_limit,
             {"TARGETING_SCORE": 300},
         )
         fill_values_by_query(base_this, C.sat_rcut & bright, {"TARGETING_SCORE": 200})
