@@ -83,9 +83,7 @@ ugri_cut = gri_cut & ug_cut
 grz_cut = gr_cut & rz_cut
 
 gri_or_grz_cut = Query(
-    gr_cut | (~valid_g_mag),
-    ri_cut | (~valid_i_mag),
-    rz_cut | (~valid_z_mag),
+    gr_cut | (~valid_g_mag), ri_cut | (~valid_i_mag), rz_cut | (~valid_z_mag),
 )
 
 high_priority_cuts = Query(
