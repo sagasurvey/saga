@@ -69,6 +69,7 @@ r_abs_limit = Query("Mr < -12.295")
 sat_vcut = Query("abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0")
 sat_rcut = Query("RHOST_KPC < 300.0")
 
+valid_u_mag = Query("u_mag > 0", "u_mag < 30")
 valid_g_mag = Query("g_mag > 0", "g_mag < 30")
 valid_i_mag = Query("i_mag > 0", "i_mag < 30")
 valid_z_mag = Query("z_mag > 0", "z_mag < 30")
@@ -86,12 +87,22 @@ gri_or_grz_cut = Query(
     gr_cut | (~valid_g_mag), ri_cut | (~valid_i_mag), rz_cut | (~valid_z_mag),
 )
 
+high_priority_ug = Query(
+    "ug - abs(ug_err) < 1.8 + 0.05*(r_mag-14)",
+    "ug + abs(ug_err) > 0.1 + 0.05*(r_mag-14)",
+) | (~valid_u_mag)
+high_priority_gr = Query("gr - abs(gr_err) < 0.85 - 0.05*(r_mag-14)") | (~valid_g_mag)
+high_priority_ri = Query("ri - abs(ri_err) < 0.65 - 0.05*(r_mag-14)") | (~valid_i_mag)
+high_priority_rz = Query("rz - abs(rz_err) < 0.80 - 0.05*(r_mag-14)") | (~valid_z_mag)
+high_priority_sb = Query("sb_r > 0.6 * (r_mag - abs(r_err)) + 10.1")
+
 high_priority_cuts = Query(
     gri_or_grz_cut,
-    Query("gr - abs(gr_err) < 0.85 - 0.05*(r_mag-14)") | (~valid_g_mag),
-    Query("ri - abs(ri_err) < 0.65 - 0.05*(r_mag-14)") | (~valid_i_mag),
-    Query("rz - abs(rz_err) < 0.80 - 0.05*(r_mag-14)") | (~valid_z_mag),
-    "sb_r > 0.6 * (r_mag - abs(r_err)) + 10.1",
+    high_priority_ug,
+    high_priority_gr,
+    high_priority_ri,
+    high_priority_rz,
+    high_priority_sb,
 )
 
 is_sat = Query("SATS == 1")
