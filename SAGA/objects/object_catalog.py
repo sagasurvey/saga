@@ -616,7 +616,7 @@ class ObjectCatalog(object):
             host_id, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
         ).pop()
 
-        simple_cuts = C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut
+        simple_cuts = C.faint_end_limit_strict & C.gri_or_grz_cut & C.sat_rcut
         high_p_cuts = Query("r_mag > 12") & C.high_priority_cuts
 
         simple_mask = simple_cuts.mask(base)
