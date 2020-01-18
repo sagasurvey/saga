@@ -194,14 +194,14 @@ def assign_targeting_score_v2(
     **kwargs
 ):
     """
-    Last updated: 09/05/2018
+    Last updated: 01/18/2020
      100 Human selection and Special targets
      150 satellites without AAT/MMT specs
      180 low-z (z < 0.05) but ZQUALITY = 2
      200 within host,  r < 17.77, gri/grz cuts
-     291 within host,  r < 21, very low SB (applied to DES only)
+     291 within host,  r < 20.75, very low SB (applied to DES only)
      300 within host,  r < 20.75, high p_GMM or GMM outliers, low SB, gri/grz cuts
-     400 within host,  r < 20.75, high-priority, low SB, gri/grz cuts
+     400 within host,  r < 20.75, high-priority cuts (incl. low-SB and gri/grz cuts)
      500 within host,  r < 20.75, gri/grz cuts, random selection of 50
      600 very high p_GMM, low SB
      700 outwith host, r < 17.77
@@ -350,8 +350,15 @@ def assign_targeting_score_v2(
                 base[col + postfix] = fill_value
                 base[col + postfix][base_this["index"]] = base_this[col]
 
+    fainter_than_abs_limit = Query(
+        "TARGETING_SCORE >= 200", "TARGETING_SCORE < 500", ~C.faint_end_limit_strict
+    ).mask(base)
+    base["TARGETING_SCORE"][fainter_than_abs_limit] += 300
+
     need_random_selection = np.flatnonzero(
-        Query("TARGETING_SCORE >= 800", "TARGETING_SCORE < 900").mask(base)
+        Query(
+            "TARGETING_SCORE >= 800", "TARGETING_SCORE < 900", C.faint_end_limit_strict
+        ).mask(base)
     )
     if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
