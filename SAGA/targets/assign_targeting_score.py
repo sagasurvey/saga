@@ -238,11 +238,12 @@ def assign_targeting_score_v2(
             n2 = "".join((b2, "_mag", postfix))
             if n1 not in base_this.colnames or n2 not in base_this.colnames:
                 continue
-            base_this[color] = base_this[n1] - base_this[n2]
-            base_this[color + "_err"] = np.hypot(
-                base_this["".join((b1, "_err", postfix))],
-                base_this["".join((b2, "_err", postfix))],
-            )
+            with np.errstate(invalid="ignore"):
+                base_this[color] = base_this[n1] - base_this[n2]
+                base_this[color + "_err"] = np.hypot(
+                    base_this["".join((b1, "_err", postfix))],
+                    base_this["".join((b2, "_err", postfix))],
+                )
 
         gmm_parameters_this = gmm_parameters.get(survey)
         if gmm_parameters_this is not None:
