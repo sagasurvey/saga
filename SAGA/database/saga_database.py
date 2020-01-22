@@ -79,6 +79,11 @@ known_google_sheets = {
         799699553,
         include_names=["OBJID"],
     ),
+    "manual_targets_mmt2020a": GoogleSheets(
+        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
+        440730178,
+        include_names=["OBJID"],
+    ),
     "lowz_fields": GoogleSheets(
         "1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266
     ),
