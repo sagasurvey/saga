@@ -293,7 +293,7 @@ def assign_targeting_score_v2(
         # remove bright DES stars
         if survey == "des":
             bright_stars = Query(
-                "0.7 * (r_mag + 10.2) > sb_r", "gr < 0.6", "r_mag < 17"
+                "0.7 * (r_mag + 10.2) > sb_r", "gr < 0.6", "r_mag < 17", C.valid_g_mag
             )
             bright &= ~bright_stars
             exclusion_cuts &= ~bright_stars
