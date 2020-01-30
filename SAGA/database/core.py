@@ -143,9 +143,12 @@ class FitsTable(FileObject):
         try:
             t = Table(hdu_list[1].data, masked=False)
         finally:
-            del hdu_list[1].data
-            hdu_list.close()
-            del hdu_list
+            try:
+                del hdu_list[1].data
+                hdu_list.close()
+                del hdu_list
+            except:  # pylint: disable=bare-except  # noqa: E722
+                pass
 
         return t
 
