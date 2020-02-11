@@ -68,11 +68,7 @@ class ObjectCatalog(object):
 
     @classmethod
     def _annotate_catalog(
-        cls,
-        table,
-        add_skycoord=False,
-        ensure_all_objid_cols=False,
-        fix_2df_lowz_zq=False,
+        cls, table, add_skycoord=False, ensure_all_objid_cols=False,
     ):
         if "EXTINCTION_R" in table.colnames:
             for b in get_sdss_bands():
@@ -131,7 +127,6 @@ class ObjectCatalog(object):
         version=None,
         add_skycoord=True,
         ensure_all_objid_cols=False,
-        fix_2df_lowz_zq=True,
     ):
         """
         load object catalogs (aka "base catalogs")
@@ -244,7 +239,6 @@ class ObjectCatalog(object):
                 self._annotate_catalog(
                     self._database[base_key, host].read(),
                     ensure_all_objid_cols=ensure_all_objid_cols,
-                    fix_2df_lowz_zq=fix_2df_lowz_zq,
                 ),
                 q,
                 columns,
