@@ -358,6 +358,7 @@ class ObjectCatalog(object):
 
         host_table = self._host_catalog.load(hosts)
         HOSTID_COLNAME = (
+            self._host_catalog._ID_COLNAME  # pylint: disable=protected-access
         )
 
         nhosts = len(host_table)
@@ -609,12 +610,15 @@ class ObjectCatalog(object):
             host_id, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
         ).pop()
 
-        simple_cuts = C.faint_end_limit_strict & C.gri_or_grz_cut & C.sat_rcut
-        high_p_cuts = Query("r_mag > 12") & C.high_priority_cuts
+        simple_cuts = C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut
+        high_p_cuts = C.high_priority_cuts
+        strict_mag_cuts = Query("r_mag > 12") & C.faint_end_limit_strict
 
         simple_mask = simple_cuts.mask(base)
         high_p_mask = high_p_cuts.mask(base)
         high_p_mask &= simple_mask
+        high_p_strict_mask = strict_mag_cuts.mask(base)
+        high_p_strict_mask &= high_p_mask
         has_spec_mask = C.has_spec.mask(base)
         sats_mask = C.is_sat.mask(base)
         sats_r_abs_limit_mask = sats_mask & C.r_abs_limit.mask(base)
@@ -629,7 +633,9 @@ class ObjectCatalog(object):
         data["really_need_spec"].append(
             np.count_nonzero(high_p_mask & (~has_spec_mask))
         )
-
+        data["really_need_spec_strict"].append(
+            np.count_nonzero(high_p_strict_mask & (~has_spec_mask))
+        )
         data["specs_total"].append(np.count_nonzero(has_spec_mask))
         data["low_z_total"].append(np.count_nonzero(has_spec_mask & low_z_mask))
         data["sats_total"].append(np.count_nonzero(sats_mask))
