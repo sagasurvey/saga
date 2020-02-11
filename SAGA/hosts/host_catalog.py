@@ -274,13 +274,14 @@ class HostCatalog(object):
 
     def _annotate_table(self, d, add_coord=False, include_stats=False):
         if include_stats:
-            d = self.add_object_stats(d)
+            d = self.add_object_stats(d, use_remote=("remote" in str(include_stats)))
         if add_coord:
             d = add_skycoord(d)
         return d
 
-    def add_object_stats(self, host_table):
-        stats = self._database["host_stats"].read()
+    def add_object_stats(self, host_table, use_remote=False):
+        data_obj = self._database["host_stats"]
+        stats = data_obj.remote.read() if use_remote else data_obj.read()
         cols_to_keep = [
             c for c in stats.colnames if c not in host_table.colnames or c == "HOSTID"
         ]
@@ -444,5 +445,7 @@ class FieldCatalog(HostCatalog):
     def build(self, overwrite=False):
         raise AttributeError
 
-    def add_object_stats(self, host_table):
+    def add_object_stats(self, host_table, use_remote=False):
+        if use_remote:
+            raise NotImplementedError
         return host_table
