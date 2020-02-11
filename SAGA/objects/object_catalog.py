@@ -358,8 +358,7 @@ class ObjectCatalog(object):
 
         host_table = self._host_catalog.load(hosts)
         HOSTID_COLNAME = (
-            self._host_catalog._ID_COLNAME
-        )  # pylint: disable=protected-access
+        )
 
         nhosts = len(host_table)
         if not nhosts:
