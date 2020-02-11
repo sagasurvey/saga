@@ -39,7 +39,7 @@ has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
 
 potential_hosts = Query("HOST_SCORE > 0")
-good_hosts = Query("HOST_SCORE >= 3")
+good_hosts = Query("HOST_SCORE >= 4")
 preferred_hosts = Query("HOST_SCORE >= 4")
 good = good_hosts & has_image
 build_default = potential_hosts & has_image
