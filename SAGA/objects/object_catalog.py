@@ -452,7 +452,7 @@ class ObjectCatalog(object):
                 catalogs = ("sdss", "wise")
             elif HOSTID_COLNAME == "field_id":
                 host_id = host[HOSTID_COLNAME]
-                if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet")):
+                if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet", "Styx")):
                     catalogs = ("decals",)
                 else:
                     catalogs = ("des",)
