@@ -5,8 +5,10 @@ def show_images(
     table,
     pixscale=0.2,
     size=200,
-    keys=("OBJID", "RA", "DEC", "survey", "r_mag", "sb_r", "gr", "RHOST_KPC"),
+    keys=("OBJID", "RA", "DEC", "HOSTID", "survey", "r_mag", "sb_r", "gr", "RHOST_KPC"),
     layer="auto",
+    ra_label="RA",
+    dec_label="DEC",
 ):
     out = []
     for row in table:
@@ -18,21 +20,14 @@ def show_images(
             else:
                 layer = "sdss2"
 
-        host_id = (
-            "nsa{}".format(row["HOST_NSAID"])
-            if row["HOST_NSAID"] != -1
-            else "pgc{}".format(row["HOST_PGC"])
-        )
-
         url = "http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
-            ra=row["RA"], dec=row["DEC"], layer=layer, pixscale=pixscale, size=size,
+            ra=row[ra_label], dec=row[dec_label], layer=layer, pixscale=pixscale, size=size,
         )
 
         link = "http://legacysurvey.org/viewer-dev?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
-            ra=row["RA"], dec=row["DEC"], layer=layer,
+            ra=row[ra_label], dec=row[dec_label], layer=layer,
         )
-        title = "host = {}\n".format(host_id)
-        title += "\n".join(
+        title = "\n".join(
             (
                 "{} = {}".format(k, row[k] if i < 4 else "{:.2f}".format(row[k]))
                 for i, k in enumerate(keys)
