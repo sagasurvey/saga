@@ -27,12 +27,8 @@ def show_images(
         link = "http://legacysurvey.org/viewer-dev?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
             ra=row[ra_label], dec=row[dec_label], layer=layer,
         )
-        title = "\n".join(
-            (
-                "{} = {}".format(k, row[k] if i < 4 else "{:.2f}".format(row[k]))
-                for i, k in enumerate(keys)
-            )
-        )
+        title = "\n".join(("{} = {}".format(k, row[k]) for k in keys))
+
         out.append(
             '<a href="{}" target="_blank"><img src="{}" style="display:inline-block;" title="{}" /></a>'.format(
                 link, url, title
