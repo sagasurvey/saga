@@ -458,9 +458,9 @@ class ObjectCatalog(object):
                     catalogs = ("des",)
             else:
                 catalogs = []
-                if _get("SDSS") >= 0.95:
+                if _get("SDSS") >= 0.85:
                     catalogs.append("sdss")
-                if _get("DES_DR1") >= 0.95:
+                if _get("DES_DR1") >= 0.85:
                     catalogs.append("des")
                 if max(_get("DECALS_DR6"), _get("DECALS_DR7")) >= 0.95:
                     catalogs.append("decals")

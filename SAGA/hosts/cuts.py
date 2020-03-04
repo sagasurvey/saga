@@ -32,8 +32,8 @@ _list_by_pgc = {
 has_decals_image = Query("COVERAGE_DECALS_DR6 >= 0.95") | Query(
     "COVERAGE_DECALS_DR7 >= 0.95"
 )
-has_des_image = Query("COVERAGE_DES_DR1 >= 0.95")
-has_sdss_image = Query("COVERAGE_SDSS >= 0.95")
+has_des_image = Query("COVERAGE_DES_DR1 >= 0.85")
+has_sdss_image = Query("COVERAGE_SDSS >= 0.85")
 
 has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
