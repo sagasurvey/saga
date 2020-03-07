@@ -40,7 +40,7 @@ There are two optional dependencies that require manual installation:
 
    * To install sciserver (recommended):
      ```sh
-     pip install -e "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.13#egg=sciserver&subdirectory=py3"
+     pip install "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.13#egg=sciserver&subdirectory=py3"
      ```
    In both cases you need to set environmental variables to store your credentials. (`CASJOBS_WSID` and `CASJOBS_PW` for casjobs; `SCISERVER_USER` and `SCISERVER_PASS` for sciserver).
 
