@@ -319,14 +319,14 @@ def add_selection_flags(d):
             "COVERAGE_DES_DR1",
             "COVERAGE_SDSS",
         ),
-        (lambda *cols: np.maximum(*cols) >= 0.85, "COVERAGE_DES_DR1", "COVERAGE_SDSS",),
+        (lambda c1, c2: np.maximum(c1, c2) >= 0.85, "COVERAGE_DES_DR1", "COVERAGE_SDSS"),
     )
 
     image_preferred = Query(
         image_allowed,
         (
             lambda d6, d7, de, s: (
-                (de >= 0.999)
+                (de >= 0.99)
                 | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)
             ),
             "COVERAGE_DECALS_DR6",

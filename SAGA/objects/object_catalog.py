@@ -290,7 +290,7 @@ class ObjectCatalog(object):
             remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (
                 nsa["DFLAGS"][:, 3:6]
             ).all(axis=1)
-            objs_to_remove = [614276, 632725]
+            objs_to_remove = [614276, 632725, 628283, 694072, 667243]
             fixes_dict = fixes_to_nsa_v101
             cols = build2.NSA_COLS_USED
         remove_mask |= np.in1d(nsa["NSAID"], objs_to_remove, assume_unique=True)
