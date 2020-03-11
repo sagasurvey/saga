@@ -94,7 +94,7 @@ gri_or_grz_cut = Query(
 high_priority_ug = Query(
     "ug - abs(ug_err) < 1.8 + 0.05*(r_mag-14)",
     "ug + abs(ug_err) > 0.1 + 0.05*(r_mag-14)",
-) | (~valid_u_mag)
+) | (~valid_u_mag) | (~valid_g_mag)
 high_priority_gr = Query("gr - abs(gr_err) < 0.85 - 0.05*(r_mag-14)") | (~valid_g_mag)
 high_priority_ri = Query("ri - abs(ri_err) < 0.65 - 0.05*(r_mag-14)") | (~valid_i_mag)
 high_priority_rz = Query("rz - abs(rz_err) < 0.80 - 0.05*(r_mag-14)") | (~valid_z_mag)
