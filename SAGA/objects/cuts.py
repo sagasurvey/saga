@@ -75,7 +75,7 @@ valid_u_mag = Query("u_mag > 0", "u_mag < 30")
 valid_g_mag = Query("g_mag > 0", "g_mag < 30")
 valid_i_mag = Query("i_mag > 0", "i_mag < 30")
 valid_z_mag = Query("z_mag > 0", "z_mag < 30")
-valid_sb = Query("sb_r > 0", "sb_r < 50")
+valid_sb = Query("sb_r > 0", "sb_r < 35")
 
 gr_cut = Query("gr-abs(gr_err)*2.0 < 0.85")
 ri_cut = Query("ri-abs(ri_err)*2.0 < 0.55")
