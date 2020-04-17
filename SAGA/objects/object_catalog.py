@@ -638,6 +638,7 @@ class ObjectCatalog(object):
         d["specs_main"] = Query(d["specs_total"], basic_targeting_cuts, C.main_targeting_cuts)
         d["specs_main_bright"] = Query(d["specs_bright"], basic_targeting_cuts, C.main_targeting_cuts)
 
+        d["specs_ours_rvir"] = Query(d["specs_ours"], C.sat_rcut)
         d["specs_ours_main"] = Query(d["specs_main"], C.has_our_specs_only)
         d["specs_ours_main_bright"] = Query(d["specs_main_bright"], C.has_our_specs_only)
 
