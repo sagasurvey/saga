@@ -50,3 +50,10 @@ paper1_incomplete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_incomplete"])
 paper1 = QueryMaker.in1d(
     "PGC", _list_by_pgc["paper1_complete"] + _list_by_pgc["paper1_incomplete"]
 )
+paper1_observed = paper1
+
+paper2_observed = Query("specs_ours_rvir >= 150", "HOST_SCORE >= 2")
+paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
+paper2_complete = Query(paper2_bright_complete, "really_need_spec < 50")
+paper2_incomplete = Query(paper2_observed, ~paper2_complete)
+paper2 = paper2_observed

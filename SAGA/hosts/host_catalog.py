@@ -9,7 +9,7 @@ from collections import defaultdict
 
 import numpy as np
 from astropy.table import join
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from ..database import Database
 from ..utils import add_skycoord, find_near_ra_dec
@@ -190,7 +190,7 @@ class HostCatalog(object):
             if "," in hosts:
                 hosts = hosts.split(",")
             elif not hosts.isdigit():
-                hosts = getattr(cuts, hosts, None) or Query(hosts)
+                hosts = self._resolve_preset_query(hosts)
 
         if isinstance(hosts, Query):
             return np.flatnonzero(hosts.mask(self._get_table(use_master))).tolist()
@@ -296,7 +296,7 @@ class HostCatalog(object):
                 d[col].fill_value = -1
         return d.filled()
 
-    def load(self, hosts=None, add_coord=True, use_master=None, include_stats=False):
+    def load(self, hosts=None, add_coord=True, use_master=None, include_stats=False, query=None):
         """
         load a host catalog
 
@@ -319,6 +319,8 @@ class HostCatalog(object):
         indices = self.resolve_id(hosts, "internal", use_master)
         d = self._get_table(use_master)[indices]
         d = self._annotate_table(d, add_coord=add_coord, include_stats=include_stats)
+        if query is not None:
+            d = self._resolve_preset_query(query).filter(d)
         return d
 
     def load_single(self, host, add_coord=True, use_master=None, include_stats=False):
@@ -403,6 +405,21 @@ class HostCatalog(object):
 
     def load_master_list(self, hosts=None, add_coord=True):
         return self.load(hosts, add_coord, use_master=True)
+
+    def _resolve_preset_query(self, query):
+        if isinstance(query, Query):
+            return query
+
+        if _is_string_like(query):
+            return getattr(cuts, query, None) or Query(query)
+
+        if hasattr(query, "__iter__"):
+            return Query(*[self._resolve_preset_query(q) for q in query])
+
+        raise ValueError("Cannot resolve input query")
+
+    def generate_host_query(self, *queries):
+        return QueryMaker.in1d("HOSTID", self.load(add_coord=False, include_stats=True, query=queries)["HOSTID"].tolist())
 
 
 class FieldCatalog(HostCatalog):
