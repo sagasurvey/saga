@@ -319,7 +319,11 @@ def add_selection_flags(d):
             "COVERAGE_DES_DR1",
             "COVERAGE_SDSS",
         ),
-        (lambda c1, c2: np.maximum(c1, c2) >= 0.85, "COVERAGE_DES_DR1", "COVERAGE_SDSS"),
+        (
+            lambda c1, c2: np.maximum(c1, c2) >= 0.85,
+            "COVERAGE_DES_DR1",
+            "COVERAGE_SDSS",
+        ),
     )
 
     image_preferred = Query(

@@ -89,12 +89,16 @@ grz_cut = gr_cut & rz_cut
 gri_or_grz_cut = Query(
     gr_cut | (~valid_g_mag), ri_cut | (~valid_i_mag), rz_cut | (~valid_z_mag),
 )
+relaxed_targeting_cuts = gri_or_grz_cut
 
-
-high_priority_ug = Query(
-    "ug - abs(ug_err) < 1.8 + 0.05*(r_mag-14)",
-    "ug + abs(ug_err) > 0.1 + 0.05*(r_mag-14)",
-) | (~valid_u_mag) | (~valid_g_mag)
+high_priority_ug = (
+    Query(
+        "ug - abs(ug_err) < 1.8 + 0.05*(r_mag-14)",
+        "ug + abs(ug_err) > 0.1 + 0.05*(r_mag-14)",
+    )
+    | (~valid_u_mag)
+    | (~valid_g_mag)
+)
 high_priority_gr = Query("gr - abs(gr_err) < 0.85 - 0.05*(r_mag-14)") | (~valid_g_mag)
 high_priority_ri = Query("ri - abs(ri_err) < 0.65 - 0.05*(r_mag-14)") | (~valid_i_mag)
 high_priority_rz = Query("rz - abs(rz_err) < 0.80 - 0.05*(r_mag-14)") | (~valid_z_mag)
@@ -109,6 +113,7 @@ high_priority_cuts = Query(
     high_priority_rz,
     high_priority_sb,
 )
+main_targeting_cuts = high_priority_cuts
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")

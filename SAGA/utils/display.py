@@ -21,7 +21,11 @@ def show_images(
                 layer = "sdss2"
 
         url = "http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
-            ra=row[ra_label], dec=row[dec_label], layer=layer, pixscale=pixscale, size=size,
+            ra=row[ra_label],
+            dec=row[dec_label],
+            layer=layer,
+            pixscale=pixscale,
+            size=size,
         )
 
         link = "http://legacysurvey.org/viewer-dev?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
