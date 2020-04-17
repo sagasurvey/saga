@@ -606,50 +606,46 @@ class ObjectCatalog(object):
             data = defaultdict(list)
 
         data["HOSTID"].append(host_id)
-        base = self.load(
-            host_id, cuts=(C.is_clean2 & C.is_galaxy2), add_skycoord=False
-        ).pop()
-
-        simple_cuts = C.faint_end_limit & C.gri_or_grz_cut & C.sat_rcut
-        high_p_cuts = C.high_priority_cuts
-        strict_mag_cuts = Query("r_mag > 12") & C.faint_end_limit_strict
-
-        simple_mask = simple_cuts.mask(base)
-        high_p_mask = high_p_cuts.mask(base)
-        high_p_mask &= simple_mask
-        high_p_strict_mask = strict_mag_cuts.mask(base)
-        high_p_strict_mask &= high_p_mask
-        has_spec_mask = C.has_spec.mask(base)
-        sats_mask = C.is_sat.mask(base)
-        sats_r_abs_limit_mask = sats_mask & C.r_abs_limit.mask(base)
-        low_z_mask = C.is_very_low_z.mask(base)
-        low_z_mask &= ~sats_mask
-        our_specs_mask = C.has_our_specs_only.mask(base)
-        our_specs_mask &= has_spec_mask
-        aat_mask = C.has_aat_spec.mask(base)
-        mmt_mask = C.has_mmt_spec.mask(base)
-
-        data["need_spec"].append(np.count_nonzero(simple_mask & (~has_spec_mask)))
-        data["really_need_spec"].append(
-            np.count_nonzero(high_p_mask & (~has_spec_mask))
+        base = self.load_single(
+            host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False
         )
-        data["really_need_spec_strict"].append(
-            np.count_nonzero(high_p_strict_mask & (~has_spec_mask))
-        )
-        data["specs_total"].append(np.count_nonzero(has_spec_mask))
-        data["low_z_total"].append(np.count_nonzero(has_spec_mask & low_z_mask))
-        data["sats_total"].append(np.count_nonzero(sats_mask))
-        data["sats_total_Mr_limit"].append(np.count_nonzero(sats_r_abs_limit_mask))
 
-        data["specs_ours"].append(np.count_nonzero(our_specs_mask))
-        data["low_z_ours"].append(np.count_nonzero(our_specs_mask & low_z_mask))
-        data["sats_ours"].append(np.count_nonzero(our_specs_mask & sats_mask))
+        basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
 
-        data["specs_aat"].append(np.count_nonzero(has_spec_mask & aat_mask))
-        data["specs_mmt"].append(np.count_nonzero(has_spec_mask & mmt_mask))
+        d = dict()
 
-        data["specs_total_highp"].append(np.count_nonzero(has_spec_mask & high_p_mask))
-        data["specs_ours_highp"].append(np.count_nonzero(our_specs_mask & high_p_mask))
+        d["need_spec"] = Query(basic_targeting_cuts, C.relaxed_targeting_cuts, ~C.has_spec)
+        d["really_need_spec"] = Query(basic_targeting_cuts, C.main_targeting_cuts, ~C.has_spec)
+        d["really_need_spec_strict"] = Query(d["really_need_spec"], C.faint_end_limit_strict)
+        d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)
+
+        d["specs_total"] = C.has_spec
+        d["specs_r_limit"] = Query(C.has_spec, C.faint_end_limit)
+        d["specs_Mr_limit"] = Query(C.has_spec, C.r_abs_limit)
+        d["specs_bright"] = Query(C.has_spec, C.sdss_limit)
+
+        for key in [k for k in d if k.startswith("specs_")]:
+            new_key = key.replace("specs_", "specs_ours_").replace("_total", "")
+            d[new_key] = Query(d[key], C.has_our_specs_only)
+
+        for key in [k for k in d if k.startswith("specs_")]:
+            new_key = key.replace("specs_", "sats_")
+            d[new_key] = Query(d[key], C.is_sat)
+
+        d["low_z_total"] = Query(d["specs_total"], C.is_very_low_z)
+        d["low_z_ours"] = Query(d["specs_ours"], C.is_very_low_z)
+
+        d["specs_main"] = Query(d["specs_total"], basic_targeting_cuts, C.main_targeting_cuts)
+        d["specs_main_bright"] = Query(d["specs_bright"], basic_targeting_cuts, C.main_targeting_cuts)
+
+        d["specs_ours_main"] = Query(d["specs_main"], C.has_our_specs_only)
+        d["specs_ours_main_bright"] = Query(d["specs_main_bright"], C.has_our_specs_only)
+
+        d["specs_ours_aat"] = Query(d["specs_ours"], C.has_aat_spec)
+        d["specs_ours_mmt"] = Query(d["specs_ours"], C.has_mmt_spec)
+
+        for k, q in d.items():
+            data[k].append(q.count(base))
 
         return data
 
