@@ -296,7 +296,14 @@ class HostCatalog(object):
                 d[col].fill_value = -1
         return d.filled()
 
-    def load(self, hosts=None, add_coord=True, use_master=None, include_stats=False, query=None):
+    def load(
+        self,
+        hosts=None,
+        add_coord=True,
+        use_master=None,
+        include_stats=False,
+        query=None,
+    ):
         """
         load a host catalog
 
@@ -418,8 +425,11 @@ class HostCatalog(object):
 
         raise ValueError("Cannot resolve input query")
 
-    def generate_host_query(self, *queries):
-        return QueryMaker.in1d("HOSTID", self.load(add_coord=False, include_stats=True, query=queries)["HOSTID"].tolist())
+    def construct_host_query(self, *queries, use_local_stats=False):
+        include_stats = True if use_local_stats else "remote"
+        hosts = self.load(add_coord=False, include_stats=include_stats, query=queries)
+        host_ids = hosts["HOSTID"].tolist()
+        return QueryMaker.in1d("HOSTID", host_ids)
 
 
 class FieldCatalog(HostCatalog):

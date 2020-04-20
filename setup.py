@@ -36,7 +36,7 @@ setup(
     keywords="SAGA",
     packages=find_packages(),
     install_requires=[
-        "numpy>=1.11",
+        "numpy>=1.11,!=1.15.0,!=1.15.1,!=1.15.2",
         "numexpr>=2.0",
         "astropy>=2.0",
         "easyquery>=0.1.5",
