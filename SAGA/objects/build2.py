@@ -524,12 +524,22 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
             # using following criteria one by one to find matching photo obj, stop when found
             for q, sorter in (
-                (Query("REMOVE == 0", ~Query("is_galaxy"), "sep < 1.0"), "sep"),
-                (Query("REMOVE == 0", "is_galaxy", "sep_norm < 2.0"), "r_mag"),
-                (Query("REMOVE > 0", ~Query("is_galaxy"), "sep < 1.0"), "sep"),
-                (Query("REMOVE == 0", "sep < 5.0"), "sep"),
-                (Query("REMOVE > 0", "is_galaxy", "sep_norm < 2.0"), "r_mag"),
-                (Query("REMOVE > 0", "sep < 5.0"), "sep"),
+                # fmt: off
+                (Query("REMOVE == 0", "is_galaxy == 0", "sep < 1"), "sep"),
+                (Query("REMOVE  > 0", "is_galaxy == 0", "sep < 1"), "sep"),
+                (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
+                (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 2"), "r_mag"),
+                (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
+                (Query("REMOVE == 0", "is_galaxy", "sep_norm < 2"), "r_mag"),
+                (Query("REMOVE == 0", "sep < 3"), "sep"),
+                (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
+                (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 2"), "r_mag"),
+                (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
+                (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 2"), "r_mag"),
+                (Query("REMOVE  > 0", "sep < 3"), "sep"),
+                (Query("REMOVE == 0", "sep < 10"), "sep"),
+                (Query("REMOVE  > 0", "sep < 10"), "sep"),
+                # fmt: on
             ):
                 mask = q.mask(possible_match)
                 if mask.any():
@@ -710,6 +720,10 @@ def add_spectra(base, specs, debug=None):
     return base
 
 
+def _join_spec_repeat(current, new):
+    return "+".join(set(sum((s.split("+") for s in new), current.split("+"))))
+
+
 def remove_shreds_near_spec_obj(base, nsa=None):
 
     has_nsa = Query("OBJ_NSAID > -1")
@@ -727,8 +741,8 @@ def remove_shreds_near_spec_obj(base, nsa=None):
     has_spec_z_indices = np.flatnonzero(has_spec_z.mask(base))
     has_spec_z_indices = has_spec_z_indices[base["r_mag"][has_spec_z_indices].argsort()]
 
-    for idx in chain(has_nsa_indices, has_spec_z_indices):
-        obj_this = base[idx]
+    for obj_this_idx in chain(has_nsa_indices, has_spec_z_indices):
+        obj_this = base[obj_this_idx]
 
         if nsa is not None and obj_this["OBJ_NSAID"] > -1:
             nsa_obj = Query("NSAID == {}".format(obj_this["OBJ_NSAID"])).filter(nsa)[0]
@@ -745,19 +759,6 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 local_dict=ellipse_calculation,
                 global_dict={},
             )
-
-            # pylint: disable=cell-var-from-loop
-            no_spec_z_or_close = Query("ZQUALITY < 3")
-            no_spec_z_or_close |= Query(
-                (lambda z: np.fabs(z - nsa_obj["Z"]) < 200.0 / SPEED_OF_LIGHT, "SPEC_Z")
-            )
-            no_spec_z_or_close |= Query(
-                (
-                    lambda z: np.fabs(z - obj_this["SPEC_Z"]) < 200.0 / SPEED_OF_LIGHT,
-                    "SPEC_Z",
-                )
-            )
-            nearby_obj_mask &= no_spec_z_or_close.mask(base)
 
             remove_flag = 28
 
@@ -793,12 +794,10 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 values_to_rewrite["{}_err".format(b)] = mag_err[j]
 
             for k, v in values_to_rewrite.items():
-                base[k][idx] = v
+                base[k][obj_this_idx] = v
 
-        elif obj_this["REMOVE"] > 0:
-            continue
+        elif obj_this["REMOVE"] == 0:  # any other good, non-NSA objects
 
-        else:
             remove_radius = 2.0 * obj_this["radius"]
 
             # HOT FIX for 219806824 in pgc67817
@@ -810,15 +809,38 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             )
             remove_flag = 29
 
-        nearby_obj_mask[idx] = False
-        nearby_obj_count = np.count_nonzero(nearby_obj_mask)
+        else:
+            continue  # skip anything else
 
-        if not nearby_obj_count:
+        nearby_obj_mask[obj_this_idx] = False
+        if not nearby_obj_mask.any():
             continue
 
-        if nearby_obj_count > 25 and remove_flag == 29:
+        nearby_obj = base[nearby_obj_mask]
+        nearby_obj["_idx"] = np.flatnonzero(nearby_obj_mask)
+        del nearby_obj_mask
+
+        close_spec_z = Query(
+            "is_galaxy",
+            "ZQUALITY >= 0",
+            (
+                lambda z: np.fabs(z - obj_this["SPEC_Z"]) < 200.0 / SPEED_OF_LIGHT,
+                "SPEC_Z",
+            ),
+        )
+        good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
+        is_fainter = Query(
+            (lambda r: (r >= obj_this["r_mag"]) | (~np.isfinite(r)), "r_mag")
+        )
+        to_remove = close_spec_z | Query("is_galaxy", is_fainter, "ZQUALITY < 2")
+
+        to_remove_count = to_remove.count(nearby_obj)
+        if not to_remove_count:
+            continue
+
+        if to_remove_count > 25 and remove_flag == 29:
             logging.warning(
-                'More than 25 photo obj within ~ {:.3f}" of {} spec obj {} ({}, {})'.format(
+                'More than 25 photo obj to be removed within ~ {:.3f}" of {} spec obj {} ({}, {})'.format(
                     remove_radius,
                     obj_this["TELNAME"],
                     obj_this["OBJID"],
@@ -827,7 +849,23 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 )
             )
 
-        base["REMOVE"][nearby_obj_mask] += 1 << remove_flag
+        base["REMOVE"][to_remove.filter(nearby_obj, "_idx")] += 1 << remove_flag
+
+        if not close_spec_z.mask(nearby_obj).any():
+            continue
+
+        base["SPEC_REPEAT"][obj_this_idx] = _join_spec_repeat(
+            obj_this["SPEC_REPEAT"], good_close_spec_z.filter(nearby_obj, "SPEC_REPEAT")
+        )
+        base["SPEC_REPEAT_ALL"][obj_this_idx] = _join_spec_repeat(
+            obj_this["SPEC_REPEAT_ALL"],
+            close_spec_z.filter(nearby_obj, "SPEC_REPEAT_ALL"),
+        )
+        _idx = close_spec_z.filter(nearby_obj, "_idx")
+        base["ZQUALITY"][_idx] = -1
+        base["SPEC_Z"][_idx] = -1
+        base["SPEC_REPEAT"][_idx] = ""
+        base["SPEC_REPEAT_ALL"][_idx] = ""
 
     return base
 
