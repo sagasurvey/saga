@@ -28,7 +28,7 @@ param_labels_nosat = ("xmean_nosat", "xcovar_nosat", "xamp_nosat")
 
 
 def logsumexp(a, axis=None, b=None, keepdims=False):
-    # pylint: disable=no-member
+    # pylint: disable=no-member,unexpected-keyword-arg
     tmp = np.add(a, np.log(b)) if b is not None else a
     return np.logaddexp.reduce(tmp, axis=axis, keepdims=keepdims)
 
