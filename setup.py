@@ -36,13 +36,13 @@ setup(
     keywords="SAGA",
     packages=find_packages(),
     install_requires=[
-        "numpy>=1.11,!=1.15.0,!=1.15.1,!=1.15.2",
-        "numexpr>=2.0",
+        "numpy>=1.15.3",
+        "numexpr>=2.6",
         "astropy>=2.0",
         "easyquery>=0.1.5",
-        "requests>=2.0",
+        "requests>=2.18",
         "fast3tree>=0.3.1",
-        "healpy>=1.11",
+        "healpy>=1.12",
     ],
-    extras_require={"full": ["ipython", "scikit-learn"],},
+    extras_require={"full": ["ipython", "scikit-learn"]},
 )
