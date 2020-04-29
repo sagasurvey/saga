@@ -104,3 +104,11 @@ class QuickStart:
         if hasattr(HostCuts, name):
             return getattr(HostCuts, name)
         raise AttributeError
+
+    @property
+    def base_file_path_pattern(self):
+        return self.database.base_file_path_pattern
+
+    @base_file_path_pattern.setter
+    def base_file_path_pattern(self, value):
+        self.database.base_file_path_pattern = value
