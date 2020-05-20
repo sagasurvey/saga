@@ -194,17 +194,16 @@ def assign_targeting_score_v2(
     **kwargs
 ):
     """
-    Last updated: 01/18/2020
+    Last updated: 05/19/2020
      100 Human selection and Special targets
-     150 satellites without AAT/MMT specs
+     150 sats without AAT/MMT/PAL specs
      180 low-z (z < 0.05) but ZQUALITY = 2
-     200 within host,  r < 17.77, gri/grz cuts
-     291 within host,  r < 20.75, very low SB (applied to DES only)
-     300 within host,  r < 20.75, high p_GMM or GMM outliers, low SB, gri/grz cuts
-     400 within host,  r < 20.75, high-priority cuts (incl. low-SB and gri/grz cuts)
-     500 within host,  r < 20.75, gri/grz cuts, random selection of 50
-     600 very high p_GMM, low SB
-     700 outwith host, r < 17.77
+     200 within host,  r < 17.77, gri/grz cuts OR very low SB
+     300 within host,  r < 20.75, high p_GMM or GMM outliers or very high priority
+     400 within host,  r < 20.75, main targeting cuts
+     500 within host,  r < 20.75, gri/grz cuts, low-SB, random selection of 50
+     600 outwith host, r < 17.77 OR very high p_GMM, low SB
+     700 within host,  r < 20.75, gri/grz cuts, low SB
      800 within host,  r < 20.75, gri/grz cuts, everything else
      900 outwith host, r < 20.75, gri/grz cuts
     1000 everything else
@@ -218,38 +217,46 @@ def assign_targeting_score_v2(
     basic_cut = C.gri_or_grz_cut & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
     if not ignore_specs:
         basic_cut &= ~C.has_spec
-    base_clean = basic_cut.filter(base)
-    base_clean["index"] = np.flatnonzero(basic_cut.mask(base))
 
     base["TARGETING_SCORE"] = 1000
+    base["P_GMM"] = 0
+    base["log_L_GMM"] = 0
+    base["index"] = np.arange(len(base))
 
     surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
 
-    if gmm_parameters is None:
-        gmm_parameters = dict()
+    if gmm_parameters is not None:
+        for survey in surveys:
 
-    for survey in surveys:
-        postfix = "_" + survey
-        base_this = Query("OBJID{} != -1".format(postfix)).filter(base_clean)
-
-        for color in get_all_colors():
-            b1, b2 = color
-            n1 = "".join((b1, "_mag", postfix))
-            n2 = "".join((b2, "_mag", postfix))
-            if n1 not in base_this.colnames or n2 not in base_this.colnames:
+            gmm_parameters_this = gmm_parameters.get(survey)
+            if gmm_parameters_this is None:
                 continue
-            with np.errstate(invalid="ignore"):
-                base_this[color] = base_this[n1] - base_this[n2]
-                base_this[color + "_err"] = np.hypot(
-                    base_this["".join((b1, "_err", postfix))],
-                    base_this["".join((b2, "_err", postfix))],
-                )
 
-        gmm_parameters_this = gmm_parameters.get(survey)
-        if gmm_parameters_this is not None:
+            postfix = "_" + survey
+            base_this = Query(
+                basic_cut,
+                "OBJID{} != -1".format(postfix),
+                "REMOVE{} == 0".format(postfix),
+                "is_galaxy{}".format(postfix),
+            ).filter(base)
+
+            for color in get_all_colors():
+                b1, b2 = color
+                n1 = "".join((b1, "_mag", postfix))
+                n2 = "".join((b2, "_mag", postfix))
+                if n1 not in base_this.colnames or n2 not in base_this.colnames:
+                    continue
+                with np.errstate(invalid="ignore"):
+                    base_this[color] = base_this[n1] - base_this[n2]
+                    base_this[color + "_err"] = np.hypot(
+                        base_this["".join((b1, "_err", postfix))],
+                        base_this["".join((b2, "_err", postfix))],
+                    )
+
             bands = getattr(  # pylint: disable=not-callable
                 utils, "get_{}_bands".format(survey)
             )()
+
             base_this["P_GMM"] = ensure_proper_prob(
                 calc_gmm_satellite_probability(
                     base_this,
@@ -264,113 +271,108 @@ def assign_targeting_score_v2(
                 ),
                 *(gmm_parameters_this[n] for n in param_labels_nosat),
             )
-        else:
-            base_this["P_GMM"] = 0
-            base_this["log_L_GMM"] = 0
 
-        veryhigh_p = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
-        high_p = Query("P_GMM >= 0.6", "log_L_GMM >= -7") | Query(
-            "log_L_GMM < -7", "ri-abs(ri_err) < -0.25"
-        )
-        bright = C.sdss_limit
-        exclusion_cuts = Query()
+            to_update_mask = base_this["P_GMM"] > base["P_GMM"][base_this["index"]]
+            if to_update_mask.any():
+                to_update_idx = base_this["index"][to_update_mask]
+                for col in ("P_GMM", "log_L_GMM"):
+                    base[col][to_update_idx] = base_this[col][to_update_mask]
 
-        if low_priority_objids is not None:
-            exclusion_cuts &= QueryMaker.in1d("OBJID", low_priority_objids, invert=True)
+            del base_this, to_update_mask
 
-        if survey == "sdss" and ("decals" in surveys or "des" in surveys):
-            deep_survey = "des" if "des" in surveys else "decals"
-            has_good_deep = Query(
-                "OBJID_{} != -1".format(deep_survey),
-                "REMOVE_{} == 0".format(deep_survey),
-            )
-            over_subtraction = Query(
-                has_good_deep, "r_mag_{} > 20.8".format(deep_survey)
-            )
-            over_subtraction |= Query(~has_good_deep, "u_mag > r_mag + 3.5")
-            exclusion_cuts &= ~over_subtraction
+    del base["index"]
 
-        # remove bright DES stars
-        if survey == "des":
-            bright_stars = Query(
-                "0.7 * (r_mag + 10.2) > sb_r", "gr < 0.6", "r_mag < 17", C.valid_g_mag
-            )
-            bright &= ~bright_stars
-            exclusion_cuts &= ~bright_stars
+    bright = C.sdss_limit
+    exclusion_cuts = Query()
 
-        base_this["TARGETING_SCORE"] = 1000
-        fill_values_by_query(base_this, C.faint_end_limit, {"TARGETING_SCORE": 900})
-        fill_values_by_query(
-            base_this, C.sat_rcut & C.faint_end_limit, {"TARGETING_SCORE": 800}
-        )
-        fill_values_by_query(base_this, bright, {"TARGETING_SCORE": 700})
-        fill_values_by_query(
-            base_this,
-            veryhigh_p & C.high_priority_sb & exclusion_cuts,
-            {"TARGETING_SCORE": 600},
-        )
-        fill_values_by_query(
-            base_this,
-            C.sat_rcut & C.high_priority_cuts & exclusion_cuts & C.faint_end_limit,
-            {"TARGETING_SCORE": 400},
-        )
-        fill_values_by_query(
-            base_this,
-            C.sat_rcut
-            & high_p
-            & C.high_priority_sb
-            & exclusion_cuts
-            & C.faint_end_limit,
-            {"TARGETING_SCORE": 300},
-        )
-        fill_values_by_query(base_this, C.sat_rcut & bright, {"TARGETING_SCORE": 200})
-        base_this["TARGETING_SCORE"] += (
-            np.round((1.0 - base_this["P_GMM"]) * 80.0).astype(np.int) + 10
+    if low_priority_objids is not None:
+        exclusion_cuts = Query(
+            exclusion_cuts, QueryMaker.in1d("OBJID", low_priority_objids, invert=True)
         )
 
-        if survey == "des":
-            des_sb_cut = Query("sb_r > 0.6 * r_mag + 12.75")
-            fill_values_by_query(
-                base_this, C.sat_rcut & des_sb_cut, {"TARGETING_SCORE": 291}
-            )
-
-        to_update_mask = (
-            base_this["TARGETING_SCORE"] < base["TARGETING_SCORE"][base_this["index"]]
+    if "sdss" in surveys and ("decals" in surveys or "des" in surveys):
+        deep_survey = "des" if "des" in surveys else "decals"
+        has_good_deep = Query(
+            "OBJID_{} != -1".format(deep_survey), "REMOVE_{} == 0".format(deep_survey),
         )
-        to_update_idx = base_this["index"][to_update_mask]
-        base["TARGETING_SCORE"][to_update_idx] = base_this["TARGETING_SCORE"][
-            to_update_mask
-        ]
+        over_subtraction = Query(
+            QueryMaker.equals("survey", "sdss"),
+            Query(has_good_deep, "r_mag_{} > 20.8".format(deep_survey))
+            | Query(~has_good_deep, "u_mag > r_mag + 3.5"),
+        )
+        exclusion_cuts = Query(exclusion_cuts, ~over_subtraction)
 
-        if debug:
-            for col, fill_value in (
-                ("P_GMM", -1.0),
-                ("log_L_GMM", np.nan),
-                ("TARGETING_SCORE", 9999),
-            ):
-                base[col + postfix] = fill_value
-                base[col + postfix][base_this["index"]] = base_this[col]
+    if "des" in surveys:
+        des_bright_stars = Query(
+            QueryMaker.equals("survey", "des"),
+            "0.7 * (r_mag + 10.2) > sb_r",
+            "gr < 0.6",
+            "r_mag < 17",
+            C.valid_g_mag,
+            C.valid_sb,
+        )
+        bright = Query(bright, ~des_bright_stars)
+        exclusion_cuts = Query(exclusion_cuts, ~des_bright_stars)
 
-    fainter_than_abs_limit = Query(
-        "TARGETING_SCORE >= 200", "TARGETING_SCORE < 500", ~C.faint_end_limit_strict
-    ).mask(base)
-    base["TARGETING_SCORE"][fainter_than_abs_limit] += 300
+    veryhigh_p_gmm = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
+    high_p_gmm = Query("P_GMM >= 0.6") | Query("log_L_GMM < -7")
+
+    fill_values_by_query(base, C.faint_end_limit, {"TARGETING_SCORE": 900})
+    fill_values_by_query(
+        base, Query(C.sat_rcut, C.faint_end_limit), {"TARGETING_SCORE": 800}
+    )
+    fill_values_by_query(
+        base,
+        Query(C.sat_rcut, C.faint_end_limit, C.high_priority_sb, C.valid_sb, exclusion_cuts),
+        {"TARGETING_SCORE": 700}
+    )
+    fill_values_by_query(
+        base,
+        (bright | Query(veryhigh_p_gmm, C.high_priority_sb, exclusion_cuts)),
+        {"TARGETING_SCORE": 600},
+    )
+    fill_values_by_query(
+        base,
+        Query(C.sat_rcut, C.high_priority_cuts, C.faint_end_limit, exclusion_cuts),
+        {"TARGETING_SCORE": 400},
+    )
+
+    low_sb_cut = Query(
+        Query("sb_r - 0.6 * (r_mag - abs(r_err)) >= 11.25"),
+        C.valid_sb,
+    )
+
+    fill_values_by_query(
+        base,
+        Query("TARGETING_SCORE == 400", (high_p_gmm | low_sb_cut)),
+        {"TARGETING_SCORE": 300},
+    )
+
+    very_low_sb_cut = Query(
+        "r_mag < 20.8",
+        Query("sb_r - 0.6 * (r_mag - abs(r_err)) >= 12.75") | Query("sb_r >= 24.75"),
+        C.valid_sb,
+        QueryMaker.equals("survey", "des") | C.high_priority_cuts,
+        exclusion_cuts,
+    )
+
+    fill_values_by_query(
+        base, Query(C.sat_rcut, (bright | very_low_sb_cut)), {"TARGETING_SCORE": 200}
+    )
 
     need_random_selection = np.flatnonzero(
-        Query(
-            "TARGETING_SCORE >= 800", "TARGETING_SCORE < 900", C.faint_end_limit_strict
-        ).mask(base)
+        Query(basic_cut, "TARGETING_SCORE >= 700", "TARGETING_SCORE < 800").mask(base)
     )
     if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
         random_mask[:n_random] = True
         np.random.RandomState(seed).shuffle(random_mask)  # pylint: disable=no-member
         need_random_selection = need_random_selection[random_mask]
-    base["TARGETING_SCORE"][need_random_selection] -= 300
+    base["TARGETING_SCORE"][need_random_selection] = 500
 
-    fill_values_by_query(
-        base, ~basic_cut, {"TARGETING_SCORE": 1100}
-    )  # pylint: disable=E1130
+    base["TARGETING_SCORE"] += (np.round((1 - base["P_GMM"]) * 80).astype(np.int) + 10)
+
+    fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})
     fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
     fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
 
@@ -385,7 +387,10 @@ def assign_targeting_score_v2(
 
         fill_values_by_query(
             base,
-            Query(C.is_sat, (lambda x: (x != "AAT") & (x != "MMT"), "TELNAME")),
+            Query(
+                C.is_sat,
+                (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME"),
+            ),
             {"TARGETING_SCORE": 150},
         )
 
