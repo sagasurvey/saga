@@ -218,9 +218,10 @@ def assign_targeting_score_v2(
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
+    base["score_sb_r"] = base["sb_r"] - 0.6 * (base["r_mag"] - np.abs(base["r_err"]))
+    base["P_GMM"] = np.float(0)
+    base["log_L_GMM"] = np.float(0)
     base["TARGETING_SCORE"] = 1000
-    base["P_GMM"] = 0
-    base["log_L_GMM"] = 0
     base["index"] = np.arange(len(base))
 
     surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
@@ -315,7 +316,18 @@ def assign_targeting_score_v2(
         exclusion_cuts = Query(exclusion_cuts, ~des_bright_stars)
 
     veryhigh_p_gmm = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
-    high_p_gmm = Query("P_GMM >= 0.6") | Query("log_L_GMM < -7")
+    high_p_gmm = Query("P_GMM >= 0.7") | Query("log_L_GMM < -7")
+
+    low_sb_cut = Query(Query("score_sb_r >= 11.25"), C.valid_sb)
+    very_low_sb_cut = Query(
+        "r_mag < 20.8",
+        (
+            Query(C.high_priority_cuts, Query("score_sb_r >= 12.5") | Query("sb_r >= 24.5"))
+            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 12.75") | Query("sb_r >= 24.75"))
+        ),
+        C.valid_sb,
+        exclusion_cuts,
+    )
 
     fill_values_by_query(base, C.faint_end_limit, {"TARGETING_SCORE": 900})
     fill_values_by_query(
@@ -323,8 +335,14 @@ def assign_targeting_score_v2(
     )
     fill_values_by_query(
         base,
-        Query(C.sat_rcut, C.faint_end_limit, C.high_priority_sb, C.valid_sb, exclusion_cuts),
-        {"TARGETING_SCORE": 700}
+        Query(
+            C.sat_rcut,
+            C.faint_end_limit,
+            C.high_priority_sb,
+            C.valid_sb,
+            exclusion_cuts,
+        ),
+        {"TARGETING_SCORE": 700},
     )
     fill_values_by_query(
         base,
@@ -336,26 +354,11 @@ def assign_targeting_score_v2(
         Query(C.sat_rcut, C.high_priority_cuts, C.faint_end_limit, exclusion_cuts),
         {"TARGETING_SCORE": 400},
     )
-
-    low_sb_cut = Query(
-        Query("sb_r - 0.6 * (r_mag - abs(r_err)) >= 11.25"),
-        C.valid_sb,
-    )
-
     fill_values_by_query(
         base,
         Query("TARGETING_SCORE == 400", (high_p_gmm | low_sb_cut)),
         {"TARGETING_SCORE": 300},
     )
-
-    very_low_sb_cut = Query(
-        "r_mag < 20.8",
-        Query("sb_r - 0.6 * (r_mag - abs(r_err)) >= 12.75") | Query("sb_r >= 24.75"),
-        C.valid_sb,
-        QueryMaker.equals("survey", "des") | C.high_priority_cuts,
-        exclusion_cuts,
-    )
-
     fill_values_by_query(
         base, Query(C.sat_rcut, (bright | very_low_sb_cut)), {"TARGETING_SCORE": 200}
     )
@@ -370,7 +373,9 @@ def assign_targeting_score_v2(
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 500
 
-    base["TARGETING_SCORE"] += (np.round((1 - base["P_GMM"]) * 80).astype(np.int) + 10)
+    base["TARGETING_SCORE"] += (
+        8 - np.digitize(base["score_sb_r"], np.linspace(10.5, 13.5, 7))
+    ) * 10 + (9 - np.floor(base["P_GMM"] * 10).astype(np.int))
 
     fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})
     fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
