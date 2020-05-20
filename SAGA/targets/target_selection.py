@@ -354,21 +354,13 @@ def prepare_mmt_catalog(
     target_catalog.sort(["TARGETING_SCORE", "r_mag"])
 
     target_catalog["rank"] = target_catalog["TARGETING_SCORE"] // 100
-    target_catalog["rank"][
-        Query("rank < 2").mask(target_catalog)
-    ] = 2  # regular targets start at rank 2
-    target_catalog["rank"][
-        Query("rank >= 5", "rank <= 6").mask(target_catalog)
-    ] += 1  # move 5, 6 to 6, 7
-    indices = np.flatnonzero(Query("rank == 4").mask(target_catalog))  # split rank 4
-    target_catalog["rank"][indices[(len(indices) // 2) :]] += 1
-    target_catalog["rank"][
-        Query("rank > 8").mask(target_catalog)
-    ] = 8  # regular targets max rank = 8
+
+    target_catalog["rank"][Query("rank < 2").mask(target_catalog)] = 2
+    target_catalog["rank"][Query("rank > 8").mask(target_catalog)] = 8
     target_catalog["rank"][is_flux_star.mask(target_catalog)] = 1
-    target_catalog["rank"][
-        is_guide_star.mask(target_catalog)
-    ] = 99  # set to 99 for sorting
+
+    # set guide star to rank 99 just for sorting
+    target_catalog["rank"][is_guide_star.mask(target_catalog)] = 99
 
     is_guide_star = Query("rank == 99")
     is_flux_star = Query("rank == 1")
@@ -382,6 +374,7 @@ def prepare_mmt_catalog(
     )  # arcsec
     fs_rank = int(flux_star_kwargs.get("rank", 5))
 
+    # move flux star rank
     if fs_rank < 1 or fs_rank > 8:
         raise ValueError("not a valid rank value for flux stars")
     if fs_rank > 1:
