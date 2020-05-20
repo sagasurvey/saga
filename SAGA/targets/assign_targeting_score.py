@@ -198,7 +198,7 @@ def assign_targeting_score_v2(
      100 Human selection and Special targets
      150 sats without AAT/MMT/PAL specs
      180 low-z (z < 0.05) but ZQUALITY = 2
-     200 within host,  r < 17.77, gri/grz cuts OR very low SB
+     200 within host,  r < 17.77, gri/grz cuts OR others with very low SB
      300 within host,  r < 20.75, high p_GMM or GMM outliers or very high priority
      400 within host,  r < 20.75, main targeting cuts
      500 within host,  r < 20.75, gri/grz cuts, low-SB, random selection of 50
@@ -218,7 +218,8 @@ def assign_targeting_score_v2(
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
-    base["score_sb_r"] = base["sb_r"] - 0.6 * (base["r_mag"] - np.abs(base["r_err"]))
+    with np.errstate(invalid="ignore"):
+        base["score_sb_r"] = base["sb_r"] - 0.6 * (base["r_mag"] - np.abs(base["r_err"]))
     base["P_GMM"] = np.float(0)
     base["log_L_GMM"] = np.float(0)
     base["TARGETING_SCORE"] = 1000
