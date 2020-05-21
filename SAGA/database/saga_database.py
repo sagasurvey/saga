@@ -84,6 +84,16 @@ known_google_sheets = {
         440730178,
         include_names=["OBJID"],
     ),
+    "manual_targets_aat2020b": GoogleSheets(
+        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
+        687508250,
+        include_names=["OBJID"],
+    ),
+    "manual_targets_mmt2020b": GoogleSheets(
+        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
+        757836001,
+        include_names=["OBJID"],
+    ),
     "lowz_fields": GoogleSheets(
         "1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266
     ),
