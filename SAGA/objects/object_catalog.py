@@ -90,6 +90,9 @@ class ObjectCatalog(object):
                     table["{}_err".format(color[0])], table["{}_err".format(color[1])]
                 )
 
+        if "sb_r_err" not in table.colnames:
+            table = build2.add_surface_brightness(table)
+
         if "HOST_ID" in table.colnames:
             table.rename_column("HOST_ID", "HOSTID")
 

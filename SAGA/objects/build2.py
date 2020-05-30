@@ -884,9 +884,9 @@ def remove_too_close_to_host(base):
 
 
 def add_surface_brightness(base):
-    base["sb_r"] = base["r_mag"] + 2.5 * np.log10(
-        np.maximum(2.0 * np.pi * base["radius"] ** 2.0, 1.0e-40)
-    )
+    radius = np.maximum(base["radius"], 1e-20)
+    base["sb_r"] = base["r_mag"] + 2.5 * np.log10(np.pi * radius * radius)
+    base["sb_r_err"] = np.hypot(base["r_err"], (5 / np.log(10)) * base["radius_err"] / radius)
     return base
 
 
