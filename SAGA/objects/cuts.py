@@ -92,6 +92,8 @@ high_priority_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.65") | (~va
 high_priority_rz = Query("rz - abs(rz_err) + 0.06 * (r_mag - 14) < 0.8") | (~valid_z_mag)
 high_priority_ug = Query("ug + abs(ug_err) > 0.5", "ug - abs(ug_err) < 1.9") | (~valid_u_mag) | (~valid_g_mag)
 
+high_priority_sb_old = Query("sb_r + 0.752575 - 0.6 * (r_mag - abs(r_err)) > 10.1") | (~valid_sb)
+
 relaxed_cut_sb = Query("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14) > 17.5") | (~valid_sb)
 relaxed_cut_gr = Query("gr - abs(gr_err) + 0.06 * (r_mag - 14) < 1.1") | (~valid_g_mag)
 relaxed_cut_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.7") | (~valid_i_mag)
@@ -100,6 +102,15 @@ relaxed_cut_ug = Query("ug + abs(ug_err) > 0.3", "ug - abs(ug_err) < 2") | (~val
 
 main_targeting_cuts = high_priority_cuts = Query(
     high_priority_sb,
+    high_priority_gr,
+    high_priority_ri,
+    high_priority_rz,
+    high_priority_ug,
+)
+
+high_priority_cuts_old = Query(
+    gri_or_grz_cut,
+    high_priority_sb_old,
     high_priority_gr,
     high_priority_ri,
     high_priority_rz,
