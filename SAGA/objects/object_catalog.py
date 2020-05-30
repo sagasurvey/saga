@@ -618,7 +618,7 @@ class ObjectCatalog(object):
         d = dict()
 
         # fmt: off
-        d["need_spec"] = Query(basic_targeting_cuts, C.relaxed_targeting_cuts, ~C.has_spec)
+        d["need_spec"] = Query(basic_targeting_cuts, C.very_relaxed_targeting_cuts, ~C.has_spec)
         d["really_need_spec"] = Query(basic_targeting_cuts, C.main_targeting_cuts, ~C.has_spec)
         d["really_need_spec_strict"] = Query(d["really_need_spec"], C.faint_end_limit_strict)
         d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)

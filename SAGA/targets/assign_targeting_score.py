@@ -214,7 +214,7 @@ def assign_targeting_score_v2(
     1400 Has spec already
     """
 
-    basic_cut = C.gri_or_grz_cut & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
+    basic_cut = C.very_relaxed_targeting_cuts & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
@@ -339,15 +339,14 @@ def assign_targeting_score_v2(
         Query(
             C.sat_rcut,
             C.faint_end_limit,
-            C.high_priority_sb,
-            C.valid_sb,
+            C.relaxed_targeting_cuts,
             exclusion_cuts,
         ),
         {"TARGETING_SCORE": 700},
     )
     fill_values_by_query(
         base,
-        (bright | Query(veryhigh_p_gmm, C.high_priority_sb, exclusion_cuts)),
+        (bright | Query(veryhigh_p_gmm, C.relaxed_cut_sb, exclusion_cuts)),
         {"TARGETING_SCORE": 600},
     )
     fill_values_by_query(
