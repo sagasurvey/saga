@@ -219,7 +219,8 @@ def assign_targeting_score_v2(
         basic_cut &= ~C.has_spec
 
     with np.errstate(invalid="ignore"):
-        base["score_sb_r"] = base["sb_r"] - 0.6 * (base["r_mag"] - np.abs(base["r_err"]))
+        # -8 to be consistent with previously used score value
+        base["score_sb_r"] = base["sb_r"] + np.abs(base["sb_r_err"]) - 0.6 * (base["r_mag"] - 14) - 8
     base["P_GMM"] = np.float(0)
     base["log_L_GMM"] = np.float(0)
     base["TARGETING_SCORE"] = 1000
