@@ -4,6 +4,7 @@ module assign_targeting_score
 from itertools import chain
 
 import numpy as np
+import numexpr as ne
 from easyquery import Query, QueryMaker
 
 from .. import utils
@@ -21,6 +22,7 @@ __all__ = [
     "calc_gmm_satellite_probability",
     "calc_simple_satellite_probability_gri",
     "calc_simple_satellite_probability_grz",
+    "add_cut_scores",
 ]
 
 COLUMNS_USED = list(
@@ -92,7 +94,11 @@ def ensure_proper_prob(p):
     return p
 
 
-# pylint: disable=unused-argument
+def add_cut_scores(base):
+    base["score_sb_r"] = ne.evaluate("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14)", base, {})
+    for c in ("gr", "ri", "rz"):
+        base["score_{}_r".format(c)] = ne.evaluate("{0} - abs({0}_err) + 0.06* (r_mag - 14)".format(c), base, {})
+    return base
 
 
 def assign_targeting_score_v1(
@@ -218,9 +224,7 @@ def assign_targeting_score_v2(
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
-    with np.errstate(invalid="ignore"):
-        # -8 to be consistent with previously used score value
-        base["score_sb_r"] = base["sb_r"] + np.abs(base["sb_r_err"]) - 0.6 * (base["r_mag"] - 14) - 8
+    base = add_cut_scores(base)
     base["P_GMM"] = np.float(0)
     base["log_L_GMM"] = np.float(0)
     base["TARGETING_SCORE"] = 1000
@@ -320,12 +324,12 @@ def assign_targeting_score_v2(
     veryhigh_p_gmm = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
     high_p_gmm = Query("P_GMM >= 0.7") | Query("log_L_GMM < -7")
 
-    low_sb_cut = Query(Query("score_sb_r >= 11.25"), C.valid_sb)
+    low_sb_cut = Query(Query("score_sb_r >= 19.25"), C.valid_sb)
     very_low_sb_cut = Query(
         "r_mag < 20.8",
         (
-            Query(C.high_priority_cuts, Query("score_sb_r >= 12.5") | Query("sb_r >= 24.5"))
-            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 12.75") | Query("sb_r >= 24.75"))
+            Query(C.high_priority_cuts, Query("score_sb_r >= 20.5") | Query("sb_r >= 24.5"))
+            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 20.75") | Query("sb_r >= 24.75"))
         ),
         C.valid_sb,
         exclusion_cuts,
@@ -375,7 +379,7 @@ def assign_targeting_score_v2(
     base["TARGETING_SCORE"][need_random_selection] = 500
 
     base["TARGETING_SCORE"] += (
-        8 - np.digitize(base["score_sb_r"], np.linspace(10.5, 13.5, 7))
+        8 - np.digitize(base["score_sb_r"], np.linspace(18.5, 21.5, 7))
     ) * 10 + (9 - np.floor(base["P_GMM"] * 10).astype(np.int))
 
     fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})

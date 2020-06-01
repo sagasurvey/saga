@@ -27,6 +27,32 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
+def calc_fiducial_p_sat(base, params=(-1.5, 1.09, -4.6, 1.98, 0.5)):
+    gr = np.where(
+        C.valid_g_mag.mask(base),
+        base["gr"],
+        np.where(
+            C.valid_i_mag.mask(base),
+            base["ri"] + 0.1,
+            np.where(C.valid_z_mag.mask(base), base["rz"] + 0.2, 0.92 - 0.03 * base["r_mag"]),
+        ),
+    )
+
+    sb = np.where(
+        C.valid_sb.mask(base),
+        base["sb_r"],
+        20 + 0.6 * (base["r_mag"] - 14),
+    )
+
+    r = base["r_mag"]
+
+    mu = params[0] * r + params[1] * sb + params[2] * gr + params[3]
+    mu = np.where(np.isnan(mu), np.inf, mu)
+    p = params[4] / (1 + np.exp(-mu))
+
+    return p
+
+
 class ObjectCatalog(object):
     """
     This class provides a high-level interface to access object catalogs
@@ -70,7 +96,9 @@ class ObjectCatalog(object):
     def _annotate_catalog(
         cls, table, add_skycoord=False, ensure_all_objid_cols=False,
     ):
+        version = 2
         if "EXTINCTION_R" in table.colnames:
+            version = 1
             for b in get_sdss_bands():
                 table["{}_mag".format(b)] = (
                     table[b] - table["EXTINCTION_{}".format(b.upper())]
@@ -101,6 +129,12 @@ class ObjectCatalog(object):
                 col = "OBJID_{}".format(s)
                 if col not in table.colnames:
                     table[col] = -1
+
+        with np.errstate(invalid="ignore"):
+            table["p_sat_approx"] = calc_fiducial_p_sat(table)
+        good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
+        good_obj = Query(good_obj, C.high_priority_cuts, "r_mag > 12")
+        fill_values_by_query(table, ~good_obj, {"p_sat_approx": 0})
 
         if add_skycoord:
             table = utils.add_skycoord(table)
