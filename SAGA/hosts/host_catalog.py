@@ -425,8 +425,8 @@ class HostCatalog(object):
 
         raise ValueError("Cannot resolve input query")
 
-    def construct_host_query(self, *queries, use_local_stats=False):
-        include_stats = True if use_local_stats else "remote"
+    def construct_host_query(self, *queries, use_remote=False):
+        include_stats = "remote" if use_remote else True
         hosts = self.load(add_coord=False, include_stats=include_stats, query=queries)
         host_ids = hosts["HOSTID"].tolist()
         return QueryMaker.in1d("HOSTID", host_ids)
