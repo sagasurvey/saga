@@ -26,9 +26,8 @@ __all__ = [
 # pylint: disable=logging-format-interpolation
 
 
-def heliocentric_correction(
+def get_obs_info_from_fits(
     fits_filepath,
-    site_name,
     ra_name="RA",
     dec_name="DEC",
     time_name="MJD",
@@ -39,10 +38,14 @@ def heliocentric_correction(
     hdr = fits.getheader(fits_filepath)
     sc = SkyCoord(hdr[ra_name], hdr[dec_name], unit=(ra_unit, dec_unit))
     obstime = Time(hdr[time_name], format=time_format)
+    return sc, obstime
+
+
+def heliocentric_correction(sc, obstime, site_name):
     helio_corr = sc.radial_velocity_correction(
         "heliocentric", obstime=obstime, location=EarthLocation.of_site(site_name)
     )
-    return helio_corr.to_value(astropy.constants.c), obstime  # pylint: disable=E1101
+    return helio_corr.to_value(astropy.constants.c)  # pylint: disable=no-member
 
 
 def read_generic_spectra(
@@ -53,7 +56,10 @@ def read_generic_spectra(
     n_cols_total,
     cuts=None,
     postprocess=None,
-    midprocess=None,
+    fits_hdr_kwargs=None,
+    helio_corr_site=None,
+    before_time=None,
+    table_read_kwargs=None,
     **kwargs
 ):
 
@@ -62,41 +68,76 @@ def read_generic_spectra(
 
     output = []
 
-    for f in os.listdir(dir_path):
-        if not f.endswith(extension):
+    for filename in os.listdir(dir_path):
+        filepath = os.path.join(dir_path, filename)
+        rootname, extension_this = os.path.splitext(filename)
+
+        if extension_this != extension:
             continue
-        if "conflicted copy" in f:
+
+        if "conflicted copy" in filename:
             logging.warning(
-                "SKIPPING spectra file {}/{} - it's a conflicted copy; check if something went wrong!".format(
-                    dir_path, f
-                )
+                "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(filepath)
             )
             continue
+
+        helio_corr = None
+        for fits_name in (
+            rootname + ".fits.gz",
+            rootname + ".fits",
+            rootname.rpartition("_")[0] + ".fits.gz",
+            rootname.rpartition("_")[0] + ".fits",
+        ):
+            fits_path = os.path.join(dir_path, fits_name)
+            if os.path.isfile(fits_path):
+                break
         try:
-            this = Table.read(
-                os.path.join(dir_path, f),
+            sc, obstime = get_obs_info_from_fits(fits_path, **(fits_hdr_kwargs or {}))
+        except (IOError, OSError):
+            if fits_hdr_kwargs or helio_corr_site or before_time is not None:
+                logging.warning(
+                    "Cannot find or read corresponding fits file for {}".format(filepath)
+                )
+        else:
+            if before_time is not None and obstime > before_time:
+                continue
+            if helio_corr_site:
+                helio_corr = heliocentric_correction(sc, obstime, helio_corr_site)
+
+        try:
+            table_read_kwargs_this = dict(
                 format="ascii.fast_no_header",
                 guess=False,
                 names=names,
                 exclude_names=exclude_names,
-                **kwargs,
             )
+            if table_read_kwargs:
+                table_read_kwargs_this.update(table_read_kwargs)
+            this = Table.read(filepath, **table_read_kwargs_this)
         except (IOError, CParserError) as e:
             logging.warning(
-                "SKIPPING spectra file {}/{} - could not read or parse\n{}".format(
-                    dir_path, f, e
-                )
+                "SKIPPING spectra file {} - could not read or parse\n{}".format(filepath, e)
             )
             continue
+
         this = ensure_specs_dtype(this, skip_missing_cols=True)
         this = Query(cuts).filter(this)
         if not len(this):
             continue
+
         if "MASKNAME" not in this.colnames:
-            this["MASKNAME"] = f
-        if midprocess:
-            this = midprocess(this)
+            this["MASKNAME"] = filename
+
+        if helio_corr is None:
+            this["HELIO_CORR"] = False
+        else:
+            this["SPEC_Z"] += float(helio_corr)
+            this["HELIO_CORR"] = True
+
         output.append(this)
+
+    if not output:
+        return
 
     output = vstack(output, "exact")
     output["TELNAME"] = telname
@@ -107,7 +148,11 @@ def read_generic_spectra(
 
 
 def read_mmt(dir_path, before_time=None):
+    extension = ".zlog"
+    telname = "MMT"
+    helio_corr_site = "mmt"
 
+    n_cols_total = 11
     usecols = {
         2: "RA",
         3: "DEC",
@@ -117,87 +162,46 @@ def read_mmt(dir_path, before_time=None):
         7: "ZQUALITY",
         8: "SPECOBJID",
     }
-    cuts = Query("mag != 0", "ZQUALITY >= 0", (lambda x: x != "0", "SPECOBJID"))
 
-    def midprocess(t):
-        fits_filepath = os.path.join(
-            dir_path, t["MASKNAME"][0].replace(".zlog", ".fits.gz")
-        )
-        try:
-            corr, obstime = heliocentric_correction(
-                fits_filepath, "mmt", "RA", "DEC", "MJD"
-            )
-        except IOError:
-            t["HELIO_CORR"] = False
-        else:
-            if before_time is not None and obstime > before_time:
-                return
-            t["SPEC_Z"] += corr
-            t["HELIO_CORR"] = True
-        return t
+    cuts = Query("mag != 0", "ZQUALITY >= 0", (lambda x: x != "0", "SPECOBJID"))
 
     def postprocess(t):
         del t["mag"]
         t["RA"] *= 15.0
         return t
 
-    return read_generic_spectra(
-        dir_path, ".zlog", "MMT", usecols, 11, cuts, postprocess, midprocess
-    )
+    return read_generic_spectra(**locals())
 
 
 def read_aat(dir_path, before_time=None):
+    extension = ".zlog"
+    telname = "AAT"
+    helio_corr_site = "sso"
 
+    n_cols_total = 11
     usecols = {2: "RA", 3: "DEC", 5: "SPEC_Z", 7: "ZQUALITY", 8: "SPECOBJID"}
     cuts = Query("ZQUALITY >= 0", (lambda x: x != "0", "SPECOBJID"))
 
-    def midprocess(t):
-        fits_filepath = os.path.join(
-            dir_path, t["MASKNAME"][0].replace(".zlog", ".fits.gz")
-        )
-        try:
-            corr, obstime = heliocentric_correction(
-                fits_filepath, "sso", "MEANRA", "MEANDEC", "UTMJD"
-            )
-        except IOError:
-            t["HELIO_CORR"] = False
-        else:
-            if before_time is not None and obstime > before_time:
-                return
-            t["SPEC_Z"] += corr
-            t["HELIO_CORR"] = True
-        return t
+    fits_hdr_kwargs = dict(ra_name="MEANRA", dec_name="MEANDEC", time_name="UTMJD")
 
     def postprocess(t):
         t["SPEC_Z_ERR"] = 10 / SPEED_OF_LIGHT
         return t
 
-    return read_generic_spectra(
-        dir_path, ".zlog", "AAT", usecols, 11, cuts, postprocess, midprocess
-    )
+    return read_generic_spectra(**locals())
 
 
 def read_aat_mz(dir_path, before_time=None):
+    extension = ".mz"
+    telname = "AAT"
+    helio_corr_site = "sso"
 
+    n_cols_total = 15
     usecols = {3: "RA", 4: "DEC", 13: "SPEC_Z", 14: "ZQUALITY", 1: "SPECOBJID"}
     cuts = Query("ZQUALITY >= 0")
 
-    def midprocess(t):
-        fits_filepath = os.path.join(
-            dir_path, t["MASKNAME"][0].replace(".mz", ".fits.gz")
-        )
-        try:
-            corr, obstime = heliocentric_correction(
-                fits_filepath, "sso", "MEANRA", "MEANDEC", "UTMJD"
-            )
-        except IOError:
-            t["HELIO_CORR"] = False
-        else:
-            if before_time is not None and obstime > before_time:
-                return
-            t["SPEC_Z"] += corr
-            t["HELIO_CORR"] = True
-        return t
+    fits_hdr_kwargs = dict(ra_name="MEANRA", dec_name="MEANDEC", time_name="UTMJD")
+    table_read_kwargs = dict(delimiter=",")
 
     def postprocess(t):
         t["RA"] *= 180.0 / np.pi
@@ -205,21 +209,14 @@ def read_aat_mz(dir_path, before_time=None):
         t["SPEC_Z_ERR"] = 10 / SPEED_OF_LIGHT
         return t
 
-    return read_generic_spectra(
-        dir_path,
-        ".mz",
-        "AAT",
-        usecols,
-        15,
-        cuts,
-        postprocess,
-        midprocess,
-        delimiter=",",
-    )
+    return read_generic_spectra(**locals())
 
 
 def read_imacs(dir_path):
+    extension = ".zlog"
+    telname = "IMACS"
 
+    n_cols_total = 12
     usecols = {
         2: "RA",
         3: "DEC",
@@ -229,8 +226,10 @@ def read_imacs(dir_path):
         8: "SPECOBJID",
         11: "MASKNAME",
     }
+
     cuts = Query("ZQUALITY >= 1", (lambda x: x != "0", "SPECOBJID"))
-    return read_generic_spectra(dir_path, ".zlog", "IMACS", usecols, 12, cuts)
+
+    return read_generic_spectra(**locals())
 
 
 def read_wiyn(dir_path):

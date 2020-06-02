@@ -62,14 +62,12 @@ class SpectraData(object):
                 ]
             )
 
-        all_specs.extend(
-            [read_observed.read_deimos(),]
-        )
+        all_specs.append(read_observed.read_deimos())
 
         if additional_specs:
             all_specs.extend(ensure_specs_dtype(spec) for spec in additional_specs)
 
-        all_specs = vstack(all_specs, "exact")
+        all_specs = vstack([specs for specs in all_specs if specs is not None], "exact")
 
         if self.halpha_data_obj is not None and self.halpha_data_obj.remote.isfile():
             halpha = self.halpha_data_obj.read()[
