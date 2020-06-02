@@ -675,11 +675,11 @@ def add_spectra(base, specs, debug=None):
     base_this = base["REMOVE", "is_galaxy", "r_mag", "coord"]
     base_this["index"] = np.arange(len(base))
     with np.errstate(over="ignore"):
-    base_this["radius_for_match"] = np.where(
-        Query("is_galaxy", "radius <= abs(radius_err) * 2.0").mask(base),
-        10.0 ** (-0.2 * (base["r_mag"] - 20)),
-        base["radius"],
-    )
+        base_this["radius_for_match"] = np.where(
+            Query("is_galaxy", "radius <= abs(radius_err) * 2.0").mask(base),
+            10.0 ** (-0.2 * (base["r_mag"] - 20)),
+            base["radius"],
+        )
     fill_values_by_query(
         base_this,
         ~Query((np.isfinite, "radius_for_match"), "radius_for_match > 0"),
@@ -760,6 +760,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
                 local_dict=ellipse_calculation,
                 global_dict={},
             )
+            del ellipse_calculation
 
             remove_flag = 28
 
@@ -821,8 +822,9 @@ def remove_shreds_near_spec_obj(base, nsa=None):
         nearby_obj["_idx"] = np.flatnonzero(nearby_obj_mask)
         del nearby_obj_mask
 
+        remove_basic_conditions = Query("is_galaxy", ~has_nsa, "r_mag > 14")
         close_spec_z = Query(
-            "is_galaxy",
+            remove_basic_conditions,
             "ZQUALITY >= 0",
             (
                 lambda z: np.fabs(z - obj_this["SPEC_Z"]) < 200.0 / SPEED_OF_LIGHT,
@@ -833,7 +835,7 @@ def remove_shreds_near_spec_obj(base, nsa=None):
         is_fainter = Query(
             (lambda r: (r >= obj_this["r_mag"]) | (~np.isfinite(r)), "r_mag")
         )
-        to_remove = close_spec_z | Query("is_galaxy", is_fainter, "ZQUALITY < 2")
+        to_remove = close_spec_z | Query(remove_basic_conditions, is_fainter, "ZQUALITY < 2")
 
         to_remove_count = to_remove.count(nearby_obj)
         if not to_remove_count:
@@ -862,11 +864,6 @@ def remove_shreds_near_spec_obj(base, nsa=None):
             obj_this["SPEC_REPEAT_ALL"],
             close_spec_z.filter(nearby_obj, "SPEC_REPEAT_ALL"),
         )
-        _idx = close_spec_z.filter(nearby_obj, "_idx")
-        base["ZQUALITY"][_idx] = -1
-        base["SPEC_Z"][_idx] = -1
-        base["SPEC_REPEAT"][_idx] = ""
-        base["SPEC_REPEAT_ALL"][_idx] = ""
 
     return base
 
