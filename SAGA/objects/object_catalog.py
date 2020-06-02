@@ -27,7 +27,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.5, 1.09, -4.6, 1.98, 0.5)):
+def calc_fiducial_p_sat(base, params=(-1.4, 1, -4, 1.9, 0.5)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -688,6 +688,7 @@ class ObjectCatalog(object):
             data[k].append(q.count(base))
 
         data["sats_missed_approx"].append(d["really_need_spec"].filter(base, "p_sat_approx").sum())
+
         return data
 
     def generate_object_stats(
