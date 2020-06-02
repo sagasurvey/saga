@@ -687,6 +687,7 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
+        data["sats_missed_approx"].append(d["really_need_spec"].filter(base, "p_sat_approx").sum())
         return data
 
     def generate_object_stats(
