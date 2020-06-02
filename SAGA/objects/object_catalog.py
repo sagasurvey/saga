@@ -130,7 +130,7 @@ class ObjectCatalog(object):
                 if col not in table.colnames:
                     table[col] = -1
 
-        with np.errstate(invalid="ignore"):
+        with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = calc_fiducial_p_sat(table)
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
         good_obj = Query(good_obj, C.high_priority_cuts, "r_mag > 12")

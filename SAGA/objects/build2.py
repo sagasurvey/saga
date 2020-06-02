@@ -674,6 +674,7 @@ def add_spectra(base, specs, debug=None):
     add_skycoord(base)
     base_this = base["REMOVE", "is_galaxy", "r_mag", "coord"]
     base_this["index"] = np.arange(len(base))
+    with np.errstate(over="ignore"):
     base_this["radius_for_match"] = np.where(
         Query("is_galaxy", "radius <= abs(radius_err) * 2.0").mask(base),
         10.0 ** (-0.2 * (base["r_mag"] - 20)),
