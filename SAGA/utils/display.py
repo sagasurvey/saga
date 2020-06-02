@@ -16,7 +16,7 @@ def show_images(
             if row["survey"] == "des":
                 layer = "des-dr1"
             elif row["survey"] == "decals":
-                layer = "dr8"
+                layer = "ls-dr67"
             else:
                 layer = "sdss2"
 
