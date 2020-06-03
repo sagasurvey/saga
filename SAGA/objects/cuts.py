@@ -150,6 +150,7 @@ has_mmt_spec = QueryMaker.contains("SPEC_REPEAT", "MMT")
 has_aat_mmt_spec = has_aat_spec | has_mmt_spec
 
 _known_telnames = {
+    "HOST",
     "2dF",
     "6dF",
     "SDSS",
