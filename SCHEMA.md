@@ -40,6 +40,7 @@ Label | Unit | Definition
 `HOST_VHOST` | km/s |  Recession (Heliocentric) velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
+`p_sat_approx` | - | Approximated probability of this object being a satellite. Use with care.
 
 _*data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`)._
 
@@ -81,5 +82,5 @@ Label | Unit | Definition
 `COVERAGE_DECALS_DR8` | - | Fraction of LS DR8 coverage within 1 Rvir
 `COVERAGE_DES_DR1` | - | Fraction of DES Dr1 coverage within 1 Rvir
 `COVERAGE_SDSS` | - | Fraction of SDSS coverage within 1 Rvir
-`HOST_SCORE` | - | Usable hosts if >=3
+`HOST_SCORE` | - | Usable hosts if >=4
 `HAS_IMAGE` | - | Has image coverage if > 0
