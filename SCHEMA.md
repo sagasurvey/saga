@@ -84,3 +84,20 @@ Label | Unit | Definition
 `COVERAGE_SDSS` | - | Fraction of SDSS coverage within 1 Rvir
 `HOST_SCORE` | - | Usable hosts if >=4
 `HAS_IMAGE` | - | Has image coverage if > 0
+
+### Host statistics schema
+
+Label | Unit | Definition
+--- | --- | ---
+`really_need_spec` | - | number of remaining targets within main targeting cuts (r < 20.75, within Rvir)
+`really_need_spec_bright` | - | number of remaining targets within main targeting cuts (r < 17.77, within Rvir)
+`specs_ours_rvir` | - | number of SAGA redshifts within Rvir
+`sats_total` | - | number of satellites 
+`sats_r_limit` | - | number of satellites (r < 20.75)
+`sats_Mr_limit` | - | number of satellites (Mr < -12.3)
+`sats_bright` | - | number of satellites (r < 17.77)
+`sats_ours` | - | number of SAGA-discovered satellites 
+`sats_ours_r_limit` | - | number of SAGA-discovered satellites (r < 20.75)
+`sats_ours_Mr_limit` | - | number of SAGA-discovered satellites (Mr < -12.3)
+`sats_ours_bright` | - | number of SAGA-discovered satellites (r < 17.77)
+`sats_missed_approx` | - | model-predicted number of missed satellites within main targeting cuts (r < 20.75, within Rvir)
