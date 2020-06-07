@@ -40,6 +40,7 @@ Label | Unit | Definition
 `HOST_VHOST` | km/s |  Recession (Heliocentric) velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
+`p_sat_approx` | - | Approximated probability of this object being a satellite. Use with care.
 
 _*data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`)._
 
@@ -81,5 +82,22 @@ Label | Unit | Definition
 `COVERAGE_DECALS_DR8` | - | Fraction of LS DR8 coverage within 1 Rvir
 `COVERAGE_DES_DR1` | - | Fraction of DES Dr1 coverage within 1 Rvir
 `COVERAGE_SDSS` | - | Fraction of SDSS coverage within 1 Rvir
-`HOST_SCORE` | - | Usable hosts if >=3
+`HOST_SCORE` | - | Usable hosts if >=4
 `HAS_IMAGE` | - | Has image coverage if > 0
+
+### Host statistics schema
+
+Label | Unit | Definition
+--- | --- | ---
+`really_need_spec` | - | number of remaining targets within main targeting cuts (r < 20.75, within Rvir)
+`really_need_spec_bright` | - | number of remaining targets within main targeting cuts (r < 17.77, within Rvir)
+`specs_ours_rvir` | - | number of SAGA redshifts within Rvir
+`sats_total` | - | number of satellites 
+`sats_r_limit` | - | number of satellites (r < 20.75)
+`sats_Mr_limit` | - | number of satellites (Mr < -12.3)
+`sats_bright` | - | number of satellites (r < 17.77)
+`sats_ours` | - | number of SAGA-discovered satellites 
+`sats_ours_r_limit` | - | number of SAGA-discovered satellites (r < 20.75)
+`sats_ours_Mr_limit` | - | number of SAGA-discovered satellites (Mr < -12.3)
+`sats_ours_bright` | - | number of SAGA-discovered satellites (r < 17.77)
+`sats_missed_approx` | - | model-predicted number of missed satellites within main targeting cuts (r < 20.75, within Rvir)
