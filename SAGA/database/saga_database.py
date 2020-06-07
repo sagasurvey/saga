@@ -269,6 +269,13 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
+            "spectra_ozdes_dr2": DataObject(
+                FitsTable(
+                    os.path.join(
+                        self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR2.fits"
+                    )
+                ),
+            ),
             "spectra_2df": DataObject(
                 FitsTable(
                     os.path.join(
@@ -381,7 +388,7 @@ class Database(object):
                     "2df": self._tables["spectra_2df"],
                     "2dflens": self._tables["spectra_2dflens"],
                     "6df": self._tables["spectra_6df"],
-                    "ozdes": self._tables["spectra_ozdes_dr1"],
+                    "ozdes": self._tables["spectra_ozdes_dr2"],
                     "wigglez": self._tables["spectra_wigglez"],
                     "lcrs": self._tables["spectra_lcrs"],
                     "ukst": self._tables["spectra_ukst"],

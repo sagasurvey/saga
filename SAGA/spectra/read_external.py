@@ -128,15 +128,28 @@ def read_6df(file_path):
 def read_ozdes(file_path):
     if not hasattr(file_path, "read"):
         file_path = FitsTable(file_path)
-    specs = file_path.read()["OzDES_ID", "RA", "DEC", "z", "flag"]
+
+    specs = file_path.read()
+
+    try:
+        # DR2
+        specs = specs["ozdes_id", "alpha_j2000", "delta_j2000", "z", "qop"]
+    except KeyError:
+        # DR1
+        specs = specs["OzDES_ID", "RA", "DEC", "z", "flag"]
+        specs.rename_column("OzDES_ID", "SPECOBJID")
+        specs.rename_column("z", "SPEC_Z")
+        specs.rename_column("flag", "ZQUALITY")
+    else:
+        specs.rename_column("ozdes_id", "SPECOBJID")
+        specs.rename_column("alpha_j2000", "RA")
+        specs.rename_column("delta_j2000", "DEC")
+        specs.rename_column("z", "SPEC_Z")
+        specs.rename_column("qop", "ZQUALITY")
 
     # flag 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
-    specs["flag"] = specs["flag"].astype(np.int16)
-    specs = Query("flag >= 3").filter(specs)
-
-    specs.rename_column("OzDES_ID", "SPECOBJID")
-    specs.rename_column("z", "SPEC_Z")
-    specs.rename_column("flag", "ZQUALITY")
+    specs["ZQUALITY"] = specs["ZQUALITY"].astype(np.int16)
+    specs = Query("ZQUALITY >= 3").filter(specs)
 
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})
 
