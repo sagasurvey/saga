@@ -54,6 +54,6 @@ paper1_observed = paper1
 
 paper2_observed = Query("specs_ours_rvir >= 100", "HOST_SCORE >= 2")
 paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
-paper2_complete = Query("really_need_spec < 35.5", "sats_missed_approx < 0.23")
+paper2_complete = Query("really_need_spec < 35.5", "sats_missed_approx < 0.25")
 paper2_incomplete = Query(paper2_observed, ~paper2_complete)
 paper2 = paper2_observed
