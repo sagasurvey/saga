@@ -312,7 +312,7 @@ def assign_targeting_score_v2(
     if "des" in surveys:
         des_bright_stars = Query(
             QueryMaker.equals("survey", "des"),
-            "0.7 * (r_mag + 9.125) > sb_r",
+            "0.7 * (r_mag + 10.2) > sb_r",
             "gr < 0.6",
             "r_mag < 17",
             C.valid_g_mag,
@@ -324,12 +324,12 @@ def assign_targeting_score_v2(
     veryhigh_p_gmm = Query("P_GMM >= 0.95", "log_L_GMM >= -7")
     high_p_gmm = Query("P_GMM >= 0.7") | Query("log_L_GMM < -7")
 
-    low_sb_cut = Query(Query("score_sb_r >= 19.25"), C.valid_sb)
+    low_sb_cut = Query(Query("score_sb_r >= 20"), C.valid_sb)
     very_low_sb_cut = Query(
         "r_mag < 20.8",
         (
-            Query(C.high_priority_cuts, Query("score_sb_r >= 20.5") | Query("sb_r >= 24.5"))
-            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 20.75") | Query("sb_r >= 24.75"))
+            Query(C.high_priority_cuts, Query("score_sb_r >= 21.25") | Query("sb_r >= 25.25"))
+            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"))
         ),
         C.valid_sb,
         exclusion_cuts,
@@ -379,7 +379,7 @@ def assign_targeting_score_v2(
     base["TARGETING_SCORE"][need_random_selection] = 500
 
     base["TARGETING_SCORE"] += (
-        8 - np.digitize(base["score_sb_r"], np.linspace(18.5, 21.5, 7))
+        8 - np.digitize(base["score_sb_r"], np.linspace(19.25, 22, 7))
     ) * 10 + (9 - np.floor(base["P_GMM"] * 10).astype(np.int))
 
     fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})
@@ -439,7 +439,7 @@ def assign_targeting_score_lowz(
     )
     base["pass_r_gr_cut"] = Query("r_mag < (2-gr)*14").mask(base)
     base["pass_gr_ri_cut"] = Query("0.5*gr + 0.05 > ri").mask(base)
-    base["pass_r_sb_cut"] = Query("0.9*r_mag + 4.5 < sb_r").mask(base)
+    base["pass_r_sb_cut"] = Query("0.9*r_mag + 5.25 < sb_r").mask(base)
 
     base["TARGETING_SCORE"] = 1000
     basic = Query("r_mag > 18", "pass_r_gr_cut", "pass_gr_ri_cut", "pass_r_sb_cut")

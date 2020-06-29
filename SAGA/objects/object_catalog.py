@@ -27,7 +27,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.68, 1.25, -5.5, 2.3, 0.5)):
+def calc_fiducial_p_sat(base, params=(-1.7, 1.25, -6, 2, 0.5)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -41,7 +41,7 @@ def calc_fiducial_p_sat(base, params=(-1.68, 1.25, -5.5, 2.3, 0.5)):
     sb = np.where(
         C.valid_sb.mask(base),
         base["sb_r"],
-        20 + 0.6 * (base["r_mag"] - 14),
+        20.75 + 0.6 * (base["r_mag"] - 14),
     )
 
     r = base["r_mag"]
@@ -118,8 +118,7 @@ class ObjectCatalog(object):
                     table["{}_err".format(color[0])], table["{}_err".format(color[1])]
                 )
 
-        if "sb_r_err" not in table.colnames:
-            table = build2.add_surface_brightness(table)
+        table = build2.add_surface_brightness(table)  # TODO: remove this line in the future
 
         if "HOST_ID" in table.colnames:
             table.rename_column("HOST_ID", "HOSTID")
