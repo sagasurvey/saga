@@ -288,7 +288,7 @@ def add_selection_flags(d):
         "REMOVED_BY_HAND == 0",
     )
 
-    env_preferred = Query(env_allowed, "BRIGHTEST_K_R1 >= K_TC + 1.6",)
+    env_preferred = Query(env_allowed, "BRIGHTEST_K_R1 >= K_TC + 1.6")
 
     sample_allowed = Query(
         "K_ABS >= -24.7",
@@ -302,7 +302,7 @@ def add_selection_flags(d):
         sample_allowed,
         "K_ABS >= -24.6",
         "K_ABS <= -23.0",
-        "DIST >= 25.25",
+        "DIST >= 25",
         "DIST <= 40.75",
     )
 
