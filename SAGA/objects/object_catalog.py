@@ -719,17 +719,6 @@ class ObjectCatalog(object):
 
         data = Table(data)
 
-        host_table = self._host_catalog.load(hosts)
-        if "distance" in host_table.colnames:
-            cols = ["HOSTID", "PGC", "RA", "DEC", "distance", "MK_compiled"]
-        else:
-            cols = ["HOSTID", "PGC", "RA", "DEC", "DIST", "K_ABS", "HOST_SCORE"]
-        host_table = host_table[cols]
-        if "distance" in host_table.colnames:
-            host_table.rename_column("distance", "DIST")
-            host_table.rename_column("MK_compiled", "K_ABS")
-        data = join(data, host_table, "HOSTID", "left")
-
         if save_to is not False:
             save_to.write(data, overwrite=overwrite)
 
