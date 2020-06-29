@@ -39,8 +39,8 @@ has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
 
 potential_hosts = Query("HOST_SCORE > 0")
-good_hosts = Query("HOST_SCORE >= 4")
-preferred_hosts = Query("HOST_SCORE >= 4")
+good_exceptions = QueryMaker.in1d("HOSTID", ("nsa163956", "nsa135739", "pgc67817"))
+good_hosts = Query("HOST_SCORE >= 4") | good_exceptions
 good = good_hosts & has_image
 build_default = potential_hosts & has_image
 
@@ -52,8 +52,9 @@ paper1 = QueryMaker.in1d(
 )
 paper1_observed = paper1
 
-paper2_observed = Query("specs_ours_rvir >= 100", "HOST_SCORE >= 2")
+paper2_observed = Query("specs_ours_rvir >= 100", good_hosts)
 paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
-paper2_complete = Query(paper2_observed, "really_need_spec < 35.5", "sats_missed_approx < 0.32")
+paper2_complete_definition = Query("really_need_spec < 35.5", "sats_missed_approx < 0.32")
+paper2_complete = Query(paper2_observed, paper2_complete_definition)
 paper2_incomplete = Query(paper2_observed, ~paper2_complete)
 paper2 = paper2_observed
