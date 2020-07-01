@@ -41,4 +41,6 @@ fixes_to_nsa_v012 = {
 fixes_to_nsa_v101 = {
     257573: {"PETRO_TH90": 120.0},
     632316: {"PETRO_TH90": 120.0},
+    39145: {"PETRO_TH90": 21.5},
+    645571: {"PETRO_TH90": 22.5},
 }
