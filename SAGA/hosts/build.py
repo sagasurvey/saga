@@ -346,6 +346,12 @@ def add_selection_flags(d):
     return d
 
 
+def apply_manual_fixes(d):
+    # pgc64427 too many stars, affecting the DES DR1 catalog
+    fill_values_by_query(d, QueryMaker.equals("HOSTID", "pgc64427"), {"HOST_SCORE": 3})
+    return d
+
+
 def build_master_list(
     hyperleda,
     edd_2mrs,
@@ -420,5 +426,6 @@ def build_master_list(
 
     d.sort("PGC")
     d = add_selection_flags(d)
+    d = apply_manual_fixes(d)
 
     return d
