@@ -89,33 +89,19 @@ paper1_targeting_cut = griz_cut = gri_or_grz_cut = gr_cut & ri_cut & rz_cut
 
 high_priority_sb = Query("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14) > 18.55") | (~valid_sb)
 high_priority_gr = Query("gr - abs(gr_err) + 0.06 * (r_mag - 14) < 0.9") | (~valid_g_mag)
-high_priority_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.7") | (~valid_i_mag)
-high_priority_rz = Query("rz - abs(rz_err) + 0.06 * (r_mag - 14) < 0.8") | (~valid_z_mag)
-high_priority_ug = Query("ug + abs(ug_err) > 0.5", "ug - abs(ug_err) < 1.9") | (~valid_u_mag) | (~valid_g_mag)
+high_priority_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.65") | (~valid_i_mag)
+high_priority_rz = Query("rz - abs(rz_err) + 0.06 * (r_mag - 14) < 0.85") | (~valid_z_mag)
 
-high_priority_sb_old = Query("sb_r - 0.6 * (r_mag - abs(r_err)) > 10.1") | (~valid_sb)
-
-relaxed_cut_sb = Query("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14) > 18") | (~valid_sb)
-relaxed_cut_gr = Query("gr - abs(gr_err) + 0.06 * (r_mag - 14) < 1.1") | (~valid_g_mag)
-relaxed_cut_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.9") | (~valid_i_mag)
-relaxed_cut_rz = Query("rz - abs(rz_err) + 0.06 * (r_mag - 14) < 1") | (~valid_z_mag)
-relaxed_cut_ug = Query("ug + abs(ug_err) > 0", "ug - abs(ug_err) < 2") | (~valid_u_mag) | (~valid_g_mag)
+relaxed_cut_sb = Query("sb_r + abs(sb_r_err)*2 - 0.6 * (r_mag - 14) > 18") | (~valid_sb)
+relaxed_cut_gr = Query("gr - abs(gr_err)*2 + 0.06 * (r_mag - 14) < 1.1") | (~valid_g_mag)
+relaxed_cut_ri = Query("ri - abs(ri_err)*2 + 0.06 * (r_mag - 14) < 0.85") | (~valid_i_mag)
+relaxed_cut_rz = Query("rz - abs(rz_err)*2 + 0.06 * (r_mag - 14) < 1.05") | (~valid_z_mag)
 
 main_targeting_cuts = high_priority_cuts = Query(
     high_priority_sb,
     high_priority_gr,
     high_priority_ri,
     high_priority_rz,
-    high_priority_ug,
-)
-
-high_priority_cuts_old = Query(
-    gri_or_grz_cut,
-    high_priority_sb_old,
-    high_priority_gr,
-    high_priority_ri,
-    high_priority_rz,
-    high_priority_ug,
 )
 
 relaxed_targeting_cuts = Query(
@@ -123,7 +109,6 @@ relaxed_targeting_cuts = Query(
     relaxed_cut_gr,
     relaxed_cut_ri,
     relaxed_cut_rz,
-    relaxed_cut_ug,
 )
 
 very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts
