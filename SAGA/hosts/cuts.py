@@ -54,7 +54,7 @@ paper1_observed = paper1
 
 paper2_observed = Query("specs_ours_rvir >= 100", good_hosts)
 paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
-paper2_complete_definition = Query("really_need_spec < 35.5", "sats_missed_approx < 0.34")
+paper2_complete_definition = Query("really_need_spec < 40", "sats_missed_approx < 0.33")
 paper2_complete = Query(paper2_observed, paper2_complete_definition)
 paper2_incomplete = Query(paper2_observed, ~paper2_complete)
 paper2 = paper2_observed
