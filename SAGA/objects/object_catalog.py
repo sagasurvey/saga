@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 
 import numpy as np
-from astropy.table import Table, join, vstack
+from astropy.table import Table, vstack
 from astropy.time import Time
 from easyquery import Query
 
@@ -27,7 +27,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.7, 1.25, -6, 2, 0.5)):
+def calc_fiducial_p_sat(base, params=(-2.05, 1.34, -6.5, 6.5, 0.34)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -132,7 +132,6 @@ class ObjectCatalog(object):
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = calc_fiducial_p_sat(table)
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        good_obj = Query(good_obj, C.high_priority_cuts, "r_mag > 12")
         fill_values_by_query(table, ~good_obj, {"p_sat_approx": 0})
 
         if add_skycoord:
@@ -652,6 +651,7 @@ class ObjectCatalog(object):
 
         # fmt: off
         d["need_spec"] = Query(basic_targeting_cuts, C.very_relaxed_targeting_cuts, ~C.has_spec)
+        d["need_spec_griz"] = Query(basic_targeting_cuts, C.griz_cut, ~C.has_spec)
         d["really_need_spec"] = Query(basic_targeting_cuts, C.main_targeting_cuts, ~C.has_spec)
         d["really_need_spec_strict"] = Query(d["really_need_spec"], C.faint_end_limit_strict)
         d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)
@@ -686,7 +686,7 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_approx"].append(d["really_need_spec"].filter(base, "p_sat_approx").sum())
+        data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
 
         return data
 
