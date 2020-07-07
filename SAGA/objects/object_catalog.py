@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 
 import numpy as np
-from astropy.table import Table, vstack
+from astropy.table import Table, vstack, unique
 from astropy.time import Time
 from easyquery import Query
 
@@ -723,8 +723,12 @@ class ObjectCatalog(object):
             data = generate_func(host, data)
 
         data = Table(data)
+        data.sort("HOSTID")
 
         if save_to is not False:
+            if hosts != "build_default" and save_to.isfile() and overwrite:
+                data = unique(vstack([save_to.read(), data]), "HOSTID")
+                data.sort("HOSTID")
             save_to.write(data, overwrite=overwrite)
 
         return data
