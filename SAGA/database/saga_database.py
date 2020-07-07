@@ -521,6 +521,7 @@ class Database(object):
     @base_file_path_pattern.setter
     def base_file_path_pattern(self, value):
         self._set_file_path_pattern("base", value)
+        self._add_derived_data()
 
     @property
     def sdss_file_path_pattern(self):
