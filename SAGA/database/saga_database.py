@@ -396,7 +396,6 @@ class Database(object):
                     "palomar": self._tables["spectra_palomar"],
                     "alfalfa": self._tables["spectra_alfalfa"],
                 },
-                self._tables["spectra_halpha"],
             )
         )
 

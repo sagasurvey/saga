@@ -16,8 +16,6 @@ _SPECS_COLUMNS = (
     ("TELNAME", "<U6"),
     ("EM_ABS", "<i2"),
     ("HELIO_CORR", "|b1"),
-    ("EW_Halpha", "<f8"),
-    ("EW_Halpha_err", "<f8"),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)

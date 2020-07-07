@@ -429,6 +429,8 @@ class ObjectCatalog(object):
         )
         print(time.strftime("[%m/%d %H:%M:%S]"), "All spectra loaded.")
 
+        halpha = self._database["spectra_halpha"].read()
+
         manual_lists = {}
         for survey, col in (
             ("sdss", "SDSS ID"),
@@ -543,6 +545,7 @@ class ObjectCatalog(object):
                     host=host,
                     nsa=nsa,
                     spectra=spectra,
+                    halpha=halpha,
                     convert_to_sdss_filters=convert_to_sdss_filters,
                     debug=debug_this,
                     **manual_lists,

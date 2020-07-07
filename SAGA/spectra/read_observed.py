@@ -82,7 +82,7 @@ def read_generic_spectra(
             )
             continue
 
-        if exclude_spec_masks and (rootname in exclude_spec_masks) or (filename in exclude_spec_masks):
+        if exclude_spec_masks and (rootname in exclude_spec_masks or filename in exclude_spec_masks):
             continue
 
         helio_corr = None

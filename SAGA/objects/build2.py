@@ -69,6 +69,15 @@ _NSA_COLS_USED = [
 ]
 NSA_COLS_USED = list(_NSA_COLS_USED)
 
+EXTENDED_SPECS_COLUMNS = dict(
+    SPECS_COLUMNS,
+    EW_Halpha="<f8",
+    EW_Halpha_err="<f8",
+    OBJ_NSAID="<i4",
+    SPEC_REPEAT="<U48",
+    SPEC_REPEAT_ALL="<U48",
+)
+
 
 def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
     catalog = add_skycoord(catalog)
@@ -309,6 +318,17 @@ def prepare_decals_catalog_for_merging(
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
+def add_halpha_to_spectra(spectra, halpha):
+    halpha = halpha["EW_Halpha", "EW_Halpha_err", "SPECOBJID1", "MASKNAME"]
+    halpha.rename_column("SPECOBJID1", "SPECOBJID")
+    halpha = ensure_specs_dtype(halpha, cols_definition=EXTENDED_SPECS_COLUMNS, skip_missing_cols=True)
+    spectra = join(spectra, halpha, ["SPECOBJID", "MASKNAME"], "left")
+    spectra["EW_Halpha"].fill_value = np.nan
+    spectra["EW_Halpha_err"].fill_value = np.nan
+    spectra.filled()
+    return spectra
+
+
 def assign_photometry_choice(stacked_catalog, indices, is_last):
     if len(indices) == 1:
         return 2  # only one entry, always chosen
@@ -472,10 +492,7 @@ def replace_poor_sdss_sky_subtraction(base):
 
 
 def add_columns_for_spectra(base):
-    base["OBJ_NSAID"] = np.int32(-1)
-    base["SPEC_REPEAT"] = get_empty_str_array(len(base), 48)
-    base["SPEC_REPEAT_ALL"] = get_empty_str_array(len(base), 48)
-    cols_definition = SPECS_COLUMNS.copy()
+    cols_definition = EXTENDED_SPECS_COLUMNS.copy()
     for col in ("RA", "DEC"):
         cols_definition[col + "_spec"] = cols_definition[col]
         del cols_definition[col]
@@ -693,11 +710,7 @@ def add_spectra(base, specs, debug=None):
         )
 
         # for matched specs, copy their info to base catalog
-        for col in tuple(SPECS_COLUMNS) + (
-            "SPEC_REPEAT",
-            "SPEC_REPEAT_ALL",
-            "OBJ_NSAID",
-        ):
+        for col in EXTENDED_SPECS_COLUMNS:
             col_base = (col + "_spec") if col in ("RA", "DEC") else col
             base[col_base][specs_matched["matched_idx"]] = specs_matched[col]
 
@@ -942,6 +955,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     decals_remove=None,
     decals_recover=None,
     spectra=None,
+    halpha=None,
     convert_to_sdss_filters=True,
     debug=None,
     **kwargs
@@ -998,6 +1012,10 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = add_columns_for_spectra(base)
     if all_spectra:
         all_spectra = vstack(all_spectra, "exact")
+
+    if halpha is not None:
+        all_spectra = add_halpha_to_spectra(all_spectra, halpha)
+
     if len(all_spectra):
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
