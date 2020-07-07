@@ -27,7 +27,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-2.05, 1.34, -6.5, 6.5, 0.34)):
+def calc_fiducial_p_sat(base, params=(-2.01, 1.4, -5.92, 4, 0.37)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
