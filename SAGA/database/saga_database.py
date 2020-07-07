@@ -438,13 +438,13 @@ class Database(object):
 
         self._file_path_pattern = {
             "base_v2p1": os.path.join(
-                self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits"
+                self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"
             ),
             "base_v2": os.path.join(
-                self._local_dir, "base_catalogs", "base_v2_{}.fits"
+                self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"
             ),
             "base_v1": os.path.join(
-                self._local_dir, "base_catalogs", "base_v1_{}.fits"
+                self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"
             ),
             "base_v0p1": os.path.join(
                 self._shared_dir, "Paper1", "base_catalogs", "base_sql_{}.fits.gz"
@@ -483,7 +483,7 @@ class Database(object):
             self._tables["saga_clean_specs"] = DataObject(t)
 
         t = FastCsvTable(
-            self.base_file_path_pattern.format("host_stats").replace(".fits", ".csv")
+            self.base_file_path_pattern.format("host_stats").partition(".")[0] + ".csv"
         )
 
         if "host_stats" in self._tables:
