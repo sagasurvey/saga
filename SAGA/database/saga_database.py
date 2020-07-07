@@ -482,9 +482,13 @@ class Database(object):
         else:
             self._tables["saga_clean_specs"] = DataObject(t)
 
-        t = FastCsvTable(
-            self.base_file_path_pattern.format("host_stats").partition(".")[0] + ".csv"
-        )
+        stats_path = self.base_file_path_pattern.format("host_stats")
+        for ext in (".fits.gz", ".fits"):
+            if stats_path.endswith(ext):
+                stats_path = stats_path[:-len(ext)]
+                break
+        stats_path += ".csv"
+        t = FastCsvTable(stats_path)
 
         if "host_stats" in self._tables:
             self._tables["host_stats"].local = t
