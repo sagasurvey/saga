@@ -19,7 +19,7 @@ class SpectraData(object):
         self._external_specs_dict = external_specs_dict or {}
         self.halpha_data_obj = halpha_data_obj
 
-    def read(self, add_coord=True, before_time=None, additional_specs=None):
+    def read(self, add_coord=True, before_time=None, additional_specs=None, exclude_spec_masks=None):
         all_specs = []
 
         for k, v in self._external_specs_dict.items():
@@ -40,18 +40,22 @@ class SpectraData(object):
                     read_observed.read_mmt(
                         os.path.join(self.spectra_dir_path, "MMT"),
                         before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_aat(
                         os.path.join(self.spectra_dir_path, "AAT"),
                         before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_aat_mz(
                         os.path.join(self.spectra_dir_path, "AAT"),
                         before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_aat_mz(
                         os.path.join(self.spectra_dir_path, "AAT_LOWZ"),
                         before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_wiyn(
                         os.path.join(self.spectra_dir_path, "WIYN")

@@ -60,6 +60,7 @@ def read_generic_spectra(
     helio_corr_site=None,
     before_time=None,
     table_read_kwargs=None,
+    exclude_spec_masks=None,
     **kwargs
 ):
 
@@ -79,6 +80,9 @@ def read_generic_spectra(
             logging.warning(
                 "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(filepath)
             )
+            continue
+
+        if exclude_spec_masks and (rootname in exclude_spec_masks) or (filename in exclude_spec_masks):
             continue
 
         helio_corr = None
@@ -147,7 +151,7 @@ def read_generic_spectra(
     return ensure_specs_dtype(output)
 
 
-def read_mmt(dir_path, before_time=None):
+def read_mmt(dir_path, before_time=None, exclude_spec_masks=None):
     extension = ".zlog"
     telname = "MMT"
     helio_corr_site = "mmt"
@@ -173,7 +177,7 @@ def read_mmt(dir_path, before_time=None):
     return read_generic_spectra(**locals())
 
 
-def read_aat(dir_path, before_time=None):
+def read_aat(dir_path, before_time=None, exclude_spec_masks=None):
     extension = ".zlog"
     telname = "AAT"
     helio_corr_site = "sso"
@@ -191,7 +195,7 @@ def read_aat(dir_path, before_time=None):
     return read_generic_spectra(**locals())
 
 
-def read_aat_mz(dir_path, before_time=None):
+def read_aat_mz(dir_path, before_time=None, exclude_spec_masks=None):
     extension = ".mz"
     telname = "AAT"
     helio_corr_site = "sso"

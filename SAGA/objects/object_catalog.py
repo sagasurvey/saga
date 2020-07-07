@@ -347,6 +347,7 @@ class ObjectCatalog(object):
         use_nsa=True,
         convert_to_sdss_filters=True,
         additional_specs=None,
+        exclude_spec_masks=None,
         debug=None,
     ):
         """
@@ -422,7 +423,9 @@ class ObjectCatalog(object):
             nsa = None
 
         spectra = self._database["spectra_raw_all"].read(
-            before_time=add_specs_only_before_time, additional_specs=additional_specs,
+            before_time=add_specs_only_before_time,
+            additional_specs=additional_specs,
+            exclude_spec_masks=exclude_spec_masks,
         )
         print(time.strftime("[%m/%d %H:%M:%S]"), "All spectra loaded.")
 
