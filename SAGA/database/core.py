@@ -58,9 +58,18 @@ class FileObject(DownloadableBase):
         self.path = path
         self.kwargs = kwargs
 
+    @staticmethod
+    def _gz_fallback(file_path):
+        file_path_str = str(file_path)
+        file_path_alt = file_path_str[:-3] if file_path_str.lower().endswith(".gz") else (file_path_str + ".gz")
+        if (not os.path.isfile(file_path)) and os.path.isfile(file_path_alt):
+            return file_path_alt
+        return file_path
+
     def read(self):
         kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
-        return Table.read(self.path, **kwargs_this)
+        path = self._gz_fallback(self.path)
+        return Table.read(path, **kwargs_this)
 
     def write(self, table, **kwargs):
         kwargs_this = dict(self._write_default_kwargs, **kwargs)
@@ -75,7 +84,7 @@ class FileObject(DownloadableBase):
             except requests.exceptions.MissingSchema:
                 shutil.copy(self.path, file_path)
             else:
-                file_open = gzip.open if compress else open
+                file_open = gzip.open if (compress or file_path.endswith(".gz")) else open
                 try:
                     with file_open(file_path, "wb") as f:
                         for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
@@ -89,7 +98,7 @@ class FileObject(DownloadableBase):
 
     def isfile(self):
         if self.path:
-            return os.path.isfile(self.path)
+            return os.path.isfile(self._gz_fallback(self.path))
         return False
 
 
@@ -127,18 +136,19 @@ class FitsTableGeneric(FileObject):
 
 
 class FitsTable(FileObject):
-    compress_after_write = True
+    compress_after_write = False
     _read_default_kwargs = dict(cache=False, memmap=True)
     _write_default_kwargs = dict(format="fits", overwrite=True)
 
     def read(self):
         kwargs_this = dict(self._read_default_kwargs, **self.kwargs)
+        path = self._gz_fallback(self.path)
 
         try:
-            hdu_list = fits.open(self.path, **kwargs_this)
+            hdu_list = fits.open(path, **kwargs_this)
         except OSError:
             # this helps fits.open guess the compression better
-            hdu_list = fits.open(open(self.path, "rb"), **kwargs_this)
+            hdu_list = fits.open(open(path, "rb"), **kwargs_this)
 
         try:
             t = Table(hdu_list[1].data, masked=False)
@@ -157,7 +167,8 @@ class FitsTable(FileObject):
         if "coord" in table.columns and table["coord"].info.dtype.name == "object":
             coord = table["coord"]
             del table["coord"]
-        file_open = gzip.open if self.compress_after_write else open
+        compress = self.compress_after_write or self.path.endswith(".gz")
+        file_open = gzip.open if compress else open
         makedirs_if_needed(self.path)
         kwargs_this = dict(self._write_default_kwargs, **kwargs)
         with file_open(self.path, "wb") as f_out:
@@ -168,7 +179,8 @@ class FitsTable(FileObject):
 
 class NumpyBinary(FileObject):
     def read(self):
-        return np.load(self.path, **self.kwargs)
+        path = self._gz_fallback(self.path)
+        return np.load(path, **self.kwargs)
 
     def write(self, table, **kwargs):
         makedirs_if_needed(self.path)
