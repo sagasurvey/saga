@@ -727,7 +727,7 @@ class ObjectCatalog(object):
 
         if save_to is not False:
             if hosts != "build_default" and save_to.isfile() and overwrite:
-                data = unique(vstack([save_to.read(), data]), "HOSTID")
+                data = unique(vstack([data, save_to.read()]), "HOSTID")
                 data.sort("HOSTID")
             save_to.write(data, overwrite=overwrite)
 
