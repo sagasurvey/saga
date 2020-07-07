@@ -112,3 +112,6 @@ class QuickStart:
     @base_file_path_pattern.setter
     def base_file_path_pattern(self, value):
         self.database.base_file_path_pattern = value
+
+    def set_default_base_version(self, version=None):
+        self.database.set_default_base_version(version=version)

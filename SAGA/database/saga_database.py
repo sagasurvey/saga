@@ -437,6 +437,9 @@ class Database(object):
         self._tables["master_list"] = self._tables["master_list_v2"]
 
         self._file_path_pattern = {
+            "base_paper2": os.path.join(
+                self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"
+            ),
             "base_v2p1": os.path.join(
                 self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"
             ),
@@ -467,7 +470,7 @@ class Database(object):
         }
 
         self._possible_base_versions = tuple(
-            k.partition("_v")[2]
+            k.partition("_")[2]
             for k in self._file_path_pattern
             if k.startswith("base_")
         )
@@ -521,7 +524,6 @@ class Database(object):
     @base_file_path_pattern.setter
     def base_file_path_pattern(self, value):
         self._set_file_path_pattern("base", value)
-        self._add_derived_data()
 
     @property
     def sdss_file_path_pattern(self):
@@ -595,21 +597,21 @@ class Database(object):
 
         if version is None:
             return 2, ""
-        version = str(version).lower().strip().lstrip("v")
+        version = str(version).lower().strip()
         if version in ("paper1", "p1"):
-            return 0, "_v0p1"
+            return 0, "v0p1"
+        if version == "paper2":
+            return 2, "paper2"
+        if not version.startswith("v"):
+            version = "v" + version
         while version.endswith(".0"):
             version = version[:-2]
-        version.replace(".", "p")
+        version = version.replace(".", "p")
         if version not in self._possible_base_versions:
             raise ValueError("version value unknown!")
-        return int(version[0]), "_v" + version
+        return int(version[1]), version
 
     def set_default_base_version(self, version=None):
         _, version_postfix = self.resolve_base_version(version)
-        if not version_postfix:
-            version_postfix = "_v2p1"
-        self._file_path_pattern["base"] = self._file_path_pattern[
-            "base" + version_postfix
-        ]
-        self._add_derived_data()
+        version_postfix = version_postfix or "v2p1"
+        self.base_file_path_pattern = self._file_path_pattern["base_" + version_postfix]
