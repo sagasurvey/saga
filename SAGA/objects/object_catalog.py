@@ -711,6 +711,7 @@ class ObjectCatalog(object):
         if save_to is not False:
             if save_to is None:
                 save_to = self._database["host_stats"]
+                self._database["host_stats"].clear_cache()
             if not isinstance(save_to, (FileObject, DataObject)):
                 save_to = CsvTable(save_to)
             print(time.strftime("[%m/%d %H:%M:%S]"), "Save to path:", save_to.path)
