@@ -111,7 +111,7 @@ relaxed_targeting_cuts = Query(
     relaxed_cut_rz,
 )
 
-very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts
+very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_approx >= 1e-4"
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")

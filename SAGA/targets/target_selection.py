@@ -13,7 +13,7 @@ from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
 from ..utils import add_skycoord
 from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
-                                     assign_targeting_score_v2)
+                                     assign_targeting_score_v2, assign_targeting_score_v2plus)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -84,7 +84,7 @@ class TargetSelection(object):
             self.assign_targeting_score = (
                 assign_targeting_score_v1
                 if self._build_version < 2
-                else assign_targeting_score_v2
+                else assign_targeting_score_v2plus
             )
         else:
             self.assign_targeting_score = assign_targeting_score_func
@@ -145,7 +145,7 @@ class TargetSelection(object):
     def _load_gmm_parameters(self, gmm_parameters):
         prefix = "gmm_parameters_"
         keys = [
-            k[len(prefix) :]
+            k[len(prefix):]
             for k in self._database.keys()
             if not isinstance(k, tuple) and k.startswith(prefix)
         ]
@@ -158,7 +158,7 @@ class TargetSelection(object):
 
         try:
             if gmm_parameters.startswith(prefix):
-                gmm_parameters = gmm_parameters[len(prefix) :]
+                gmm_parameters = gmm_parameters[len(prefix):]
         except AttributeError:
             return gmm_parameters
 
@@ -203,14 +203,13 @@ class TargetSelection(object):
 
         for host_id in host_ids:
             if reload_base or host_id not in self.target_catalogs:
-                self.target_catalogs[host_id] = self._object_catalog.load(
+                self.target_catalogs[host_id] = self._object_catalog.load_single(
                     host_id,
                     cuts=self._cuts,
                     columns=self.columns,
-                    return_as="list",
                     version=self._version,
                     add_skycoord=False,
-                ).pop()
+                )
 
             if (
                 recalculate_score
