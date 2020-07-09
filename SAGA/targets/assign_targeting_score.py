@@ -221,7 +221,7 @@ def assign_targeting_score_v2(
     1400 Has spec already
     """
 
-    basic_cut = C.very_relaxed_targeting_cuts & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
+    basic_cut = (C.relaxed_targeting_cuts | C.paper1_targeting_cut) & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
@@ -467,6 +467,7 @@ def assign_targeting_score_v2plus(
         basic_loose = Query(basic_loose, ~C.has_spec)
         basic = Query(basic, ~C.has_spec)
 
+    base = add_cut_scores(base)
     base["TARGETING_SCORE"] = 1000
     surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
 
@@ -499,45 +500,36 @@ def assign_targeting_score_v2plus(
             C.valid_g_mag,
             C.valid_sb,
         )
-        bright = Query(bright, ~des_bright_stars)
         exclusion_cuts = Query(exclusion_cuts, ~des_bright_stars)
 
-    p_sat_1 = "p_sat_approx >= 0.1"
-    p_sat_2 = "p_sat_approx >= 0.0007"
-    p_sat_3 = "p_sat_approx >= 0.0001"
+    very_low_sb_cut = Query(
+        "r_mag < 20.8",
+        C.valid_sb,
+        QueryMaker.equals("survey", "des") | C.main_targeting_cuts,
+        Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
+    )
+
+    tier_1 = Query(exclusion_cuts, bright | very_low_sb_cut | "p_sat_approx >= 0.1")
+    tier_2 = Query(exclusion_cuts, C.main_targeting_cuts, "p_sat_approx >= 0.0007")
+    tier_3 = C.relaxed_targeting_cuts | "p_sat_approx >= 0.0001"
 
     fill_values_by_query(base, Query(C.sat_rcut, "r_mag < 21"), {"TARGETING_SCORE": 900})
     fill_values_by_query(base, basic, {"TARGETING_SCORE": 800})
-    fill_values_by_query(
-        base,
-        Query(basic, C.relaxed_targeting_cuts | p_sat_3),
-        {"TARGETING_SCORE": 700},
-    )
-    fill_values_by_query(
-        base,
-        Query(basic_loose, exclusion_cuts, bright | p_sat_1),
-        {"TARGETING_SCORE": 600},
-    )
-    fill_values_by_query(
-        base,
-        Query(basic, exclusion_cuts, C.main_targeting_cuts),
-        {"TARGETING_SCORE": 400},
-    )
-    fill_values_by_query(
-        base,
-        Query(basic, exclusion_cuts, C.main_targeting_cuts, p_sat_2),
-        {"TARGETING_SCORE": 300},
-    )
-    fill_values_by_query(
-        base,
-        Query(basic, exclusion_cuts, bright | p_sat_1),
-        {"TARGETING_SCORE": 200},
-    )
+    fill_values_by_query(base, Query(basic, tier_3), {"TARGETING_SCORE": 700})
+    fill_values_by_query(base, Query(basic_loose, tier_1), {"TARGETING_SCORE": 600})
+    fill_values_by_query(base, Query(basic, C.main_targeting_cuts), {"TARGETING_SCORE": 400})
+    fill_values_by_query(base, Query(basic, tier_2), {"TARGETING_SCORE": 300})
+    fill_values_by_query(base, Query(basic, tier_1), {"TARGETING_SCORE": 200})
+
+    fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
+    fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
 
     if not ignore_specs:
+        fill_values_by_query(base, C.has_spec, {"TARGETING_SCORE": 1400})
+
         fill_values_by_query(
             base,
-            Query(basic, "ZQUALITY == 2", "SPEC_Z < 0.05"),
+            Query(basic_loose, "ZQUALITY == 2", "SPEC_Z < 0.05"),
             {"TARGETING_SCORE": 180},
         )
 
@@ -546,17 +538,6 @@ def assign_targeting_score_v2plus(
             Query(C.is_sat, (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME")),
             {"TARGETING_SCORE": 150},
         )
-
-    if manual_selected_objids is not None:
-        q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
-        if not ignore_specs:
-            q &= ~C.has_spec
-        fill_values_by_query(base, q, {"TARGETING_SCORE": 100})
-
-    fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
-    fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
-    if not ignore_specs:
-        fill_values_by_query(base, C.has_spec, {"TARGETING_SCORE": 1400})
 
     if remove_lists is not None:
         for survey in surveys:
@@ -572,8 +553,14 @@ def assign_targeting_score_v2plus(
                 {"TARGETING_SCORE": 1350},
             )
 
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
+        if not ignore_specs:
+            q &= ~C.has_spec
+        fill_values_by_query(base, q, {"TARGETING_SCORE": 100})
+
     need_random_selection = np.flatnonzero(
-        Query("TARGETING_SCORE >= 600", "TARGETING_SCORE < 800").mask(base)
+        Query("TARGETING_SCORE >= 700", "TARGETING_SCORE < 800").mask(base)
     )
     if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
