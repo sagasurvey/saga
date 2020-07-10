@@ -19,6 +19,7 @@ __all__ = [
     "assign_targeting_score_v2",
     "assign_targeting_score_v2plus",
     "assign_targeting_score_lowz",
+    "assign_targeting_score_lowz_v2",
     "calc_simple_satellite_probability",
     "calc_gmm_satellite_probability",
     "calc_simple_satellite_probability_gri",
@@ -600,6 +601,28 @@ def assign_targeting_score_lowz(
     )
     fill_values_by_query(
         base, Query(basic, "p_GMM > 0.6", "p_GMM_fsps > 0.6"), {"TARGETING_SCORE": 800}
+    )
+
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
+        if not ignore_specs:
+            q &= ~C.has_spec
+        fill_values_by_query(base, q, {"TARGETING_SCORE": 800})
+
+    base.sort("TARGETING_SCORE")
+    return base
+
+
+def assign_targeting_score_lowz_v2(base, manual_selected_objids=None, ignore_specs=False, **kwargs):
+    base["TARGETING_SCORE"] = 1000
+
+    targeting_cuts = Query(C.griz_cut, C.relaxed_targeting_cuts, "gr + r_mag / 14 < 2", "sb_r - 0.9 * r_mag >= 5.25")
+    if not ignore_specs:
+        targeting_cuts = Query(targeting_cuts, ~C.has_spec)
+
+    fill_values_by_query(base, targeting_cuts, {"TARGETING_SCORE": 900})
+    fill_values_by_query(
+        base, Query(targeting_cuts, "p_sat_approx >= 0.002"), {"TARGETING_SCORE": 800}
     )
 
     if manual_selected_objids is not None:
