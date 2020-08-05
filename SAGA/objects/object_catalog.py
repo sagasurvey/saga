@@ -12,6 +12,7 @@ from .. import utils
 from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
 from ..hosts import HostCatalog
 from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
+from ..utils.distance import d2m
 from . import build, build2
 from . import cuts as C
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
@@ -27,7 +28,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4)):
+def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4), use_abs_r_mag=False):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -44,7 +45,7 @@ def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4)):
         20.75 + 0.6 * (base["r_mag"] - 14),
     )
 
-    r = base["r_mag"]
+    r = (base["r_mag"] - d2m(base["HOST_DIST"])) if use_abs_r_mag else base["r_mag"]
 
     mu = params[0] * r + params[1] * sb + params[2] * gr + params[3]
     mu = np.where(np.isnan(mu), np.inf, mu)
