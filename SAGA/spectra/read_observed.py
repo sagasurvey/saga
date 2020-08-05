@@ -14,7 +14,9 @@ from ..database import CsvTable, FitsTable
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
 
 __all__ = [
+    "read_generic_spectra",
     "read_mmt",
+    "read_mmt_bino",
     "read_aat",
     "read_aat_mz",
     "read_imacs",
@@ -172,6 +174,34 @@ def read_mmt(dir_path, before_time=None, exclude_spec_masks=None):
     def postprocess(t):
         del t["mag"]
         t["RA"] *= 15.0
+        return t
+
+    return read_generic_spectra(**locals())
+
+
+def read_mmt_bino(dir_path, exclude_spec_masks=None):
+    extension = ".dat"
+    telname = "BINO"
+
+    n_cols_total = 8
+    usecols = {
+        1: "masknum",
+        2: "SPECOBJID",
+        3: "RA",
+        4: "DEC",
+        6: "SPEC_Z",
+        7: "ZQUALITY",
+    }
+
+    table_read_kwargs = dict(
+        format="ascii.fixed_width_no_header",
+        col_starts=(0, 5, 11, 25, 38, 58, 66, 71),
+    )
+
+    def postprocess(t):
+        t["SPEC_Z_ERR"] = 10 / SPEED_OF_LIGHT
+        t["MASKNAME"] = np.char.add(np.char.add(t["MASKNAME"], "-"), t["masknum"].astype("<U"))
+        del t["masknum"]
         return t
 
     return read_generic_spectra(**locals())

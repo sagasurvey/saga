@@ -1,7 +1,6 @@
 import os
 
-import numpy as np
-from astropy.table import join, vstack
+from astropy.table import vstack
 from astropy.time import Time
 
 from ..utils import add_skycoord
@@ -39,6 +38,10 @@ class SpectraData(object):
                     read_observed.read_mmt(
                         os.path.join(self.spectra_dir_path, "MMT"),
                         before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
+                    ),
+                    read_observed.read_mmt_bino(
+                        os.path.join(self.spectra_dir_path, "MMT_BINO"),
                         exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_aat(
