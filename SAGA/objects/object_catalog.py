@@ -6,7 +6,7 @@ from collections import defaultdict
 import numpy as np
 from astropy.table import Table, vstack, unique
 from astropy.time import Time
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from .. import utils
 from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
@@ -54,6 +54,42 @@ def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4), use_abs
     return p
 
 
+def calc_fiducial_p_sat_corrected(base, params=(-1.68, 1.54, -4.825, -60.219, 0.437), use_abs_r_mag=True, sat_prob_setter=None, human_selected=None):
+
+    if sat_prob_setter is None:
+        if human_selected is not None:
+            is_human_selected = QueryMaker.in1d("OBJID", human_selected)
+        elif "human_selected" in base.colnames:
+            is_human_selected = "human_selected"
+        else:
+            is_human_selected = None
+        sat_prob_setter = (
+            (Query(is_human_selected, "ZQUALITY < 2", C.gr_cut), 0.2),
+            (Query(is_human_selected, "ZQUALITY == 2", ~C.is_low_z), 0.05),
+            (Query(is_human_selected, "ZQUALITY == 2", C.is_low_z), 0.5),
+            (Query(C.is_sat, C.has_spec), 1),
+            (Query(~C.is_sat, C.has_spec), 0),
+        )
+        if is_human_selected is None:
+            sat_prob_setter = sat_prob_setter[3:]
+
+    p_new = calc_fiducial_p_sat(base, params, use_abs_r_mag=True)
+
+    for q, p in sat_prob_setter:
+        mask = q.mask(base)
+        if not mask.any():
+            continue
+        if p > 0 and p < 1:
+            p_orig = p_new[mask].copy()
+            p_orig *= 1e-3
+            p_orig -= p_orig.mean(dtype=np.float64)
+            p_new[mask] = p + p_orig
+        else:
+            p_new[mask] = p
+
+    return p_new
+
+
 class ObjectCatalog(object):
     """
     This class provides a high-level interface to access object catalogs
@@ -93,9 +129,8 @@ class ObjectCatalog(object):
         else:
             self._host_catalog = host_catalog_class(self._database)
 
-    @classmethod
     def _annotate_catalog(
-        cls, table, add_skycoord=False, ensure_all_objid_cols=False,
+        self, table, add_skycoord=False, ensure_all_objid_cols=False,
     ):
         version = 2
         if "EXTINCTION_R" in table.colnames:
@@ -125,15 +160,17 @@ class ObjectCatalog(object):
             table.rename_column("HOST_ID", "HOSTID")
 
         if ensure_all_objid_cols:
-            for s in cls._surveys:
+            for s in self._surveys:
                 col = "OBJID_{}".format(s)
                 if col not in table.colnames:
                     table[col] = -1
 
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = calc_fiducial_p_sat(table)
+            table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(table, human_selected=self._database["human_selected"].read()["OBJID"])
+
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        fill_values_by_query(table, ~good_obj, {"p_sat_approx": 0})
+        fill_values_by_query(table, ~good_obj, {"p_sat_approx": 0, "p_sat_corrected": 0})
 
         if add_skycoord:
             table = utils.add_skycoord(table)

@@ -97,6 +97,11 @@ known_google_sheets = {
     "lowz_fields": GoogleSheets(
         "1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266
     ),
+    "human_selected": GoogleSheets(
+        "1WB3aK-DOgtUuSyMQ9Eb-83tJmHsGYWSDI-vHh16Xz8g",
+        0,
+        include_names=["OBJID"],
+    ),
 }
 
 
