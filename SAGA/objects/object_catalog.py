@@ -54,7 +54,7 @@ def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4), use_abs
     return p
 
 
-def calc_fiducial_p_sat_corrected(base, params=(-1.68, 1.54, -4.825, -60.219, 0.437), use_abs_r_mag=True, sat_prob_setter=None, human_selected=None):
+def calc_fiducial_p_sat_corrected(base, params=(-1.737, 1.536, -4.984, -60.96, 0.439), use_abs_r_mag=True, sat_prob_setter=None, human_selected=None):
 
     if sat_prob_setter is None:
         if human_selected is not None:
