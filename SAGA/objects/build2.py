@@ -627,7 +627,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
             < 150.0 / SPEED_OF_LIGHT
         )
         mask_same_zq_class = (
-            specs_to_merge["ZQUALITY_sort_key"] == best_spec["ZQUALITY_sort_key"]
+            (specs_to_merge["ZQUALITY_sort_key"] == best_spec["ZQUALITY_sort_key"]) | (specs_to_merge["ZQUALITY"] >= 3)
         )
         if ((~mask_within_dz) & mask_same_zq_class).any():
             specs["matched_idx"][
