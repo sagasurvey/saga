@@ -56,6 +56,9 @@ COLUMNS_USED2 = [
 ]
 
 has_spec = Query("ZQUALITY >= 3")
+has_poor_spec = Query("ZQUALITY == 2")
+has_failed_spec = Query("ZQUALITY > -1", "ZQUALITY < 2")
+
 is_clean = Query("REMOVE == -1")
 is_clean2 = Query("REMOVE == 0")
 is_galaxy = Query("PHOTPTYPE == 3")
@@ -87,6 +90,10 @@ ugri_cut = gri_cut & ug_cut
 grz_cut = gr_cut & rz_cut
 paper1_targeting_cut = griz_cut = gri_or_grz_cut = gr_cut & ri_cut & rz_cut
 
+lsbg_cut = Query("HOST_DIST * 1000 * radius / 3600 / 90 * arccos(0) > 10 ** (-0.1 * (r_mag - log10(HOST_DIST) * 5 - 25 + 18))")
+high_priority_sb_tight = Query("sb_r + abs(sb_r_err) - 0.7 * (r_mag - 14) > 18.5") | (~valid_sb)
+gr_cut_tight = Query("gr - abs(gr_err) < 0.75") | (~valid_g_mag)
+
 high_priority_sb = Query("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14) > 18.55") | (~valid_sb)
 high_priority_gr = Query("gr - abs(gr_err) + 0.06 * (r_mag - 14) < 0.9") | (~valid_g_mag)
 high_priority_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.65") | (~valid_i_mag)
@@ -112,6 +119,8 @@ relaxed_targeting_cuts = Query(
 )
 
 very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_approx >= 1e-4"
+
+paper2_targeting_cut = high_priority_sb_tight & high_priority_gr
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")
