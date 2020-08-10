@@ -699,6 +699,8 @@ class ObjectCatalog(object):
         d["really_need_spec"] = Query(basic_targeting_cuts, C.main_targeting_cuts, ~C.has_spec)
         d["really_need_spec_strict"] = Query(d["really_need_spec"], C.faint_end_limit_strict)
         d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)
+        d["paper2_need_spec"] = Query(basic_targeting_cuts, C.paper2_targeting_cut, ~C.has_spec)
+        d["paper2_total"] = Query(basic_targeting_cuts, C.paper2_targeting_cut)
 
         d["specs_total"] = C.has_spec
         d["specs_r_limit"] = Query(C.has_spec, C.faint_end_limit)
@@ -731,6 +733,7 @@ class ObjectCatalog(object):
             data[k].append(q.count(base))
 
         data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
+        data["sats_missed_corrected"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum())
 
         return data
 
