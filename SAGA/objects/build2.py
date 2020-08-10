@@ -620,22 +620,32 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
         specs_to_merge = specs_to_merge[rank.argsort()]
         best_spec = specs_to_merge[0]
 
-        # we now check if there is any spec that is not at the same redshift as the best spec
-        # if there is, and those specs are as good as the best spec, then we push them out of this merge process
+        # We now check if there is any spec that is not at the same redshift as the best spec (mask_within_dz).
+        # If so, and those specs are good or as good as the best spec (mask_same_zq_class),
+        #        and those specs are at least 0.5 arcsec away (mask_coord_offset),
+        # then, we push them out of this merge process (to_rematch).
         mask_within_dz = (
-            np.fabs(specs_to_merge["SPEC_Z"] - best_spec["SPEC_Z"])
-            < 150.0 / SPEED_OF_LIGHT
+            np.fabs(specs_to_merge["SPEC_Z"] - best_spec["SPEC_Z"]) < 150.0 / SPEED_OF_LIGHT
         )
+
         mask_same_zq_class = (
             (specs_to_merge["ZQUALITY_sort_key"] == best_spec["ZQUALITY_sort_key"]) | (specs_to_merge["ZQUALITY"] >= 3)
         )
-        if ((~mask_within_dz) & mask_same_zq_class).any():
+
+        mask_coord_offset = (
+            SkyCoord(specs_to_merge["RA"], specs_to_merge["DEC"], unit="deg").separation(
+                SkyCoord(best_spec["RA"], best_spec["DEC"], unit="deg")
+            ).arcsec > 0.5
+        )
+
+        if ((~mask_within_dz) & mask_coord_offset & mask_same_zq_class).any():
+            to_rematch = (~mask_within_dz) & mask_coord_offset
             specs["matched_idx"][
-                specs_to_merge["index"][~mask_within_dz]
+                specs_to_merge["index"][to_rematch]
             ] = -2  # we will deal with these -2 later
-            specs_to_merge = specs_to_merge[mask_within_dz]
-            mask_same_zq_class = mask_same_zq_class[mask_within_dz]
-            mask_within_dz = mask_within_dz[mask_within_dz]
+            specs_to_merge = specs_to_merge[~to_rematch]
+            mask_same_zq_class = mask_same_zq_class[~to_rematch]
+            mask_within_dz = mask_within_dz[~to_rematch]
 
         # so now specs_to_merge has specs that are ok to merge
         # we need to find if there's NSA objects and also get SPEC_REPEAT and put those info on best spec
@@ -663,7 +673,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
 
     # print out warnings for unmatched good specs
     for spec in Query("matched_idx == -1", "ZQUALITY >= 3").filter(specs):
-        if spec["TELNAME"] in ("AAT", "MMT", "IMACS", "WIYN", "SDSS", "NSA"):
+        if spec["TELNAME"] in ("AAT", "MMT", "BINO", "IMACS", "WIYN", "SDSS", "NSA", "PAL", "SALT"):
             logging.warning(
                 "No photo obj matched to {0[TELNAME]} spec {0[MASKNAME]} {0[SPECOBJID]} ({0[RA]}, {0[DEC]})".format(
                     spec
