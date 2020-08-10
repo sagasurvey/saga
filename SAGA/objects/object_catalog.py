@@ -165,12 +165,15 @@ class ObjectCatalog(object):
                 if col not in table.colnames:
                     table[col] = -1
 
+        p_sat_dict = {"p_sat_approx": 0}
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = calc_fiducial_p_sat(table)
-            table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(table, human_selected=self._database["human_selected"].read()["OBJID"])
+            if "HOST_DIST" in table.colnames:
+                table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(table, human_selected=self._database["human_selected"].read()["OBJID"])
+                p_sat_dict["p_sat_corrected"] = 0
 
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        fill_values_by_query(table, ~good_obj, {"p_sat_approx": 0, "p_sat_corrected": 0})
+        fill_values_by_query(table, ~good_obj, p_sat_dict)
 
         if add_skycoord:
             table = utils.add_skycoord(table)
