@@ -26,6 +26,7 @@ __all__ = [
     "find_near_ra_dec",
     "makedirs_if_needed",
     "group_by",
+    "decode_flag",
 ]
 
 
@@ -243,3 +244,8 @@ def group_by(x, is_sorted=False):
         edges = np.flatnonzero(np.hstack([[1], np.ediff1d(x[sorter]), [1]]))
         for i, j in zip(edges[:-1], edges[1:]):
             yield sorter[i:j]
+
+
+def decode_flag(flag, offset=0):
+    flag = int(flag)
+    return [i + offset for i in range(int(np.floor(np.log2(flag))) + 1) if (flag & (1 << i))]
