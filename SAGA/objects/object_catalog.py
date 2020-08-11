@@ -477,16 +477,17 @@ class ObjectCatalog(object):
             ("sdss", "SDSS ID"),
             ("des", "DES_OBJID"),
             ("decals", "decals_objid"),
+            ("shreds", "OBJID"),
         ):
             for list_type in ("remove", "recover"):
                 key = "{}_{}".format(survey, list_type)
                 try:
-                    val = get_unique_objids(self._database[key].read()[col])
+                    mlist = self._database[key]
                 except KeyError:
-                    pass
-                else:
-                    if len(val):
-                        manual_lists[key] = val
+                    continue
+                val = get_unique_objids(mlist.read()[col])
+                if len(val):
+                    manual_lists[key] = val
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
         failed_count = 0

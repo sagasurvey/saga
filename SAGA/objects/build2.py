@@ -11,7 +11,7 @@ import numexpr as ne
 import numpy as np
 from astropy.coordinates import SkyCoord, search_around_sky
 from astropy.table import join, vstack
-from easyquery import Query
+from easyquery import Query, QueryMaker
 from fast3tree import find_friends_of_friends
 
 from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
@@ -748,7 +748,7 @@ def _join_spec_repeat(current, new):
     return "+".join(set(sum((s.split("+") for s in new), current.split("+"))))
 
 
-def remove_shreds_near_spec_obj(base, nsa=None):
+def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
     has_nsa = Query("OBJ_NSAID > -1")
     has_spec_z = Query(
@@ -860,6 +860,9 @@ def remove_shreds_near_spec_obj(base, nsa=None):
         )
         to_remove = close_spec_z | Query(remove_basic_conditions, is_fainter, "ZQUALITY < 2")
 
+        if shreds_recover is not None:
+            to_remove = to_remove & QueryMaker.in1d("OBJID", shreds_recover, invert=True)
+
         to_remove_count = to_remove.count(nearby_obj)
         if not to_remove_count:
             continue
@@ -966,6 +969,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     decals_recover=None,
     spectra=None,
     halpha=None,
+    shreds_recover=None,
     convert_to_sdss_filters=True,
     debug=None,
     **kwargs
@@ -1029,7 +1033,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     if len(all_spectra):
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
-        base = remove_shreds_near_spec_obj(base, nsa)
+        base = remove_shreds_near_spec_obj(base, nsa, shreds_recover=shreds_recover)
         del nsa
 
     if "RHOST_KPC" in base.colnames:  # has host info
