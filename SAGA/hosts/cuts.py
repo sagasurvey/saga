@@ -52,9 +52,11 @@ paper1 = QueryMaker.in1d(
 )
 paper1_observed = paper1
 
-paper2_observed = Query("specs_ours_rvir >= 100", good_hosts)
+paper2_observed = observed = Query("specs_ours_rvir >= 100", good_hosts)
 paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
-paper2_complete_definition = Query("really_need_spec < 40", "sats_missed_approx < 0.33")
+paper2_complete_definition_old = Query("really_need_spec < 40", "sats_missed_approx < 0.33")
+paper2_complete_definition = Query("paper2_need_spec / paper2_total < 0.2")
+paper2_complete_old = Query(paper2_observed, paper2_complete_definition_old)
 paper2_complete = Query(paper2_observed, paper2_complete_definition)
 paper2_incomplete = Query(paper2_observed, ~paper2_complete)
-paper2 = paper2_observed
+paper2 = paper2_complete
