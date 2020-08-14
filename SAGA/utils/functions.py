@@ -161,7 +161,13 @@ def find_near_coord(table, coord, within_arcsec=3.0):
     -------
     table : astropy.table.Table
     """
+    remove_coord = False
+    if "coord" not in table.colnames:
+        table = add_skycoord(table)
+        remove_coord = True
     sep = table["coord"].separation(coord).arcsec
+    if remove_coord:
+        del table["coord"]
     nearby_indices = np.flatnonzero(sep < within_arcsec)
     nearby_indices = nearby_indices[sep[nearby_indices].argsort()]
     return table[nearby_indices]
