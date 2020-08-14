@@ -1,13 +1,36 @@
 from IPython.display import display_html
+from astropy.io import ascii
+try:
+    import pyperclip
+except ImportError:
+    _HAS_CLIP = False
+else:
+    _HAS_CLIP = True
 
-__all__ = ["print_for_viewer", "show_images"]
+__all__ = ["print_for_viewer", "read_marks_from_clipboard", "show_images"]
 
 
 def print_for_viewer(table, keys=("OBJID", "RA", "DEC"), additional_keys=None):
     keys = list(keys)
     if additional_keys:
         keys.extend(additional_keys)
-    table[keys].pprint(-1, -1)
+    output = "\n".join(table[keys].pformat_all(-1, -1))
+    if _HAS_CLIP:
+        pyperclip.copy(output)
+    print(output)
+
+
+def read_marks_from_clipboard(extract_marked_value=True, extract_cols="objid", marked_col_name="marked"):
+    if not _HAS_CLIP:
+        raise RuntimeError("needs pyperclip to work")
+    t = ascii.read(table=pyperclip.paste(), format="fast_tab")
+    if extract_marked_value is True or extract_marked_value is False:
+        extract_marked_value = str(extract_marked_value).lower()
+    if extract_marked_value is not None:
+        t = t[t[marked_col_name] == extract_marked_value]
+    if extract_cols is not None:
+        t = t[extract_cols]
+    return t
 
 
 def show_images(
