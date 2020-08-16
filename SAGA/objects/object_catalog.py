@@ -28,7 +28,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4), use_abs_r_mag=False):
+def calc_fiducial_p_sat(base, params=(-1.946, 1.522, -5.6, -0.316, 0.456), use_abs_r_mag=False):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -54,40 +54,32 @@ def calc_fiducial_p_sat(base, params=(-1.977, 1.372, -5.95, 3.979, 0.4), use_abs
     return p
 
 
-def calc_fiducial_p_sat_corrected(base, params=(-1.737, 1.536, -4.984, -60.96, 0.439), use_abs_r_mag=True, sat_prob_setter=None, human_selected=None):
+def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.25, **kwargs):
 
-    if sat_prob_setter is None:
-        if human_selected is not None:
-            is_human_selected = QueryMaker.in1d("OBJID", human_selected)
-        elif "human_selected" in base.colnames:
-            is_human_selected = "human_selected"
+    p = calc_fiducial_p_sat(base, **kwargs)
+
+    if human_selected is not None:
+        mask = Query(~C.has_spec, QueryMaker.in1d("OBJID", human_selected)).mask(base)
+    elif "human_selected" in base.colnames:
+        mask = Query(~C.has_spec, "human_selected > 0").mask(base)
+    else:
+        mask = None
+
+    if mask is not None:
+        p_orig = p[mask]
+        if callable(bias):
+            p[mask] = bias(p_orig)
+        elif bias > 1:
+            p[mask] = bias * p_orig / (1 + (bias - 1) * p_orig)
+        elif bias > 0 and bias < 1:
+            p[mask] = p_orig * (1 - bias) + bias
         else:
-            is_human_selected = None
-        sat_prob_setter = (
-            (Query(is_human_selected, "ZQUALITY < 2", C.gr_cut), 0.2),
-            (Query(is_human_selected, "ZQUALITY == 2", ~C.is_low_z), 0.05),
-            (Query(is_human_selected, "ZQUALITY == 2", C.is_low_z), 0.5),
-            (Query(C.is_sat, C.has_spec), 1),
-            (Query(~C.is_sat, C.has_spec), 0),
-        )
-        if is_human_selected is None:
-            sat_prob_setter = sat_prob_setter[3:]
+            raise ValueError("bias not correctly specified")
 
-    p_new = calc_fiducial_p_sat(base, params, use_abs_r_mag=True)
+    p[Query(C.has_spec, C.is_sat).mask(base)] = 1
+    p[Query(C.has_spec, ~C.is_sat).mask(base)] = 0
 
-    for q, p in sat_prob_setter:
-        mask = q.mask(base)
-        if not mask.any():
-            continue
-        if p > 0 and p < 1:
-            p_orig = p_new[mask].copy()
-            p_orig *= 1e-3
-            p_orig -= p_orig.mean(dtype=np.float64)
-            p_new[mask] = p + p_orig
-        else:
-            p_new[mask] = p
-
-    return p_new
+    return p
 
 
 class ObjectCatalog(object):
