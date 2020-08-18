@@ -28,7 +28,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.946, 1.522, -5.6, -0.316, 0.456), use_abs_r_mag=False):
+def calc_fiducial_p_sat(base, params=(-1.973, 1.518, -5.584, 0.357, 0.483), use_abs_r_mag=False):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -166,6 +166,9 @@ class ObjectCatalog(object):
 
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
         fill_values_by_query(table, ~good_obj, p_sat_dict)
+
+        # sat def fix  TODO: remove later
+        fill_values_by_query(table, Query(good_obj, C.has_spec, C.sat_rcut, C.sat_vcut, "SATS != 3"), {"SATS": 1})
 
         if add_skycoord:
             table = utils.add_skycoord(table)
