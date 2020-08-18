@@ -72,7 +72,7 @@ r_abs_limit = Query("Mr < -12.295")
 
 faint_end_limit_strict = Query("r_mag - log10(HOST_DIST)*5 - 25 < -12", faint_end_limit)
 
-sat_vcut = Query("abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 250.0")
+sat_vcut = Query("abs(SPEC_Z * 2.99792458e5 - HOST_VHOST) < 275.0")
 sat_rcut = Query("RHOST_KPC < 300.0")
 
 valid_u_mag = Query("u_mag > 0", "u_mag < 30")
