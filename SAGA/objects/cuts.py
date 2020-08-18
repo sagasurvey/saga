@@ -99,7 +99,7 @@ high_priority_gr = Query("gr - abs(gr_err) + 0.06 * (r_mag - 14) < 0.9") | (~val
 high_priority_ri = Query("ri - abs(ri_err) + 0.06 * (r_mag - 14) < 0.65") | (~valid_i_mag)
 high_priority_rz = Query("rz - abs(rz_err) + 0.06 * (r_mag - 14) < 0.85") | (~valid_z_mag)
 
-relaxed_cut_sb = Query("sb_r + abs(sb_r_err)*2 - 0.6 * (r_mag - 14) > 18") | (~valid_sb)
+relaxed_cut_sb = Query("sb_r + abs(sb_r_err)*2 - 0.6 * (r_mag - 14) > 18.5") | (~valid_sb)
 relaxed_cut_gr = Query("gr - abs(gr_err)*2 + 0.06 * (r_mag - 14) < 1.1") | (~valid_g_mag)
 relaxed_cut_ri = Query("ri - abs(ri_err)*2 + 0.06 * (r_mag - 14) < 0.85") | (~valid_i_mag)
 relaxed_cut_rz = Query("rz - abs(rz_err)*2 + 0.06 * (r_mag - 14) < 1.05") | (~valid_z_mag)

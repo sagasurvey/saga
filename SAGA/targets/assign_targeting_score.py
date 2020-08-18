@@ -506,20 +506,20 @@ def assign_targeting_score_v2plus(
     very_low_sb_cut = Query(
         "r_mag < 20.8",
         C.valid_sb,
-        QueryMaker.equals("survey", "des") | C.main_targeting_cuts,
+        QueryMaker.equals("survey", "des") | C.paper2_targeting_cut,
         Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
     )
 
-    tier_1 = Query(exclusion_cuts, bright | very_low_sb_cut | "p_sat_approx >= 0.1")
-    tier_2 = Query(exclusion_cuts, C.main_targeting_cuts, "p_sat_approx >= 0.0007")
-    tier_3 = C.relaxed_targeting_cuts | "p_sat_approx >= 0.0001"
+    tier_1 = Query(exclusion_cuts, bright | very_low_sb_cut | "p_sat_corrected >= 0.1")
+    tier_2 = Query(exclusion_cuts, C.paper2_targeting_cut, "p_sat_corrected >= 0.0007")
+    tier_3 = C.relaxed_targeting_cuts | "p_sat_corrected >= 0.0001"
 
     fill_values_by_query(base, Query(C.sat_rcut, "r_mag < 21"), {"TARGETING_SCORE": 900})
     fill_values_by_query(base, Query(basic_loose, tier_2), {"TARGETING_SCORE": 890})
     fill_values_by_query(base, basic, {"TARGETING_SCORE": 800})
     fill_values_by_query(base, Query(basic, tier_3), {"TARGETING_SCORE": 700})
     fill_values_by_query(base, Query(basic_loose, tier_1), {"TARGETING_SCORE": 600})
-    fill_values_by_query(base, Query(basic, C.main_targeting_cuts), {"TARGETING_SCORE": 400})
+    fill_values_by_query(base, Query(basic, C.paper2_targeting_cut), {"TARGETING_SCORE": 400})
     fill_values_by_query(base, Query(basic, tier_2), {"TARGETING_SCORE": 300})
     fill_values_by_query(base, Query(basic, tier_1), {"TARGETING_SCORE": 200})
 
@@ -571,7 +571,7 @@ def assign_targeting_score_v2plus(
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 500
 
-    p = np.round(np.abs(np.log10(np.maximum(base["p_sat_approx"], 1e-9))) * 10)
+    p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
     p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
     base["TARGETING_SCORE"] += np.where((base["TARGETING_SCORE"] >= 200) & (base["TARGETING_SCORE"] < 890), p, p // 10)
 
