@@ -449,7 +449,7 @@ def assign_targeting_score_v2plus(
      200 within host & r < 20.75, bright in primary targeting region -OR- very low SB -OR- very high p_sat
      300 within host & r < 20.75, primary targeting region, the higher p_sat half
      400 within host & r < 20.75, primary targeting region, the lower p_sat half
-     500 within host & bright (non-primary) -OR- outwith host & bright in primary targeting region
+     500 within host & bright (relaxed) -OR- outwith host & bright in primary targeting region
      600 outwith host & r < 20.75, main targeting cuts, limit to 100
      700 within host, relaxed targeting cuts (i.e., slightly outside of primary targeting region)
      800 within host, everything else in griz cuts
@@ -518,7 +518,7 @@ def assign_targeting_score_v2plus(
     fill_values_by_query(base, Query(basic), {"TARGETING_SCORE": 800})
     fill_values_by_query(base, Query(basic, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 700})
     fill_values_by_query(base, Query(basic_loose, C.faint_end_limit, main_targeting_cuts), {"TARGETING_SCORE": 600})
-    fill_values_by_query(base, Query(basic_loose, bright), {"TARGETING_SCORE": 500})
+    fill_values_by_query(base, Query(basic_loose, bright_main) | Query(basic, bright, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 500})
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
     fill_values_by_query(base, Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"), {"TARGETING_SCORE": 200})
 
