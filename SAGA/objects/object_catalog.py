@@ -168,7 +168,7 @@ class ObjectCatalog(object):
         fill_values_by_query(table, ~good_obj, p_sat_dict)
 
         # sat def fix  TODO: remove later
-        fill_values_by_query(table, Query(good_obj, C.has_spec, C.sat_rcut, C.sat_vcut, "SATS != 3"), {"SATS": 1})
+        fill_values_by_query(table, Query(good_obj, C.has_spec, C.sat_rcut, C.sat_vcut, "SATS != 3", "SATS != 5"), {"SATS": 1})
 
         if add_skycoord:
             table = utils.add_skycoord(table)

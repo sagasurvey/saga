@@ -4,7 +4,7 @@ import numexpr as ne
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, join
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from ..external.calc_kcor import calc_kcor
 from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
@@ -830,6 +830,10 @@ def find_satellites(base, version=1):
     fill_values_by_query(base, removed_obj & C.is_low_z, {"SATS": 92})
     fill_values_by_query(base, removed_obj & C.is_very_low_z, {"SATS": 94})
     fill_values_by_query(base, removed_obj & C.sat_rcut & C.sat_vcut, {"SATS": 91})
+
+    # fixes for overlapping hosts
+    if base["HOSTID"][0] == "pgc67817":  # overlapping with pgc67782
+        fill_values_by_query(base, QueryMaker.in1d("OBJID", [247126789, 247129294]) & "SATS == 1", {"SATS": 5})
 
     return base
 
