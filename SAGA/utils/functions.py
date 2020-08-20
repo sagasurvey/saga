@@ -27,6 +27,7 @@ __all__ = [
     "makedirs_if_needed",
     "group_by",
     "decode_flag",
+    "join_str_arr",
 ]
 
 
@@ -251,3 +252,11 @@ def group_by(x, is_sorted=False):
 def decode_flag(flag, offset=0):
     flag = int(flag)
     return [i + offset for i in range(int(np.floor(np.log2(flag))) + 1) if (flag & (1 << i))]
+
+
+def join_str_arr(*arrays):
+    arrays_iter = iter(arrays)
+    a = next(arrays_iter)
+    for b in arrays_iter:
+        a = np.char.add(a, b)
+    return a
