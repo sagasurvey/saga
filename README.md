@@ -6,6 +6,16 @@ to determine dwarf galaxy satellite systems around 100 Milky Way analogs down
 to the brightness of the Leo I galaxy (Mr < −12.3).
 
 This `SAGA` package contains code to generate and access SAGA data catalogs.
+This package is intended for SAGA internal use, but it is licensed under the 
+MIT license. 
+If you use this package or part of it in your research, please considering citing
+SAGA Stage II paper (Mao et al. 2020).
+
+- Visit [yymao/FoFCatalogMatching](https://github.com/yymao/FoFCatalogMatching) 
+  if you are looking for the friends-of-friends sky catalog matching code.
+- Visit [yymao.github.io/decals-image-list-tool/](https://yymao.github.io/decals-image-list-tool/) 
+  if you are looking for the web app for listing cutouts from the egacy Surveys.
+- Visit [sagasurvey.org](https://sagasurvey.org) for the most up-to-date SAGA results! 
 
 
 ## Installation
