@@ -1,5 +1,6 @@
 SAGA
 ====
+[![arXiv:2008.12783](https://img.shields.io/badge/astro--ph.GA-arXiv%3A2008.12783-B31B1B.svg)](https://arxiv.org/abs/2008.12783)
 
 The [SAGA Survey](http://sagasurvey.org/) is a spectroscopic survey that aims
 to determine dwarf galaxy satellite systems around 100 Milky Way analogs down
