@@ -26,6 +26,12 @@ _list_by_pgc = {
     ),
     'paper1_complete': (9988, 23028, 52735, 55588, 58470, 68743, 70795, 71883),
     'paper1_incomplete': (279, 4948, 28805, 31166, 37845, 38031, 38802, 53499),
+    'paper2_complete': (
+        4948, 9988, 12626, 13646, 18880, 23028, 26246, 27635, 27723,
+        35294, 37483, 38802, 40284, 41083, 48815, 49342, 50031, 51340,
+        51471, 51620, 52273, 52735, 53499, 54119, 55588, 58470, 59426,
+        64725, 66318, 66934, 67782, 67817, 68743, 69349, 70795, 71883,
+    )
     # fmt: on
 }
 
@@ -52,11 +58,12 @@ paper1 = QueryMaker.in1d(
 )
 paper1_observed = paper1
 
-paper2_observed = observed = Query("specs_ours_rvir >= 100", good_hosts)
-paper2_bright_complete = Query(paper2_observed, "really_need_spec_bright < 2")
-paper2_complete_definition_old = Query("really_need_spec < 40", "sats_missed_approx < 0.33")
-paper2_complete_definition = Query("paper2_need_spec / paper2_total < 0.2")
-paper2_complete_old = Query(paper2_observed, paper2_complete_definition_old)
-paper2_complete = Query(paper2_observed, paper2_complete_definition)
-paper2_incomplete = Query(paper2_observed, ~paper2_complete)
-paper2 = paper2_complete
+paper2 = paper2_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper2_complete"])
+
+observed_definition = Query("specs_ours_rvir >= 100")
+complete_definition = Query("paper2_need_spec / paper2_total < 0.2")
+
+observed = good & observed_definition
+unobserved = good & (~observed_definition)
+complete = observed & complete_definition
+incomplete = observed & (~complete_definition)
