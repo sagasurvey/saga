@@ -47,6 +47,7 @@ MERGED_CATALOG_COLUMNS = list(
             "morphology_info",
             "radius",
             "radius_err",
+            "b_to_a",
         ),
         (b + "_mag" for b in "ugrizy"),
         (b + "_err" for b in "ugrizy"),
@@ -132,6 +133,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
         )
     catalog["y_mag"] = 99.0
     catalog["y_err"] = 99.0
+    catalog["b_to_a"] = -1.0
 
     catalog["is_galaxy"] = catalog["PHOTPTYPE"] == 3
     catalog["morphology_info"] = catalog["PHOTPTYPE"].astype(np.int32)
@@ -225,6 +227,11 @@ def prepare_des_catalog_for_merging(
     catalog["u_mag"] = 99.0
     catalog["u_err"] = 99.0
 
+    try:
+        catalog["b_to_a"] = catalog["B_IMAGE"] / catalog["A_IMAGE"]
+    except KeyError:
+        catalog["b_to_a"] = -1.0
+
     remove_queries = [
         "imaflags_iso_r != 0",
         "flags_r >= 4",
@@ -271,6 +278,13 @@ def prepare_decals_catalog_for_merging(
         },
         {},
     )
+
+    e_tot = (
+        catalog["FRACDEV"] * np.hypot(catalog["SHAPEDEV_E1"], catalog["SHAPEDEV_E1"])
+        + (1.0 - catalog["FRACDEV"]) * np.hypot(catalog["SHAPEEXP_E1"], catalog["SHAPEEXP_E2"])
+    )
+    catalog["b_to_a"] = (1 - e_tot) / (1 + e_tot)
+
     del mask
     fill_values_by_query(
         catalog,
