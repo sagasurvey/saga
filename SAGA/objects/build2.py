@@ -228,7 +228,7 @@ def prepare_des_catalog_for_merging(
     catalog["u_err"] = 99.0
 
     try:
-        catalog["b_to_a"] = catalog["B_IMAGE"] / catalog["A_IMAGE"]
+        catalog["b_to_a"] = catalog["b_image"] / catalog["a_image"]
     except KeyError:
         catalog["b_to_a"] = -1.0
 
