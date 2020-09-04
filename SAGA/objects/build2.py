@@ -280,10 +280,10 @@ def prepare_decals_catalog_for_merging(
     )
 
     e_tot = (
-        catalog["FRACDEV"] * np.hypot(catalog["SHAPEDEV_E1"], catalog["SHAPEDEV_E1"])
+        catalog["FRACDEV"] * np.hypot(catalog["SHAPEDEV_E1"], catalog["SHAPEDEV_E2"])
         + (1.0 - catalog["FRACDEV"]) * np.hypot(catalog["SHAPEEXP_E1"], catalog["SHAPEEXP_E2"])
     )
-    catalog["b_to_a"] = (1 - e_tot) / (1 + e_tot)
+    catalog["b_to_a"] = np.sqrt((1 - e_tot) / (1 + e_tot))
 
     del mask
     fill_values_by_query(
