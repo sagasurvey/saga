@@ -564,15 +564,26 @@ def assign_targeting_score_v2plus(
     base.sort(["TARGETING_SCORE", "p_sort"])
     del base["p_sort"]
 
-    n = Query("TARGETING_SCORE == 300").count(base)
-    if n:
-        p_cut = Query("TARGETING_SCORE == 300").filter(base, "p_sat_corrected")[n // 2]
-        fill_values_by_query(base, Query("TARGETING_SCORE == 300", "p_sat_corrected < {}".format(p_cut)), {"TARGETING_SCORE": 400})
-
-    n = Query("TARGETING_SCORE == 600").count(base)
-    if n > 100:
-        p_cut = Query("TARGETING_SCORE == 600").filter(base, "p_sat_corrected")[99]
-        fill_values_by_query(base, Query("TARGETING_SCORE == 600", "p_sat_corrected < {}".format(p_cut)), {"TARGETING_SCORE": 1000})
+    for score_to_limit, new_score, n_limit, random_choice in (
+        (300, 400, 0, False),
+        (600, 1000, 100, False),
+        (700, 800, 100, False),
+        (800, 900, 200, True),
+    ):
+        score_this = Query("TARGETING_SCORE == {}".format(score_to_limit))
+        n = score_this.count(base)
+        if n > n_limit:
+            if random_choice:
+                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
+                base["TARGETING_SCORE"][idx] = new_score
+            else:
+                n_cut = (n_limit - 1) if n_limit else (n // 2)
+                p_cut = score_this.filter(base, "p_sat_corrected")[n_cut]
+                fill_values_by_query(
+                    base,
+                    Query(score_this, (lambda p: p < p_cut, "p_sat_corrected")),
+                    {"TARGETING_SCORE": new_score},
+                )
 
     p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
     p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
