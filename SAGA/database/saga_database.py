@@ -80,7 +80,7 @@ known_google_sheets = {
         1594861456,
         include_names=["OBJID"],
     ),
-    "manual_targets_aat2020a": GoogleSheets(
+    "manual_targets_aat2020a_may": GoogleSheets(
         "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
         799699553,
         include_names=["OBJID"],
@@ -90,7 +90,7 @@ known_google_sheets = {
         440730178,
         include_names=["OBJID"],
     ),
-    "manual_targets_aat2020b": GoogleSheets(
+    "manual_targets_aat2020a_jul": GoogleSheets(
         "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
         687508250,
         include_names=["OBJID"],
@@ -108,6 +108,9 @@ known_google_sheets = {
         382210667,
     ),
 }
+
+known_google_sheets["manual_targets_mmt2020c"] = known_google_sheets["manual_targets_mmt2020b"]
+known_google_sheets["manual_targets_aat2020b"] = known_google_sheets["manual_targets_mmt2020b"]
 
 
 class Database(object):
