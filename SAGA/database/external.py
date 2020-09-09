@@ -548,13 +548,32 @@ class DecalsQuery(DownloadableBase):
         decals_base_dir="/global/project/projectdirs/cosmo/data/legacysurvey",
     ):
 
-        self.sweep_dir = os.path.join(
-            decals_base_dir, decals_dr, "sweep", decals_dr[-1] + ".0"
+        try:
+            dr_number = int(decals_dr)
+        except ValueError:
+            dr_number = int(decals_dr[-1])
+        decals_dr = "dr{}".format(dr_number)
+
+        if dr_number not in (6, 7, 8):
+            raise ValueError("{} not supported".format(decals_dr))
+
+        sweep_dir = os.path.join(
+            decals_base_dir, decals_dr, "sweep", "{}.0".format(dr_number)
         )
-        if not os.path.isdir(self.sweep_dir):
-            raise ValueError(
-                "DECaLS sweep directory {} does not exist!".format(self.sweep_dir)
-            )
+
+        if dr_number >= 8:
+            self.sweep_dirs = [
+                sweep_dir.replace("/sweep/", "/north/sweep/"),
+                sweep_dir.replace("/sweep/", "/south/sweep/")
+            ]
+        else:
+            self.sweep_dirs = [sweep_dir]
+
+        for sweep_dir in self.sweep_dirs:
+            if not os.path.isdir(sweep_dir):
+                raise ValueError(
+                    "DECaLS sweep directory {} does not exist!".format(sweep_dir)
+                )
 
         self.ra = ensure_deg(ra)
         self.dec = ensure_deg(dec)
@@ -600,31 +619,30 @@ class DecalsQuery(DownloadableBase):
 
     def get_decals_catalog(self):
         output = []
-        for filename in sorted(os.listdir(self.sweep_dir)):
-            if not filename.startswith("sweep-"):
-                continue
-            if not self.is_within(
-                self.ra,
-                self.dec,
-                *self.get_ra_dec_range(filename),
-                margin_ra=self.radius
-                * 1.01
-                / max(np.cos(np.deg2rad(self.dec)), 1.0e-8),
-                margin_dec=self.radius * 1.01,
-            ):
-                continue
+        for sweep_dir in self.sweep_dirs:
+            for filename in sorted(os.listdir(sweep_dir)):
+                if not filename.startswith("sweep-") or not filename.endswith(".fits"):
+                    continue
+                if not self.is_within(
+                    self.ra,
+                    self.dec,
+                    *self.get_ra_dec_range(filename),
+                    margin_ra=(self.radius * 1.01 / max(np.cos(np.deg2rad(self.dec)), 1.0e-8)),
+                    margin_dec=(self.radius * 1.01),
+                ):
+                    continue
 
-            d = FitsTable(os.path.join(self.sweep_dir, filename)).read()
-            sep = (
-                SkyCoord(d["RA"], d["DEC"], unit="deg")
-                .separation(SkyCoord(self.ra, self.dec, unit="deg"))
-                .deg
-            )
-            d = d[sep <= self.radius]
-            if len(d):
-                output.append(d)
+                d = FitsTable(os.path.join(sweep_dir, filename)).read()
+                sep = (
+                    SkyCoord(d["RA"], d["DEC"], unit="deg")
+                    .separation(SkyCoord(self.ra, self.dec, unit="deg"))
+                    .deg
+                )
+                d = d[sep <= self.radius]
+                if len(d):
+                    output.append(d)
+                del d
 
-        del d
         if not output:
             return Table()
 
