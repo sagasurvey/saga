@@ -574,7 +574,7 @@ def assign_targeting_score_v2plus(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
+                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)  # pylint: disable=no-member
                 base["TARGETING_SCORE"][idx] = new_score
             else:
                 n_cut = (n_limit - 1) if n_limit else (n // 2)
