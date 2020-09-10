@@ -1,16 +1,14 @@
-name: Python package
+name: Python CI Test
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
-  build:
-
+  ci-test:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
       matrix:
         python-version: [3.7]
-
     steps:
     - uses: actions/checkout@v2
     - name: Cache Python packages
@@ -21,9 +19,10 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-py${{ matrix.python-version }}-pip-
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+        architecture: x64
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -39,7 +38,7 @@ jobs:
       run: |
         pip install pylint
         # stop the build if there are Pylint errors
-        pylint --disable=all --enable=F,E *.py SAGA
+        pylint --disable=all --enable=F,E,unreachable,duplicate-key,unnecessary-semicolon,global-variable-not-assigned,unused-variable,binary-op-exception,bad-format-string,anomalous-backslash-in-string,bad-open-mode --extension-pkg-whitelist=numpy --init-hook='import sys; sys.setrecursionlimit(8 * sys.getrecursionlimit())' SAGA
     - name: Test with pytest
       run: |
         pip install pytest
