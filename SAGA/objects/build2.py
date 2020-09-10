@@ -1041,10 +1041,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     if all_spectra:
         all_spectra = vstack(all_spectra, "exact")
 
+    if len(all_spectra):
     if halpha is not None:
         all_spectra = add_halpha_to_spectra(all_spectra, halpha)
-
-    if len(all_spectra):
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa, shreds_recover=shreds_recover)
