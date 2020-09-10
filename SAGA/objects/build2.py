@@ -251,10 +251,25 @@ def prepare_des_catalog_for_merging(
 def prepare_decals_catalog_for_merging(
     catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True
 ):
-    catalog["OBJID"] = np.array(catalog["BRICKID"], dtype=np.int64) * int(
-        1e13
-    ) + np.array(catalog["OBJID"], dtype=np.int64)
+    """
+    Ref:
+    - DR6/7: https://www.legacysurvey.org/dr7/files/#sweep-7-0-sweep-brickmin-brickmax-fits
+    - DR8:   https://www.legacysurvey.org/dr8/files/#sweep-catalogs-region-sweep
+    """
+    is_dr8plus = (catalog["RELEASE"][0] >= 8000)
+
+    if is_dr8plus:
+        catalog["OBJID"] = (
+            (catalog["RELEASE"] // 100) * np.int64(1e16)
+            + catalog["BRICKID"] * np.int64(1e10)
+            + catalog["OBJID"].astype(np.int64)
+        )
+    else:
+        catalog["OBJID"] = catalog["BRICKID"] * np.int64(1e13) + catalog["OBJID"].astype(np.int64)
+
     catalog["is_galaxy"] = catalog["TYPE"] != "PSF"
+    if is_dr8plus:
+        catalog["is_galaxy"] &= catalog["TYPE"] != "DUP"
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
     catalog["radius"] = (
         catalog["FRACDEV"] * catalog["SHAPEDEV_R"]
@@ -263,7 +278,7 @@ def prepare_decals_catalog_for_merging(
     catalog["radius_err"] = np.float32(0)
     mask = catalog["TYPE"] == "DEV"
     catalog["radius_err"][mask] = 1.0 / np.sqrt(catalog["SHAPEDEV_R_IVAR"][mask])
-    mask = catalog["TYPE"] == "EXP"
+    mask = (catalog["TYPE"] == "EXP") | (catalog["TYPE"] == "REX")
     catalog["radius_err"][mask] = 1.0 / np.sqrt(catalog["SHAPEEXP_R_IVAR"][mask])
     mask = catalog["TYPE"] == "COMP"
     catalog["radius_err"][mask] = ne.evaluate(
@@ -278,6 +293,7 @@ def prepare_decals_catalog_for_merging(
         },
         {},
     )
+    del mask
 
     e_tot = (
         catalog["FRACDEV"] * np.hypot(catalog["SHAPEDEV_E1"], catalog["SHAPEDEV_E2"])
@@ -285,7 +301,6 @@ def prepare_decals_catalog_for_merging(
     )
     catalog["b_to_a"] = np.sqrt((1 - e_tot) / (1 + e_tot))
 
-    del mask
     fill_values_by_query(
         catalog,
         Query("radius > 0", ~Query((np.isfinite, "radius_err"))),
@@ -327,6 +342,19 @@ def prepare_decals_catalog_for_merging(
         Query("is_galaxy", "radius < 10.0**(-0.2 * (r_mag - 17))"),
         "r_mag >= 25",
     ]
+
+    if is_dr8plus:
+        remove_queries = [
+            "NOBS_R <= 0",
+            "FLUX_IVAR_R <= 0",
+            (lambda *x: np.stack(x).any(axis=0), "ALLMASK_G", "ALLMASK_R", "ALLMASK_Z"),
+            (lambda *x: np.median(np.stack(x), axis=0) >= 0.35, "FRACMASKED_G", "FRACMASKED_R", "FRACMASKED_Z"),
+            (lambda *x: np.median(np.stack(x), axis=0) >= 5, "FRACFLUX_G", "FRACFLUX_R", "FRACFLUX_Z"),
+            Query("RCHISQ_W1 >= 50", (lambda *x: np.median(np.stack(x), axis=0) >= 50, "RCHISQ_G", "RCHISQ_R", "RCHISQ_Z")),
+            Query("NOBS_G > 0", "FLUX_IVAR_G > 0", Query("g_mag - r_mag < -1") | "g_mag - r_mag > 4"),
+            Query("NOBS_Z > 0", "FLUX_IVAR_Z > 0", Query("r_mag - z_mag < -1") | "r_mag - z_mag > 4"),
+            "r_mag >= 25",
+        ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
     return catalog[MERGED_CATALOG_COLUMNS]
@@ -1041,10 +1069,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     if all_spectra:
         all_spectra = vstack(all_spectra, "exact")
 
-    if halpha is not None:
-        all_spectra = add_halpha_to_spectra(all_spectra, halpha)
-
     if len(all_spectra):
+        if halpha is not None:
+            all_spectra = add_halpha_to_spectra(all_spectra, halpha)
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa, shreds_recover=shreds_recover)

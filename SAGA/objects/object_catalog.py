@@ -539,7 +539,9 @@ class ObjectCatalog(object):
                     catalogs.append("sdss")
                 if _get("DES_DR1") >= 0.85:
                     catalogs.append("des")
-                if max(_get("DECALS_DR6"), _get("DECALS_DR7")) >= 0.95:
+                if (max(_get("DECALS_DR6"), _get("DECALS_DR7")) >= 0.95 or (
+                    'dr8' in self._database.decals_file_path_pattern and _get("DECALS_DR8") >= 0.95
+                )):
                     catalogs.append("decals")
                 catalogs = tuple(catalogs)
 
