@@ -1,5 +1,4 @@
 import os
-from builtins import print as builtin_print
 
 import numpy as np
 import requests
@@ -36,11 +35,10 @@ def get_gaia_guidestars(
     `magrng` is the range of magnitudes to actually select on.  It's ~r-band, based on the
     Evans et al. 2018 r-to-G conversion
     """
-    print = builtin_print
     if not verbose:
-        print = lambda *args, **kwargs: None
+        def print(*args, **kwargs):
+            pass
 
-    host = host_catalog.load_single(hostname)
     obj_cat = object_catalog.load(hostname)[0]
     omag = obj_cat["r_mag"]
     gaia_cat = table.Table.read(
@@ -112,11 +110,10 @@ def get_gaia_guidestars(
 
 
 def get_sdss_guidestars(hostname, host_catalog, object_catalog, verbose=True):
-    print = builtin_print
     if not verbose:
-        print = lambda *args, **kwargs: None
+        def print(*args, **kwargs):
+            pass
 
-    host = host_catalog.load_single(hostname)
     obj_cat = object_catalog.load(hostname)[0]
     r = obj_cat["r_mag"]
     msk = (12.5 < r) & (r < 14) & ~obj_cat["is_galaxy"] & (obj_cat["RHOST_ARCM"] > 15)

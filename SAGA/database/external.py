@@ -30,7 +30,7 @@ except ImportError:
 
 # fix astropy six
 try:
-    import astropy.extern.six
+    import astropy.extern.six  # noqa: F401
 except ImportError:
     import sys
     import six
@@ -321,7 +321,7 @@ class SdssQuery(DownloadableBase):
             "casjob ({}) submitted...".format(db_table_name),
         )
 
-        code, status = cjob.monitor(job_id)
+        code, _ = cjob.monitor(job_id)
         if code == 3 or code == 4:
             raise RuntimeError(
                 "{} casjob ({}) {}!".format(
