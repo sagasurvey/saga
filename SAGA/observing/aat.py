@@ -1,4 +1,5 @@
 import os
+from io import StringIO
 
 import numpy as np
 import requests
@@ -136,11 +137,12 @@ def get_sdss_guidestars(hostname, host_catalog, object_catalog, verbose=True):
 
 
 def write_fld_file(
-    target_catalog, host, obstime, fn, suffix=" master catalog", host_id_label="ID_STR"
+    target_catalog, host, obstime, fn, suffix=" master catalog", host_id_label="HOSTID", host_coord_label="coord",
 ):
-    hostname = host[host_id_label]
+    output = StringIO()
+
     target_catalog.write(
-        fn,
+        output,
         delimiter=" ",
         quotechar='"',
         format="ascii.fast_commented_header",
@@ -153,10 +155,12 @@ def write_fld_file(
             "Magnitude": "%.2f",
         },
     )
-    with open(fn) as fh:
-        content = fh.read()
+
+    content = output.getvalue().replace('"', "")
+    output.close()
+
     with open(fn, "w") as fh:
-        fh.write("LABEL " + hostname + suffix + "\n")
+        fh.write("LABEL " + host[host_id_label] + suffix + "\n")
         fh.write(
             "UTDATE  {yr} {mo:02} {day:02}\n".format(
                 yr=obstime.datetime.year,
@@ -164,13 +168,13 @@ def write_fld_file(
                 day=obstime.datetime.day,
             )
         )
-        censtr = host["coord"].to_string(
+        censtr = host[host_coord_label].to_string(
             "hmsdms", sep=" ", precision=2, alwayssign=True
         )
         fh.write("CENTRE  " + censtr + "\n")
         fh.write("EQUINOX J2000.0\n")
         fh.write("# End of Header\n\n")
-        fh.write(content.replace('"', ""))
+        fh.write(content)
 
 
 def subsample_catalog(

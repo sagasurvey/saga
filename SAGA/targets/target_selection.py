@@ -7,13 +7,14 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 from astropy.table import Table, vstack
+from astropy.time import Time
 from easyquery import Query
 
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
 from ..utils import add_skycoord
-from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
-                                     assign_targeting_score_v2, assign_targeting_score_v2plus)
+from ..observing.aat import write_fld_file
+from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1, assign_targeting_score_v2plus)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -473,6 +474,7 @@ def prepare_aat_catalog(
     offset_ra=None,
     offset_dec=None,
     seed=123,
+    obstime=None,
 ):
     """
     Prepare AAT target catalog.
@@ -513,6 +515,9 @@ def prepare_aat_catalog(
     host_dec = target_catalog["HOST_DEC"][0] * u.deg
     host_dist = target_catalog["HOST_DIST"][0]
     host_rvir = np.arcsin(0.3 / host_dist) * u.rad
+
+    # `host` will be used during file writing
+    host = dict(HOSTID=target_catalog["HOSTID"][0], coord=SkyCoord(host_ra, host_dec))
 
     annulus_actual = sky_fiber_max ** 2.0 - host_rvir ** 2.0
     annulus_wanted = sky_fiber_max ** 2.0 - sky_fiber_host_rvir_threshold ** 2.0
@@ -662,25 +667,9 @@ def prepare_aat_catalog(
         if verbose:
             print("Writing to {}".format(write_to))
 
-        target_catalog.write(
-            write_to,
-            delimiter=" ",
-            quotechar='"',
-            format="ascii.fast_commented_header",
-            overwrite=True,
-            formats={
-                "RA": lambda x: Angle(x, "deg")
-                .wrap_at(360 * u.deg)
-                .to_string("hr", sep=" ", precision=2),  # pylint: disable=E1101
-                "Dec": lambda x: Angle(x, "deg").to_string("deg", sep=" ", precision=2),
-                "Magnitude": "%.2f",
-            },
-        )
+        if obstime is None:
+            obstime = Time("2020-01-01")
 
-        with open(write_to) as fh:
-            content = fh.read()
-
-        with open(write_to, "w") as fh:
-            fh.write(content.replace('"', ""))
+        write_fld_file(target_catalog, host, obstime, write_to)
 
     return target_catalog
