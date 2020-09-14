@@ -12,8 +12,13 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
 
-from astroquery.gaia import Gaia
-Gaia.ROW_LIMIT = 0
+try:
+    from astroquery.gaia import Gaia
+except ImportError:
+    _HAS_GAIA_ = False
+else:
+    _HAS_GAIA_ = True
+    Gaia.ROW_LIMIT = 0
 
 from ..utils import makedirs_if_needed
 from .core import DownloadableBase, FitsTable
@@ -667,6 +672,8 @@ class GaiaQuery(DownloadableBase):
         self.radius = radius * u.deg  # pylint: disable=no-member
 
     def get_gaia_catalog(self):
+        if not _HAS_GAIA_:
+            raise RuntimeError("Needs astroquery to access Gaia!")
         return Gaia.cone_search_async(self.coord, self.radius).get_data()
 
     def download_as_file(self, file_path, overwrite=False, **kwargs):
