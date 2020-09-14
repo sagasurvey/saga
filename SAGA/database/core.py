@@ -24,6 +24,7 @@ __all__ = [
     "FileObject",
     "CsvTable",
     "FastCsvTable",
+    "EcsvTable",
     "GoogleSheets",
     "FitsTableGeneric",
     "FitsTable",
@@ -110,6 +111,11 @@ class CsvTable(FileObject):
 class FastCsvTable(FileObject):
     _read_default_kwargs = dict(format="ascii.fast_csv")
     _write_default_kwargs = dict(format="ascii.fast_csv", overwrite=True)
+
+
+class EcsvTable(FileObject):
+    _read_default_kwargs = dict(format="ascii.ecsv")
+    _write_default_kwargs = dict(format="ascii.ecsv", overwrite=True)
 
 
 class GoogleSheets(FastCsvTable):
