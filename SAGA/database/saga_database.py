@@ -1,7 +1,7 @@
 import os
 
 from ..spectra import SpectraData
-from .core import (CsvTable, DataObject, FastCsvTable, FileObject, FitsTable,
+from .core import (CsvTable, DataObject, FastCsvTable, EcsvTable, FileObject, FitsTable,
                    GoogleSheets, NumpyBinary)
 from .external_masterlist import EddQuery, HyperledaQuery
 
@@ -480,6 +480,9 @@ class Database(object):
             "decals": os.path.join(
                 self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
             ),
+            "gaia": os.path.join(
+                self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
+            ),
         }
 
         self._possible_base_versions = tuple(
@@ -580,7 +583,8 @@ class Database(object):
             and key[0] in self._file_path_pattern
         ):
             path = self._file_path_pattern[key[0]].format(key[1])
-            self._tables[key] = DataObject(FitsTable(path))
+            data_type = EcsvTable if path.endswith(".ecsv") else FitsTable
+            self._tables[key] = DataObject(data_type(path))
             return self._tables[key]
 
         raise KeyError("cannot find {} in database".format(key))
