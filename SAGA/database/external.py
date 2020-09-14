@@ -11,6 +11,7 @@ import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
+from astroquery.gaia import Gaia
 
 from ..utils import makedirs_if_needed
 from .core import DownloadableBase, FitsTable
@@ -50,6 +51,7 @@ __all__ = [
     "DesQuery",
     "DecalsPrebuilt",
     "DecalsQuery",
+    "GaiaQuery",
     "download_catalogs_for_hosts",
 ]
 
@@ -655,6 +657,18 @@ class DecalsQuery(DownloadableBase):
         f = FitsTable(file_path)
         f.compress_after_write = bool(compress)
         f.write(self.get_decals_catalog())
+
+
+class GaiaQuery(DownloadableBase):
+    def __init__(self, ra, dec, radius=1.0):
+        self.coord = SkyCoord(ra, dec, unit="deg")
+        self.radius = radius * u.deg  # pylint: disable=no-member
+
+    def get_gaia_catalog(self):
+        return Gaia.cone_search(self.coord, self.radius).get_data()
+
+    def download_as_file(self, file_path, overwrite=False, **kwargs):
+        self.get_gaia_catalog().write(file_path, format='ascii.ecsv', overwrite=overwrite)
 
 
 def download_catalogs_for_hosts(
