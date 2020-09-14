@@ -13,7 +13,7 @@ from easyquery import Query
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
 from ..utils import add_skycoord
-from ..observing.aat import write_fld_file
+from ..observing.aat import write_fld_file, get_gaia_guidestars
 from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1, assign_targeting_score_v2plus)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
@@ -465,6 +465,7 @@ def prepare_aat_catalog(
     flux_star_removal_threshold=20.0 * u.arcsec,
     flux_star_r_range=(17, 17.7),
     flux_star_gr_range=(0.1, 0.4),
+    flux_star_max=5,
     sky_fiber_void_radius=10.0 * u.arcsec,
     sky_fiber_needed=100,
     sky_fiber_max=1.1 * u.deg,
@@ -473,8 +474,10 @@ def prepare_aat_catalog(
     targeting_score_threshold=900,
     offset_ra=None,
     offset_dec=None,
-    seed=123,
+    seed=None,
     obstime=None,
+    gaia_catalog=None,
+    guidestar_max=100,
 ):
     """
     Prepare AAT target catalog.
@@ -498,6 +501,9 @@ def prepare_aat_catalog(
             '`target_catalog` does not have column "TARGETING_SCORE".'
             "Have you run `compile_target_list` or `assign_targeting_score`?"
         )
+
+    if seed is None:
+        seed = target_catalog["HOST_PGC"][0]
 
     if not isinstance(flux_star_removal_threshold, u.Quantity):
         flux_star_removal_threshold = flux_star_removal_threshold * u.arcsec
@@ -557,7 +563,7 @@ def prepare_aat_catalog(
     n_needed = sky_fiber_needed
     ra_sky = []
     dec_sky = []
-    base_sc = SkyCoord(target_catalog["RA"], target_catalog["DEC"], unit="deg")
+    target_catalog = add_skycoord(target_catalog)
     while n_needed > 0:
         n_rand = int(np.ceil(n_needed * 1.1))
         dist_rand = gen_dist_rand(seed, n_rand)
@@ -568,16 +574,22 @@ def prepare_aat_catalog(
         ra_rand = ra_rand[ok_mask]
         dec_rand = dec_rand[ok_mask]
         sky_sc = SkyCoord(ra_rand, dec_rand)
-        sep = sky_sc.match_to_catalog_sky(base_sc)[1]
+        sep = sky_sc.match_to_catalog_sky(target_catalog["coord"])[1]
         ok_mask = sep > sky_fiber_void_radius
         n_needed -= np.count_nonzero(ok_mask)
         ra_sky.append(ra_rand[ok_mask].to_value("deg"))
         dec_sky.append(dec_rand[ok_mask].to_value("deg"))
         seed += np.random.RandomState(seed + 2).randint(100, 200)
         del ra_rand, dec_rand, sky_sc, sep, ok_mask
-    del base_sc
     ra_sky = np.concatenate(ra_sky)[:sky_fiber_needed]
     dec_sky = np.concatenate(dec_sky)[:sky_fiber_needed]
+
+    gaia_guidestars = None
+    if gaia_catalog is not None:
+        gaia_guidestars = get_gaia_guidestars(object_catalog=target_catalog, gaia_catalog=gaia_catalog)
+        if len(gaia_guidestars) > guidestar_max:
+            idx = np.random.RandomState(seed + 3).choice(len(gaia_guidestars), guidestar_max, False)
+            gaia_guidestars = gaia_guidestars[idx]
 
     is_target = Query(
         "TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold)
@@ -604,20 +616,20 @@ def prepare_aat_catalog(
     target_catalog["Priority"][Query("Priority < 1").mask(target_catalog)] = 1
     target_catalog["Priority"][Query("Priority > 8").mask(target_catalog)] = 8
     target_catalog["Priority"] = 9 - target_catalog["Priority"]
-    target_catalog["Priority"][is_flux_star.mask(target_catalog)] = 9
+    target_catalog["Priority"][(~is_target).mask(target_catalog)] = 0
+
+    flux_star_sc = is_flux_star.filter(target_catalog, "coord")
+    target_sc = is_target.filter(target_catalog, "coord")
+    sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
 
     flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
-    flux_star_sc = SkyCoord(
-        *target_catalog[["RA", "DEC"]][flux_star_indices].itercols(), unit="deg"
-    )
-    target_sc = SkyCoord(
-        *is_target.filter(target_catalog)[["RA", "DEC"]].itercols(), unit="deg"
-    )
-    sep = flux_star_sc.match_to_catalog_sky(target_sc)[1]
-    target_catalog["Priority"][flux_star_indices[sep < flux_star_removal_threshold]] = 0
+    flux_star_indices = flux_star_indices[sep > flux_star_removal_threshold]
+    if len(flux_star_indices) > flux_star_max:
+        flux_star_indices = np.random.RandomState(seed + 4).choice(flux_star_indices, flux_star_max, False)
+    target_catalog["Priority"][flux_star_indices] = 9
     target_catalog = Query("Priority > 0").filter(target_catalog)
     n_flux_star = Query("Priority == 9").count(target_catalog)
-    del flux_star_indices, flux_star_sc, target_sc, sep
+    del flux_star_indices, flux_star_sc, target_sc, sep, target_catalog["coord"]
 
     target_catalog["TargetType"] = "P"
     target_catalog["0"] = 0
@@ -646,7 +658,12 @@ def prepare_aat_catalog(
         }
     )
 
-    target_catalog = vstack([target_catalog, sky_catalog])
+    to_stack = [target_catalog, sky_catalog]
+    if gaia_guidestars is not None:
+        to_stack.append(gaia_guidestars)
+
+    target_catalog = vstack(to_stack)
+    del to_stack
 
     if offset_ra:
         target_catalog["RA"] -= float(offset_ra)
@@ -657,6 +674,8 @@ def prepare_aat_catalog(
     if verbose:
         print("# of flux stars =", n_flux_star)
         print("# of sky fibers =", len(sky_catalog))
+        if gaia_guidestars is not None:
+            print("# of guide stars =", len(gaia_guidestars))
         for rank in range(1, 10):
             print(
                 "# of Priority={} targets =".format(rank),

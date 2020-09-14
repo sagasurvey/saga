@@ -21,9 +21,9 @@ __all__ = [
 
 
 def get_gaia_guidestars(
-    hostname,
-    host_catalog,
-    object_catalog,
+    hostname=None,
+    host_catalog=None,
+    object_catalog=None,
     magrng=(12.5, 13.5),
     matchmagrng=(16, 17),
     d_matchmag=1,
@@ -31,20 +31,25 @@ def get_gaia_guidestars(
     verbose=True,
     neighbor_cut=30 * u.arcsec,
     nmagdown=4.5,
+    gaia_catalog=None,
 ):
     """
     `magrng` is the range of magnitudes to actually select on.  It's ~r-band, based on the
     Evans et al. 2018 r-to-G conversion
     """
-    if not verbose:
-        def print(*args, **kwargs):
-            pass
+    if gaia_catalog is None:
+        gaia_cat = table.Table.read(
+            "external_catalogs/astrometric/{}_gaia.ecsv".format(hostname)
+        )
+    else:
+        gaia_cat = gaia_catalog
 
-    obj_cat = object_catalog.load(hostname)[0]
+    if isinstance(object_catalog, table.Table):
+        obj_cat = object_catalog
+    else:
+        obj_cat = object_catalog.load(hostname)[0]
+
     omag = obj_cat["r_mag"]
-    gaia_cat = table.Table.read(
-        "external_catalogs/astrometric/{}_gaia.ecsv".format(hostname)
-    )
     gaia_sc = SkyCoord(gaia_cat["ra"], gaia_cat["dec"])
     gmag = gaia_cat["phot_g_mean_mag"]
 
@@ -62,13 +67,14 @@ def get_gaia_guidestars(
     ddec = (oscmsk[sepmsk].dec - gscmsk[idx][sepmsk].dec).to(u.arcsec)
     offset = np.mean(dra), np.mean(ddec)
 
-    print(
-        "Object catalog to Gaia offset:",
-        offset,
-        "from",
-        np.sum(sepmsk),
-        "objects ({:.1%})".format(np.sum(sepmsk) / len(sepmsk)),
-    )
+    if verbose:
+        print(
+            "Object catalog to Gaia offset:",
+            offset,
+            "from",
+            np.sum(sepmsk),
+            "objects ({:.1%})".format(np.sum(sepmsk) / len(sepmsk)),
+        )
 
     # this polynomial is from Evans et al. 2018 for the G to r conversion
     Gmr_coeffs = (-0.1856, 0.1579, 0.02738, -0.0550)
@@ -111,16 +117,14 @@ def get_gaia_guidestars(
 
 
 def get_sdss_guidestars(hostname, host_catalog, object_catalog, verbose=True):
-    if not verbose:
-        def print(*args, **kwargs):
-            pass
 
     obj_cat = object_catalog.load(hostname)[0]
     r = obj_cat["r_mag"]
     msk = (12.5 < r) & (r < 14) & ~obj_cat["is_galaxy"] & (obj_cat["RHOST_ARCM"] > 15)
     starcat = obj_cat[msk]
 
-    print("Found", len(starcat), "SDSS guide stars")
+    if verbose:
+        print("Found", len(starcat), "SDSS guide stars")
 
     return table.Table(
         {
