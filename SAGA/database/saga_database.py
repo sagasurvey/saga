@@ -480,6 +480,9 @@ class Database(object):
             "decals": os.path.join(
                 self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
             ),
+            "decals_dr8": os.path.join(
+                self._local_dir, "external_catalogs", "decals_dr8", "{}_decals_dr8.fits.gz"
+            ),
             "gaia": os.path.join(
                 self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
             ),
@@ -532,6 +535,9 @@ class Database(object):
             del self._tables[k]
         if key == "base":
             self._add_derived_data()
+
+    def get_file_path_pattern(self, key):
+        return self._file_path_pattern[key]
 
     @property
     def base_file_path_pattern(self):

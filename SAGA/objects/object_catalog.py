@@ -543,6 +543,8 @@ class ObjectCatalog(object):
                     'dr8' in self._database.decals_file_path_pattern and _get("DECALS_DR8") >= 0.95
                 )):
                     catalogs.append("decals")
+                if not catalogs and _get("DECALS_DR8") >= 0.95:
+                    catalogs.append("decals_dr8")
                 catalogs = tuple(catalogs)
 
             def get_catalog_or_none(catalog_name):
@@ -559,7 +561,7 @@ class ObjectCatalog(object):
                     return
                 return cat[build.WISE_COLS_USED] if catalog_name == "wise" else cat
 
-            catalog_dict = {k: get_catalog_or_none(k) for k in catalogs}
+            catalog_dict = {k.partition("_")[0]: get_catalog_or_none(k) for k in catalogs}
 
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
