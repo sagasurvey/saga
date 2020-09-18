@@ -146,8 +146,6 @@ class ObjectCatalog(object):
                     table["{}_err".format(color[0])], table["{}_err".format(color[1])]
                 )
 
-        table = build2.add_surface_brightness(table)  # TODO: remove this line in the future
-
         if "HOST_ID" in table.colnames:
             table.rename_column("HOST_ID", "HOSTID")
 
@@ -166,9 +164,6 @@ class ObjectCatalog(object):
 
         good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
         fill_values_by_query(table, ~good_obj, p_sat_dict)
-
-        # sat def fix  TODO: remove later
-        fill_values_by_query(table, Query(good_obj, C.has_spec, C.sat_rcut, C.sat_vcut, "SATS != 3", "SATS != 5"), {"SATS": 1})
 
         if add_skycoord:
             table = utils.add_skycoord(table)
@@ -532,6 +527,8 @@ class ObjectCatalog(object):
                 host_id = host[HOSTID_COLNAME]
                 if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet", "Styx")):
                     catalogs = ("decals",)
+                elif any((host_id).startswith(s) for s in ("p13")):
+                    catalogs = ("decals_dr8",)
                 else:
                     catalogs = ("des",)
             else:
