@@ -1042,6 +1042,8 @@ def build_full_stack(  # pylint: disable=unused-argument
         )
 
     if decals is not None:
+        if "decals_dr8_remove" in kwargs:
+            decals_remove = np.concatenate([decals_remove, kwargs["decals_dr8_remove"]])
         decals = prepare_decals_catalog_for_merging(
             decals, decals_remove, decals_recover, convert_to_sdss_filters
         )

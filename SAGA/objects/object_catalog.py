@@ -472,6 +472,7 @@ class ObjectCatalog(object):
             ("sdss", "SDSS ID"),
             ("des", "DES_OBJID"),
             ("decals", "decals_objid"),
+            ("decals_dr8", "OBJID"),
             ("shreds", "OBJID"),
         ):
             for list_type in ("remove", "recover"):

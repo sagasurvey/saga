@@ -56,6 +56,11 @@ known_google_sheets = {
         1549289503,
         include_names=["decals_objid"],
     ),
+    "decals_dr8_remove": GoogleSheets(
+        "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
+        1157130787,
+        include_names=["OBJID"],
+    ),
     "shreds_recover": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         763845590,
