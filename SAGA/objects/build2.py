@@ -354,6 +354,7 @@ def prepare_decals_catalog_for_merging(
             Query("NOBS_G > 0", "FLUX_IVAR_G > 0", Query("g_mag - r_mag < -1") | "g_mag - r_mag > 4"),
             Query("NOBS_Z > 0", "FLUX_IVAR_Z > 0", Query("r_mag - z_mag < -1") | "r_mag - z_mag > 4"),
             "r_mag >= 25",
+            Query("NOBS_W1 > 0", "FLUX_IVAR_W1 > 0", "FLUX_W1 < 0", "NOBS_W2 > 0", "FLUX_IVAR_W2 > 0", "FLUX_W2 < 0"),
         ]
 
     catalog = set_remove_flag(catalog, remove_queries, to_remove, to_recover)
