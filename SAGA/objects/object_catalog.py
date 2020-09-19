@@ -541,7 +541,7 @@ class ObjectCatalog(object):
                     'dr8' in self._database.decals_file_path_pattern and _get("DECALS_DR8") >= 0.95
                 )):
                     catalogs.append("decals")
-                if not catalogs and _get("DECALS_DR8") >= 0.95:
+                if "decals" not in catalogs and _get("DECALS_DR8") >= 0.95 and _get("DES_DR1") < 0.95:
                     catalogs.append("decals_dr8")
                 catalogs = tuple(catalogs)
 
