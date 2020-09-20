@@ -35,11 +35,11 @@ _list_by_pgc = {
     # fmt: on
 }
 
-has_decals_image = Query("COVERAGE_DECALS_DR6 >= 0.95") | Query(
-    "COVERAGE_DECALS_DR7 >= 0.95"
+has_decals_image = Query("COVERAGE_DECALS_DR6 >= 0.99") | Query(
+    "COVERAGE_DECALS_DR7 >= 0.99"
 )
-has_des_image = Query("COVERAGE_DES_DR1 >= 0.85")
-has_sdss_image = Query("COVERAGE_SDSS >= 0.85")
+has_des_image = Query("COVERAGE_DES_DR1 >= 0.99")
+has_sdss_image = Query("COVERAGE_SDSS >= 0.99")
 has_decals_dr8_image = Query("COVERAGE_DECALS_DR8 >= 0.99")
 
 has_image = Query("HAS_IMAGE > 0")
@@ -49,7 +49,7 @@ potential_hosts = Query("HOST_SCORE > 0")
 good_exceptions = QueryMaker.in1d("HOSTID", ("nsa163956", "nsa135739", "pgc67817"))
 good_hosts = Query("HOST_SCORE >= 4") | good_exceptions
 good = good_hosts & has_image
-build_default = potential_hosts & has_image
+build_default = potential_hosts & (has_image | has_decals_dr8_image)
 
 hostlist_v1 = QueryMaker.in1d("PGC", _list_by_pgc["hostlist_v1"])
 paper1_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_complete"])
@@ -62,7 +62,7 @@ paper1_observed = paper1
 paper2 = paper2_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper2_complete"])
 
 observed_definition = Query("specs_ours_rvir >= 100", "specs_ours_rvir < 999999")
-complete_definition = Query("paper2_need_spec / paper2_total < 0.2", "paper2_total > 0", "paper2_total < 999999")
+complete_definition = Query("paper2_need_spec / paper2_total < 0.2", "paper2_total > 0", "paper2_need_spec < 999999")
 
 observed = good_hosts & observed_definition
 unobserved = good & (~observed_definition)
