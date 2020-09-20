@@ -514,13 +514,6 @@ class ObjectCatalog(object):
                     )
                     continue
 
-            def _get(col):
-                # pylint: disable=cell-var-from-loop
-                try:
-                    return host["COVERAGE_" + col]
-                except KeyError:
-                    return 1.0
-
             if build_version < 2:
                 catalogs = ("sdss", "wise")
             elif HOSTID_COLNAME == "field_id":
@@ -532,18 +525,41 @@ class ObjectCatalog(object):
                 else:
                     catalogs = ("des",)
             else:
+                def _get(col):
+                    # pylint: disable=cell-var-from-loop
+                    try:
+                        return host["COVERAGE_" + col.upper()]
+                    except KeyError:
+                        return 0.0
+
                 catalogs = []
-                if _get("SDSS") >= 0.85:
+                coverage = {s: _get(s) for s in ("sdss", "des_dr1", "decals_dr6", "decals_dr7", "decals_dr8")}
+                using_dr8_by_default = 'dr8' in self._database.decals_file_path_pattern
+
+                if using_dr8_by_default:
+                    coverage["decals"] = coverage["decals_dr8"]
+                else:
+                    coverage["decals"] = max(coverage["decals_dr6"], coverage["decals_dr7"])
+                coverage["sdss_des"] = max(coverage["sdss"], coverage["des_dr1"])
+                coverage["max"] = max(coverage["decals"], coverage["sdss_des"])
+
+                if coverage["sdss"] >= 0.85:
                     catalogs.append("sdss")
-                if _get("DES_DR1") >= 0.85:
+                if coverage["des_dr1"] >= 0.85:
                     catalogs.append("des")
-                if (max(_get("DECALS_DR6"), _get("DECALS_DR7")) >= 0.95 or (
-                    'dr8' in self._database.decals_file_path_pattern and _get("DECALS_DR8") >= 0.95
-                )):
+                if coverage["decals"] >= 0.95:
                     catalogs.append("decals")
-                if "decals" not in catalogs and _get("DECALS_DR8") >= 0.95 and _get("DES_DR1") < 0.95:
-                    catalogs.append("decals_dr8")
-                catalogs = tuple(catalogs)
+
+                if not using_dr8_by_default:
+                    if "decals" in catalogs and coverage["decals_dr8"] >= 0.99 and (
+                        coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99
+                    ):
+                        catalogs.remove("decals")
+                        catalogs.append("decals_dr8")
+                    elif "decals" not in catalogs and coverage["decals_dr8"] >= 0.95 and coverage["des_dr1"] < 0.95:
+                        catalogs.append("decals_dr8")
+
+                catalogs = tuple(set(catalogs))
 
             def get_catalog_or_none(catalog_name):
                 # pylint: disable=cell-var-from-loop
