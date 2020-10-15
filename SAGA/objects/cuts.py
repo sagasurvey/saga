@@ -104,7 +104,7 @@ relaxed_cut_gr = Query("gr - abs(gr_err)*2 + 0.06 * (r_mag - 14) < 1.1") | (~val
 relaxed_cut_ri = Query("ri - abs(ri_err)*2 + 0.06 * (r_mag - 14) < 0.85") | (~valid_i_mag)
 relaxed_cut_rz = Query("rz - abs(rz_err)*2 + 0.06 * (r_mag - 14) < 1.05") | (~valid_z_mag)
 
-main_targeting_cuts = high_priority_cuts = Query(
+orig_high_priority_cuts = Query(
     high_priority_sb,
     high_priority_gr,
     high_priority_ri,
@@ -120,7 +120,7 @@ relaxed_targeting_cuts = Query(
 
 very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_approx >= 1e-4"
 
-paper2_targeting_cut = high_priority_sb_tight & high_priority_gr
+paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = high_priority_sb_tight & high_priority_gr
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")
