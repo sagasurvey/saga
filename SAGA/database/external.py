@@ -557,13 +557,19 @@ class DecalsQuery(DownloadableBase):
         decals_base_dir="/global/project/projectdirs/cosmo/data/legacysurvey",
     ):
 
-        try:
-            dr_number = int(decals_dr)
-        except ValueError:
-            dr_number = int(decals_dr[-1])
-        decals_dr = "dr{}".format(dr_number)
+        decals_dr = str(decals_dr).lower()
+        if not decals_dr.startswith("dr"):
+            decals_dr = "dr" + decals_dr
 
-        if dr_number not in (6, 7, 8):
+        try:
+            dr_number = int(decals_dr[2:4])
+        except ValueError:
+            try:
+                dr_number = int(decals_dr[2])
+            except ValueError:
+                raise ValueError("Cannot recognize `decals_dr` specification:", decals_dr)
+
+        if dr_number not in (6, 7, 8, 9):
             raise ValueError("{} not supported".format(decals_dr))
 
         sweep_dir = os.path.join(
