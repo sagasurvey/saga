@@ -5,6 +5,7 @@ import re
 import shutil
 import string
 import time
+import warnings
 
 import numpy as np
 import requests
@@ -586,9 +587,10 @@ class DecalsQuery(DownloadableBase):
 
         for sweep_dir in self.sweep_dirs:
             if not os.path.isdir(sweep_dir):
-                raise ValueError(
-                    "DECaLS sweep directory {} does not exist!".format(sweep_dir)
-                )
+                warnings.warn("Cannot access sweep directory {}".format(sweep_dir))
+                self.sweep_dirs.remove(sweep_dir)
+        if not self.sweep_dirs:
+            raise ValueError("No DECaLS sweep directory found! Abort!")
 
         self.ra = ensure_deg(ra)
         self.dec = ensure_deg(dec)
