@@ -5,6 +5,7 @@ import re
 import shutil
 import string
 import time
+import warnings
 
 import numpy as np
 import requests
@@ -557,13 +558,19 @@ class DecalsQuery(DownloadableBase):
         decals_base_dir="/global/project/projectdirs/cosmo/data/legacysurvey",
     ):
 
-        try:
-            dr_number = int(decals_dr)
-        except ValueError:
-            dr_number = int(decals_dr[-1])
-        decals_dr = "dr{}".format(dr_number)
+        decals_dr = str(decals_dr).lower()
+        if not decals_dr.startswith("dr"):
+            decals_dr = "dr" + decals_dr
 
-        if dr_number not in (6, 7, 8):
+        try:
+            dr_number = int(decals_dr[2:4])
+        except ValueError:
+            try:
+                dr_number = int(decals_dr[2])
+            except ValueError:
+                raise ValueError("Cannot recognize `decals_dr` specification:", decals_dr)
+
+        if dr_number not in (6, 7, 8, 9):
             raise ValueError("{} not supported".format(decals_dr))
 
         sweep_dir = os.path.join(
@@ -580,9 +587,10 @@ class DecalsQuery(DownloadableBase):
 
         for sweep_dir in self.sweep_dirs:
             if not os.path.isdir(sweep_dir):
-                raise ValueError(
-                    "DECaLS sweep directory {} does not exist!".format(sweep_dir)
-                )
+                warnings.warn("Cannot access sweep directory {}".format(sweep_dir))
+                self.sweep_dirs.remove(sweep_dir)
+        if not self.sweep_dirs:
+            raise ValueError("No DECaLS sweep directory found! Abort!")
 
         self.ra = ensure_deg(ra)
         self.dec = ensure_deg(dec)
