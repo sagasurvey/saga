@@ -153,8 +153,19 @@ def add_manual_remove_flag(d, remove):
     else:
         raise ValueError("cannot find `HOSTID` or `NSAID` column in `remove`")
 
-    d["REMOVED_BY_HAND"] = q.mask(d)
+    d["REMOVED_BY_HAND"] = q.mask(d).astype(np.int32)
 
+    return d
+
+
+def add_hostid(d):
+    pgc_col = "pgc" if "pgc" in d.colnames else "PGC"
+    nsa_col = "NSAID"
+    d["HOSTID"] = np.where(
+        (d[nsa_col].filled(-1) <= 0),
+        np.char.add("pgc", d[pgc_col].astype(np.unicode)),
+        np.char.add("nsa", d[nsa_col].astype(np.unicode)),
+    )
     return d
 
 
@@ -267,11 +278,6 @@ def clean_up_columns(d):
     d["NSAID"] = d["NSAID"].filled(-1)
     d["NSA1ID"] = d["NSA1ID"].filled(-1)
     d["M_HALO"] = d["M_HALO"].filled(-1.0)
-    d["HOSTID"] = np.where(
-        (d["NSAID"] <= 0),
-        np.char.add("pgc", d["PGC"].astype(np.unicode)),
-        np.char.add("nsa", d["NSAID"].astype(np.unicode)),
-    )
 
     needed_cols = [
         "HOSTID",
@@ -416,6 +422,8 @@ def build_master_list(
 
     d = add_nsa(d, nsa1)
     del nsa1
+
+    d = add_hostid(d)
 
     if remove_list is not None:
         d = add_manual_remove_flag(d, remove_list)
