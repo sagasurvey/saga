@@ -21,7 +21,7 @@ known_google_sheets = {
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         1133875164,
         header_start=1,
-        include_names=["NSAID", "flag"],
+        include_names=["HOSTID", "flag"],
     ),
     "sdss_remove": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",

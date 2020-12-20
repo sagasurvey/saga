@@ -144,10 +144,17 @@ def add_nsa(d, nsa):
 
 
 def add_manual_remove_flag(d, remove):
-    remove_nsaid = Query("flag > 1").filter(remove, "NSAID")
-    d["REMOVED_BY_HAND"] = Query(
-        (notnull, "NSAID"), QueryMaker.in1d("NSAID", remove_nsaid)
-    ).mask(d)
+    if "HOSTID" in remove.colnames:
+        remove_id = Query("flag > 1").filter(remove, "HOSTID")
+        q = QueryMaker.in1d("HOSTID", remove_id)
+    elif "NSAID" in remove.colnames:
+        remove_id = Query("flag > 1").filter(remove, "NSAID")
+        q = Query((notnull, "NSAID"), QueryMaker.in1d("NSAID", remove_id))
+    else:
+        raise ValueError("cannot find `HOSTID` or `NSAID` column in `remove`")
+
+    d["REMOVED_BY_HAND"] = q.mask(d)
+
     return d
 
 
