@@ -82,6 +82,67 @@ def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.25, **kwargs
     return p
 
 
+def _get_coverage(host, survey):
+    try:
+        return host["COVERAGE_" + survey.upper()]
+    except KeyError:
+        return 0.0
+
+
+def _determine_v2_raw_catalogs_saga(host, using_dr8_by_default=False):
+    coverage = {
+        s: _get_coverage(host, s)
+        for s in (
+            "sdss",
+            "des_dr1",
+            "decals_dr6",
+            "decals_dr7",
+            "decals_dr8",
+        )
+    }
+
+    if using_dr8_by_default:
+        coverage["decals"] = coverage["decals_dr8"]
+    else:
+        coverage["decals"] = max(coverage["decals_dr6"], coverage["decals_dr7"])
+    coverage["sdss_des"] = max(coverage["sdss"], coverage["des_dr1"])
+    coverage["max"] = max(coverage["decals"], coverage["sdss_des"])
+
+    catalogs = []
+    if coverage["sdss"] >= 0.85:
+        catalogs.append("sdss")
+    if coverage["des_dr1"] >= 0.85:
+        catalogs.append("des")
+    if coverage["decals"] >= 0.95:
+        catalogs.append("decals")
+
+    if not using_dr8_by_default:
+        if (
+            "decals" in catalogs
+            and coverage["decals_dr8"] >= 0.99
+            and (coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99)
+        ):
+            catalogs.remove("decals")
+            catalogs.append("decals_dr8")
+        elif (
+            "decals" not in catalogs
+            and coverage["decals_dr8"] >= 0.95
+            and coverage["des_dr1"] < 0.95
+        ):
+            catalogs.append("decals_dr8")
+
+    return list(set(catalogs))
+
+
+def _determine_v2_raw_catalogs_lowz(field_name):
+    field_name = str(field_name)
+    if any(field_name.startswith(s) for s in ["GD1", "300S", "Jet", "Styx"]):
+        return ["decals_dr67"]
+    if any(field_name.startswith(s) for s in ["p13"]):
+        return ["decals_dr8"]
+    return ["des"]
+
+
 class ObjectCatalog(object):
     """
     This class provides a high-level interface to access object catalogs
@@ -443,10 +504,25 @@ class ObjectCatalog(object):
 
         if build_version < 2:
             build_module = build
+            manual_keys = [("sdss", "SDSS ID")]
+            catalogs = ["sdss", "wise"]
         elif build_version < 3:
             build_module = build2
+            manual_keys = [
+                ("sdss", "SDSS ID"),
+                ("des", "DES_OBJID"),
+                ("decals", "decals_objid"),
+                ("decals_dr8", "OBJID"),
+                ("shreds", "OBJID"),
+            ]
+            catalogs = None  # To be determine in the host loop
         else:
             build_module = build3
+            manual_keys = [
+                ("decals_dr9", "OBJID"),
+                ("shreds", "OBJID"),
+            ]
+            catalogs = ["decals_dr9"]
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
@@ -463,14 +539,8 @@ class ObjectCatalog(object):
 
         halpha = self._database["spectra_halpha"].read()
 
-        manual_lists = {}
-        for survey, col in (
-            ("sdss", "SDSS ID"),
-            ("des", "DES_OBJID"),
-            ("decals", "decals_objid"),
-            ("decals_dr8", "OBJID"),
-            ("shreds", "OBJID"),
-        ):
+        manual_lists = dict()
+        for survey, col in manual_keys:
             for list_type in ("remove", "recover"):
                 key = "{}_{}".format(survey, list_type)
                 try:
@@ -478,8 +548,13 @@ class ObjectCatalog(object):
                 except KeyError:
                     continue
                 val = get_unique_objids(mlist.read()[col])
-                if len(val):
-                    manual_lists[key] = val
+                if not len(val):
+                    continue
+                if "_" in survey:
+                    new_key = "{}_{}".format(survey.partition("_")[0], list_type)
+                    if new_key not in manual_lists:
+                        key = new_key
+                manual_lists[key] = val
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
         failed_count = 0
@@ -515,71 +590,17 @@ class ObjectCatalog(object):
                     )
                     continue
 
-            if build_version < 2:
-                catalogs = ("sdss", "wise")
-            elif HOSTID_COLNAME == "field_id":
-                host_id = host[HOSTID_COLNAME]
-                if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet", "Styx")):
-                    catalogs = ("decals",)
-                elif any((host_id).startswith(s) for s in ("p13")):
-                    catalogs = ("decals_dr8",)
+            catalogs_this = catalogs
+            if catalogs_this is None:
+                if HOSTID_COLNAME == "field_id":
+                    catalogs_this = _determine_v2_raw_catalogs_lowz(host_id)
                 else:
-                    catalogs = ("des",)
-            else:
-
-                def _get(col):
-                    # pylint: disable=cell-var-from-loop
-                    try:
-                        return host["COVERAGE_" + col.upper()]
-                    except KeyError:
-                        return 0.0
-
-                catalogs = []
-                coverage = {
-                    s: _get(s)
-                    for s in (
-                        "sdss",
-                        "des_dr1",
-                        "decals_dr6",
-                        "decals_dr7",
-                        "decals_dr8",
+                    catalogs_this = _determine_v2_raw_catalogs_saga(
+                        host, "dr8" in self._database.decals_file_path_pattern
                     )
-                }
-                using_dr8_by_default = "dr8" in self._database.decals_file_path_pattern
 
-                if using_dr8_by_default:
-                    coverage["decals"] = coverage["decals_dr8"]
-                else:
-                    coverage["decals"] = max(coverage["decals_dr6"], coverage["decals_dr7"])
-                coverage["sdss_des"] = max(coverage["sdss"], coverage["des_dr1"])
-                coverage["max"] = max(coverage["decals"], coverage["sdss_des"])
-
-                if coverage["sdss"] >= 0.85:
-                    catalogs.append("sdss")
-                if coverage["des_dr1"] >= 0.85:
-                    catalogs.append("des")
-                if coverage["decals"] >= 0.95:
-                    catalogs.append("decals")
-
-                if not using_dr8_by_default:
-                    if (
-                        "decals" in catalogs
-                        and coverage["decals_dr8"] >= 0.99
-                        and (coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99)
-                    ):
-                        catalogs.remove("decals")
-                        catalogs.append("decals_dr8")
-                    elif (
-                        "decals" not in catalogs
-                        and coverage["decals_dr8"] >= 0.95
-                        and coverage["des_dr1"] < 0.95
-                    ):
-                        catalogs.append("decals_dr8")
-
-                catalogs = tuple(set(catalogs))
-
-            def get_catalog_or_none(catalog_name):
-                # pylint: disable=cell-var-from-loop
+            catalog_dict = dict()
+            for catalog_name in catalogs_this:
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
@@ -589,15 +610,15 @@ class ObjectCatalog(object):
                             catalog_name.upper(), host_id
                         ),
                     )
-                    return
-                return cat[build.WISE_COLS_USED] if catalog_name == "wise" else cat
-
-            catalog_dict = {k.partition("_")[0]: get_catalog_or_none(k) for k in catalogs}
+                    continue
+                if catalog_name == "wise":
+                    cat = cat[build.WISE_COLS_USED]
+                catalog_dict[catalog_name.partition("_")[0]] = cat
 
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
                 "Use {} to build base catalog {} for {}".format(
-                    ", ".join((k for k, v in catalog_dict.items() if v is not None)).upper(),
+                    ", ".join(catalog_dict).upper(),
                     version_postfix.lstrip("_"),
                     host_id,
                 ),
