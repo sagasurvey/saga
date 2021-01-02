@@ -9,6 +9,8 @@ __all__ = ["extract_sdss_spectra", "extract_nsa_spectra"]
 
 
 def extract_sdss_spectra(sdss):
+    if sdss is None:
+        return
     specs = Query("SPEC_Z > -1.0").filter(
         sdss["RA", "DEC", "SPEC_Z", "SPEC_Z_ERR", "SPEC_Z_WARN", "OBJID"]
     )
@@ -28,6 +30,8 @@ def extract_sdss_spectra(sdss):
 
 
 def extract_nsa_spectra(nsa):
+    if nsa is None:
+        return
     specs = nsa["RA", "DEC", "Z", "ZSRC", "NSAID"]
     specs["TELNAME"] = "NSA"
     specs["SPEC_Z_ERR"] = 20 / SPEED_OF_LIGHT
