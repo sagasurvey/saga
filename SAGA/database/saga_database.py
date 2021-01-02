@@ -410,6 +410,7 @@ class Database(object):
                 self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"
             ),
             "base_v2p1": os.path.join(self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"),
+            "base_v3": os.path.join(self._local_dir, "base_catalogs", "base_v3_{}.fits.gz"),
             "base_v2": os.path.join(self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"),
             "base_v1": os.path.join(self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"),
             "base_v0p1": os.path.join(
@@ -425,7 +426,7 @@ class Database(object):
             "des_dr1": os.path.join(
                 self._local_dir, "external_catalogs", "des_dr1", "{}_des_dr1.fits.gz"
             ),
-            "decals": os.path.join(
+            "decals_dr67": os.path.join(
                 self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
             ),
             "decals_dr8": os.path.join(
@@ -433,6 +434,12 @@ class Database(object):
                 "external_catalogs",
                 "decals_dr8",
                 "{}_decals_dr8.fits.gz",
+            ),
+            "decals_dr9": os.path.join(
+                self._local_dir,
+                "external_catalogs",
+                "decals_dr9",
+                "{}_decals_dr9.fits.gz",
             ),
             "gaia": os.path.join(
                 self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
@@ -444,6 +451,7 @@ class Database(object):
         )
         self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
         self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+        self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
         self.set_default_base_version()
 
     def _add_derived_data(self):
