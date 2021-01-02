@@ -6,8 +6,9 @@ import numpy as np
 from ..utils import get_sdss_bands, view_table_as_2d_array
 
 try:
+    from extreme_deconvolution.extreme_deconvolution import \
+        extreme_deconvolution
     from sklearn.mixture import GaussianMixture
-    from extreme_deconvolution.extreme_deconvolution import extreme_deconvolution
 except (ImportError, OSError):
     _XDGMM_AVAILABLE = False
 else:
@@ -72,14 +73,10 @@ def get_input_data(
     include_covariance=True,
 ):
     colors = ["".join((b1, b2, color_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])]
-    color_errors = [
-        "".join((b1, b2, color_err_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])
-    ]
+    color_errors = ["".join((b1, b2, color_err_postfix)) for b1, b2 in zip(bands[:-1], bands[1:])]
     mag_errors = [b + mag_err_postfix for b in bands[1:-1]]
     X = view_table_as_2d_array(catalog, colors)
-    Xcov = np.stack(
-        [np.diag(e * e) for e in view_table_as_2d_array(catalog, color_errors)]
-    )
+    Xcov = np.stack([np.diag(e * e) for e in view_table_as_2d_array(catalog, color_errors)])
     if include_covariance:
         Xcov -= np.stack(
             [

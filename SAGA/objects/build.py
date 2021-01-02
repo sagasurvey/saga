@@ -118,9 +118,7 @@ def initialize_base_catalog(base):
         Query("SPEC_Z > -1.0"),
         {"TELNAME": "SDSS", "MASKNAME": "SDSS", "SPEC_REPEAT": "SDSS", "ZQUALITY": 4},
     )
-    fill_values_by_query(
-        base, Query("SPEC_Z > -1.0", "SPEC_Z_WARN != 0"), {"ZQUALITY": 1}
-    )
+    fill_values_by_query(base, Query("SPEC_Z > -1.0", "SPEC_Z_WARN != 0"), {"ZQUALITY": 1})
 
     return base
 
@@ -170,17 +168,13 @@ def add_host_info(base, host, overwrite_if_different_host=False):
         base["HOST_VHOST"] = np.float32(host["V_HELIO"])
         base["HOST_ZCOSMO"] = np.float32(host["Z_COSMO"])
         base["HOST_MK"] = np.float32(host["K_ABS"])
-        base["HOST_COMMON_NAME"] = get_empty_str_array(
-            len(base), 48, host["COMMON_NAME"] or ""
-        )
+        base["HOST_COMMON_NAME"] = get_empty_str_array(len(base), 48, host["COMMON_NAME"] or "")
 
     host_sc = SkyCoord(host["RA"], host["DEC"], unit="deg")
     base = add_skycoord(base)
     sep = base["coord"].separation(host_sc)
     base["RHOST_ARCM"] = sep.arcmin.astype(np.float32)
-    base["RHOST_KPC"] = (np.sin(sep.radian) * (1000.0 * base["HOST_DIST"][0])).astype(
-        np.float32
-    )
+    base["RHOST_KPC"] = (np.sin(sep.radian) * (1000.0 * base["HOST_DIST"][0])).astype(np.float32)
 
     return base
 
@@ -312,9 +306,7 @@ def remove_shreds_with_nsa(base, nsa):
 
     host_sc = SkyCoord(base["HOST_RA"][0], base["HOST_DEC"][0], unit="deg")
     nsa_sc = (
-        nsa["coord"]
-        if "coord" in nsa.colnames
-        else SkyCoord(nsa["RA"], nsa["DEC"], unit="deg")
+        nsa["coord"] if "coord" in nsa.colnames else SkyCoord(nsa["RA"], nsa["DEC"], unit="deg")
     )
     nsa = nsa[nsa_sc.separation(host_sc).deg < 1.0]
     del nsa_sc
@@ -417,9 +409,7 @@ def remove_bad_photometry(base):
     q |= Query("BAD_COUNTS_ERROR != 0")
     fill_values_by_query(base, q & (~has_nsa), {"REMOVE": 3})
 
-    q = Query(
-        (lambda *x: np.abs(np.median(x, axis=0)) > 0.5, "g_err", "r_err", "i_err")
-    )
+    q = Query((lambda *x: np.abs(np.median(x, axis=0)) > 0.5, "g_err", "r_err", "i_err"))
     fill_values_by_query(base, q & (~has_nsa), {"REMOVE": 4})
 
     return base
@@ -482,8 +472,7 @@ def remove_shreds_with_highz(base):
             continue
 
         nearby_obj_mask = (
-            base["coord"].separation(base["coord"][idx]).arcsec
-            < 1.25 * base["PETRORAD_R"][idx]
+            base["coord"].separation(base["coord"][idx]).arcsec < 1.25 * base["PETRORAD_R"][idx]
         )
         nearby_obj_mask &= base["REMOVE"] == -1
 
@@ -558,9 +547,9 @@ def clean_repeat_spectra(spectra):
 
         # search nearby spectra in 3D
         nearby_mask = np.fabs(spectra["SPEC_Z"] - spec["SPEC_Z"]) < _spec_search_dz
-        nearby_mask &= spectra["coord"].separation(
-            spec["coord"]
-        ).arcsec < _get_spec_search_radius(spec["SPEC_Z"])
+        nearby_mask &= spectra["coord"].separation(spec["coord"]).arcsec < _get_spec_search_radius(
+            spec["SPEC_Z"]
+        )
         nearby_mask &= not_done
         nearby_mask = np.flatnonzero(nearby_mask)
         assert len(nearby_mask) >= 1
@@ -568,9 +557,7 @@ def clean_repeat_spectra(spectra):
         not_done[nearby_mask] = False
 
         best_spec_idx = nearby_mask[spectra["ZQUALITY"][nearby_mask].argmax()]
-        spec_repeat[best_spec_idx] = _join_spec_repeat(
-            *spectra[spec_repeat_col][nearby_mask]
-        )
+        spec_repeat[best_spec_idx] = _join_spec_repeat(*spectra[spec_repeat_col][nearby_mask])
 
     del not_done
 
@@ -619,9 +606,7 @@ def add_cleaned_spectra(base, spectra_clean):
     """
     for spec in spectra_clean:
         sep = spec["coord"].separation(base["coord"]).arcsec
-        nearby_obj_indices = np.flatnonzero(
-            sep < _get_spec_search_radius(spec["SPEC_Z"])
-        )
+        nearby_obj_indices = np.flatnonzero(sep < _get_spec_search_radius(spec["SPEC_Z"]))
 
         if len(nearby_obj_indices) == 0:
             if spec["TELNAME"] != "GAMA":
@@ -633,9 +618,7 @@ def add_cleaned_spectra(base, spectra_clean):
             continue
 
         # for faster access, slice a small set of the base catalog.
-        nearby_obj = base[["REMOVE", "ZQUALITY", "SPEC_Z", "OBJ_NSAID"]][
-            nearby_obj_indices
-        ]
+        nearby_obj = base[["REMOVE", "ZQUALITY", "SPEC_Z", "OBJ_NSAID"]][nearby_obj_indices]
 
         mask = sep[nearby_obj_indices] < 3.0
         very_close_indices = nearby_obj_indices[mask]
@@ -682,8 +665,7 @@ def add_cleaned_spectra(base, spectra_clean):
         )
 
         if spec["ZQUALITY"] > base["ZQUALITY"][closest_obj_index] or (
-            spec["ZQUALITY"] == base["ZQUALITY"][closest_obj_index]
-            and spec["TELNAME"] == "MMT"
+            spec["ZQUALITY"] == base["ZQUALITY"][closest_obj_index] and spec["TELNAME"] == "MMT"
         ):
             for col in (
                 "TELNAME",
@@ -762,10 +744,7 @@ def clean_sdss_spectra(base):
 
     def find_sdss_only(t):
         return np.fromiter(
-            (
-                (x and set(x.split("+")).issubset({"NSA", "SDSS"}))
-                for x in t["SPEC_REPEAT"]
-            ),
+            ((x and set(x.split("+")).issubset({"NSA", "SDSS"})) for x in t["SPEC_REPEAT"]),
             np.bool,
             len(t),
         )
@@ -833,7 +812,11 @@ def find_satellites(base, version=1):
 
     # fixes for overlapping hosts
     if base["HOSTID"][0] == "pgc67817":  # overlapping with pgc67782
-        fill_values_by_query(base, QueryMaker.in1d("OBJID", [247126789, 247129294]) & "SATS == 1", {"SATS": 5})
+        fill_values_by_query(
+            base,
+            QueryMaker.in1d("OBJID", [247126789, 247129294]) & "SATS == 1",
+            {"SATS": 5},
+        )
 
     return base
 
@@ -949,7 +932,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     spectra=None,
     sdss_remove=None,
     sdss_recover=None,
-    **kwargs
+    **kwargs,
 ):
     """
     This function calls all needed functions to complete the full stack of building

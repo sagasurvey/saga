@@ -1,11 +1,17 @@
-from IPython.display import display_html
 from astropy.io import ascii
+
 try:
     import pyperclip
 except ImportError:
     _HAS_CLIP = False
 else:
     _HAS_CLIP = True
+try:
+    from IPython.display import display_html
+except ImportError:
+    _HAS_DISPLAY = False
+else:
+    _HAS_DISPLAY = True
 
 __all__ = ["print_for_viewer", "read_marks_from_clipboard", "show_images"]
 
@@ -20,7 +26,9 @@ def print_for_viewer(table, keys=("OBJID", "RA", "DEC"), additional_keys=None):
     print(output)
 
 
-def read_marks_from_clipboard(extract_marked_value=True, extract_cols="objid", marked_col_name="marked"):
+def read_marks_from_clipboard(
+    extract_marked_value=True, extract_cols="objid", marked_col_name="marked"
+):
     if not _HAS_CLIP:
         raise RuntimeError("needs pyperclip to work")
     t = ascii.read(table=pyperclip.paste(), format="fast_tab")
@@ -37,7 +45,18 @@ def show_images(
     table,
     pixscale=0.2,
     size=200,
-    keys=("OBJID", "RA", "DEC", "HOSTID", "r_mag", "sb_r", "gr", "SPEC_Z", "ZQUALITY", "TELNAME"),
+    keys=(
+        "OBJID",
+        "RA",
+        "DEC",
+        "HOSTID",
+        "r_mag",
+        "sb_r",
+        "gr",
+        "SPEC_Z",
+        "ZQUALITY",
+        "TELNAME",
+    ),
     layer="dr8",
     ra_label="RA",
     dec_label="DEC",
@@ -72,11 +91,21 @@ def show_images(
         )
 
         link = "http://legacysurvey.org/viewer{dev}?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
-            ra=row[ra_label], dec=row[dec_label], layer=layer, dev=dev,
+            ra=row[ra_label],
+            dec=row[dec_label],
+            layer=layer,
+            dev=dev,
         )
         title = "\n".join((f"{k} = {row[k]}" for k in keys_used))
 
         out.append(
             f'<a href="{link}" target="_blank"><img src="{url}" style="display:inline-block; width:{size}px; height:{size}px" title="{title}" /></a>'
         )
-    display_html("\n".join(out), raw=True)
+
+    html = "\n".join(out)
+
+    if _HAS_DISPLAY:
+        display_html(html, raw=True)
+        return
+
+    return html

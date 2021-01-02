@@ -1,5 +1,5 @@
 """
-SAGA.host.selection
+SAGA.host.build
 
 This file contains the functinos to build the master list and host list
 """
@@ -34,31 +34,31 @@ SAGA_NAMES = {
     38802: "ScoobyDoo",
     38031: "Sopranos",
     23028: "StarTrek",
-    12626: 'Hiccup',
-    13646: 'Genji',
-    18880: 'Mulan',
-    26246: 'Okonkwo',
-    27635: 'Aeneid',
-    27723: 'Skywalker',
-    35294: 'Chihiro',
-    37483: 'Gaukur',
-    40284: 'Macondo',
-    41083: 'Metamorphoses',
-    48815: 'Rand',
-    49342: 'Trisolaris',
-    50031: 'Essun',
-    51340: 'Pippi',
-    51471: 'Beloved',
-    51620: 'DonQuixote',
-    52273: 'SunWukong',
-    54119: 'Ynglinga',
-    59426: 'Arya',
-    64725: 'Moana',
-    66318: 'Ozymandias',
-    66934: 'Middlemarch',
-    67782: 'Bilbo',
-    67817: 'Frodo',
-    69349: 'PiPatel',
+    12626: "Hiccup",
+    13646: "Genji",
+    18880: "Mulan",
+    26246: "Okonkwo",
+    27635: "Aeneid",
+    27723: "Skywalker",
+    35294: "Chihiro",
+    37483: "Gaukur",
+    40284: "Macondo",
+    41083: "Metamorphoses",
+    48815: "Rand",
+    49342: "Trisolaris",
+    50031: "Essun",
+    51340: "Pippi",
+    51471: "Beloved",
+    51620: "DonQuixote",
+    52273: "SunWukong",
+    54119: "Ynglinga",
+    59426: "Arya",
+    64725: "Moana",
+    66318: "Ozymandias",
+    66934: "Middlemarch",
+    67782: "Bilbo",
+    67817: "Frodo",
+    69349: "PiPatel",
 }
 
 
@@ -248,9 +248,7 @@ def add_image_coverage(d, coverage_map, name, nest=True):
         idx = hp.query_disc(
             nside, hp.ang2vec(ra, dec, lonlat=True), np.arcsin(0.3 / dist), nest=nest
         )
-        frac.append(
-            np.count_nonzero(coverage_map[idx]) / len(idx) if len(idx) else np.nan
-        )
+        frac.append(np.count_nonzero(coverage_map[idx]) / len(idx) if len(idx) else np.nan)
     d["COVERAGE_{}".format(name.upper())] = np.array(frac)
     return d
 
@@ -368,8 +366,7 @@ def add_selection_flags(d):
         image_allowed,
         (
             lambda d6, d7, de, s: (
-                (de >= 0.99)
-                | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)
+                (de >= 0.99) | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)
             ),
             "COVERAGE_DECALS_DR6",
             "COVERAGE_DECALS_DR7",

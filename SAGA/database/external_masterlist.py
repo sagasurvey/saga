@@ -29,9 +29,7 @@ class HyperledaQuery(FastCsvTable):
             + urlencode(
                 {
                     "d": self._default_fields if fields is None else fields,
-                    "sql": self._default_conditions
-                    if conditions is None
-                    else conditions,
+                    "sql": self._default_conditions if conditions is None else conditions,
                     "ob": "pgc",
                     "a": "csv[,]",
                 }
@@ -56,9 +54,7 @@ class EddQuery(DownloadableBase):
         ).text
 
     def read(self):
-        return Table.read(
-            BytesIO(self._get_raw_output().encode()), format="ascii.fast_csv"
-        )
+        return Table.read(BytesIO(self._get_raw_output().encode()), format="ascii.fast_csv")
 
     def download_as_file(self, file_path, overwrite=False, compress=False):
         makedirs_if_needed(file_path)

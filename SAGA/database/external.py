@@ -42,6 +42,7 @@ try:
     import astropy.extern.six  # noqa: F401
 except ImportError:
     import sys
+
     import six
 
     sys.modules["astropy.extern.six"] = six
@@ -532,9 +533,7 @@ class DecalsPrebuilt(DownloadableBase):
         )
 
         if not r.ok:
-            raise requests.RequestException(
-                "Decals-prebuilt download failed: '{}'".format(r.text)
-            )
+            raise requests.RequestException("Decals-prebuilt download failed: '{}'".format(r.text))
 
         makedirs_if_needed(file_path)
         chunk_size = 16 * 1024 * 1024
@@ -573,14 +572,12 @@ class DecalsQuery(DownloadableBase):
         if dr_number not in (6, 7, 8, 9):
             raise ValueError("{} not supported".format(decals_dr))
 
-        sweep_dir = os.path.join(
-            decals_base_dir, decals_dr, "sweep", "{}.0".format(dr_number)
-        )
+        sweep_dir = os.path.join(decals_base_dir, decals_dr, "sweep", "{}.0".format(dr_number))
 
         if dr_number >= 8:
             self.sweep_dirs = [
                 sweep_dir.replace("/sweep/", "/north/sweep/"),
-                sweep_dir.replace("/sweep/", "/south/sweep/")
+                sweep_dir.replace("/sweep/", "/south/sweep/"),
             ]
         else:
             self.sweep_dirs = [sweep_dir]
@@ -685,7 +682,7 @@ class GaiaQuery(DownloadableBase):
         return Gaia.cone_search_async(self.coord, self.radius).get_data()
 
     def download_as_file(self, file_path, overwrite=False, **kwargs):
-        self.get_gaia_catalog().write(file_path, format='ascii.ecsv', overwrite=overwrite)
+        self.get_gaia_catalog().write(file_path, format="ascii.ecsv", overwrite=overwrite)
 
 
 def download_catalogs_for_hosts(
@@ -698,7 +695,7 @@ def download_catalogs_for_hosts(
     host_id_label="HOSTID",
     host_ra_label="RA",
     host_dec_label="DEC",
-    **query_class_kwargs
+    **query_class_kwargs,
 ):
     """
     A convenience function of getting all catalogs for hosts.

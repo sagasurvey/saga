@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 
 import numpy as np
-from astropy.table import Table, vstack, unique
+from astropy.table import Table, unique, vstack
 from astropy.time import Time
 from easyquery import Query, QueryMaker
 
@@ -108,9 +108,7 @@ class ObjectCatalog(object):
 
     _surveys = ("sdss", "des", "decals")
 
-    def __init__(
-        self, database=None, host_catalog_class=HostCatalog, host_catalog_instance=None
-    ):
+    def __init__(self, database=None, host_catalog_class=HostCatalog, host_catalog_instance=None):
         self._database = database or Database()
         if host_catalog_instance is not None:
             if not isinstance(host_catalog_instance, host_catalog_class):
@@ -122,15 +120,16 @@ class ObjectCatalog(object):
             self._host_catalog = host_catalog_class(self._database)
 
     def _annotate_catalog(
-        self, table, add_skycoord=False, ensure_all_objid_cols=False,
+        self,
+        table,
+        add_skycoord=False,
+        ensure_all_objid_cols=False,
     ):
         version = 2
         if "EXTINCTION_R" in table.colnames:
             version = 1
             for b in get_sdss_bands():
-                table["{}_mag".format(b)] = (
-                    table[b] - table["EXTINCTION_{}".format(b.upper())]
-                )
+                table["{}_mag".format(b)] = table[b] - table["EXTINCTION_{}".format(b.upper())]
 
         for color in get_all_colors():
             if (
@@ -139,9 +138,7 @@ class ObjectCatalog(object):
             ):
                 continue
             with np.errstate(invalid="ignore"):
-                table[color] = (
-                    table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
-                )
+                table[color] = table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
                 table["{}_err".format(color)] = np.hypot(
                     table["{}_err".format(color[0])], table["{}_err".format(color[1])]
                 )
@@ -159,10 +156,15 @@ class ObjectCatalog(object):
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = calc_fiducial_p_sat(table)
             if "HOST_DIST" in table.colnames:
-                table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(table, human_selected=self._database["human_selected"].read()["OBJID"])
+                table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(
+                    table,
+                    human_selected=self._database["human_selected"].read()["OBJID"],
+                )
                 p_sat_dict["p_sat_corrected"] = 0
 
-        good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
+        good_obj = (
+            Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
+        )
         fill_values_by_query(table, ~good_obj, p_sat_dict)
 
         if add_skycoord:
@@ -262,9 +264,7 @@ class ObjectCatalog(object):
             return_as = "stacked" if (has_spec and base_key == "base_v0p1") else "list"
         return_as = return_as.lower()
         if return_as[0] not in "slid":
-            raise ValueError(
-                '`return_as` should be "list", "stacked", "iter", or "dict"'
-            )
+            raise ValueError('`return_as` should be "list", "stacked", "iter", or "dict"')
 
         if has_spec and base_key == "base_v0p1":
             t = self._database["saga_spectra_May2017"].read()
@@ -337,9 +337,7 @@ class ObjectCatalog(object):
         if "hosts" in kwargs:
             raise TypeError("load_single() got an unexpected keyword argument 'hosts'")
         if "return_as" in kwargs:
-            raise TypeError(
-                "load_single() got an unexpected keyword argument 'return_as'"
-            )
+            raise TypeError("load_single() got an unexpected keyword argument 'return_as'")
         return self.load(hosts=host, **kwargs).pop()
 
     def load_nsa(self, version="0.1.2"):
@@ -353,9 +351,9 @@ class ObjectCatalog(object):
             fixes_dict = fixes_to_nsa_v012
             cols = build.NSA_COLS_USED
         elif version == "1.0.1":
-            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (
-                nsa["DFLAGS"][:, 3:6]
-            ).all(axis=1)
+            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (nsa["DFLAGS"][:, 3:6]).all(
+                axis=1
+            )
             objs_to_remove = [614276, 632725, 628283, 694072, 667243, 219164]
             fixes_dict = fixes_to_nsa_v101
             cols = build2.NSA_COLS_USED
@@ -424,9 +422,7 @@ class ObjectCatalog(object):
             overwrite = Time(overwrite)
 
         host_table = self._host_catalog.load(hosts)
-        HOSTID_COLNAME = (
-            self._host_catalog._ID_COLNAME  # pylint: disable=protected-access
-        )
+        HOSTID_COLNAME = self._host_catalog._ID_COLNAME  # pylint: disable=protected-access
 
         nhosts = len(host_table)
         if not nhosts:
@@ -525,6 +521,7 @@ class ObjectCatalog(object):
                 else:
                     catalogs = ("des",)
             else:
+
                 def _get(col):
                     # pylint: disable=cell-var-from-loop
                     try:
@@ -533,8 +530,17 @@ class ObjectCatalog(object):
                         return 0.0
 
                 catalogs = []
-                coverage = {s: _get(s) for s in ("sdss", "des_dr1", "decals_dr6", "decals_dr7", "decals_dr8")}
-                using_dr8_by_default = 'dr8' in self._database.decals_file_path_pattern
+                coverage = {
+                    s: _get(s)
+                    for s in (
+                        "sdss",
+                        "des_dr1",
+                        "decals_dr6",
+                        "decals_dr7",
+                        "decals_dr8",
+                    )
+                }
+                using_dr8_by_default = "dr8" in self._database.decals_file_path_pattern
 
                 if using_dr8_by_default:
                     coverage["decals"] = coverage["decals_dr8"]
@@ -551,12 +557,18 @@ class ObjectCatalog(object):
                     catalogs.append("decals")
 
                 if not using_dr8_by_default:
-                    if "decals" in catalogs and coverage["decals_dr8"] >= 0.99 and (
-                        coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99
+                    if (
+                        "decals" in catalogs
+                        and coverage["decals_dr8"] >= 0.99
+                        and (coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99)
                     ):
                         catalogs.remove("decals")
                         catalogs.append("decals_dr8")
-                    elif "decals" not in catalogs and coverage["decals_dr8"] >= 0.95 and coverage["des_dr1"] < 0.95:
+                    elif (
+                        "decals" not in catalogs
+                        and coverage["decals_dr8"] >= 0.95
+                        and coverage["des_dr1"] < 0.95
+                    ):
                         catalogs.append("decals_dr8")
 
                 catalogs = tuple(set(catalogs))
@@ -580,9 +592,7 @@ class ObjectCatalog(object):
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
                 "Use {} to build base catalog {} for {}".format(
-                    ", ".join(
-                        (k for k, v in catalog_dict.items() if v is not None)
-                    ).upper(),
+                    ", ".join((k for k, v in catalog_dict.items() if v is not None)).upper(),
                     version_postfix.lstrip("_"),
                     host_id,
                 ),
@@ -702,9 +712,7 @@ class ObjectCatalog(object):
             data = defaultdict(list)
 
         data["HOSTID"].append(host_id)
-        base = self.load_single(
-            host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False
-        )
+        base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
 
@@ -749,8 +757,12 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
-        data["sats_missed_corrected"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum())
+        data["sats_missed_approx"].append(
+            Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum()
+        )
+        data["sats_missed_corrected"].append(
+            Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
+        )
 
         return data
 

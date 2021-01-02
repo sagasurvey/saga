@@ -84,9 +84,7 @@ class HostCatalog(object):
                 try:
                     self._master_table_ = self._database["master_list"].read()
                 except:  # pylint: disable=bare-except # noqa: E722
-                    logging.warning(
-                        "Cannot load master list; attempt to build from scratch..."
-                    )
+                    logging.warning("Cannot load master list; attempt to build from scratch...")
                     self._master_table_ = self.build_master_list()
                 self._master_table_["SAGA_NAME"].fill_value = ""
                 self._master_table_ = self._master_table_.filled()
@@ -106,9 +104,7 @@ class HostCatalog(object):
                 try:
                     self._host_table_ = self._database["hosts"].read()
                 except:  # pylint: disable=bare-except # noqa: E722
-                    logging.warning(
-                        "Cannot load host list; attempt to load master list..."
-                    )
+                    logging.warning("Cannot load host list; attempt to load master list...")
                     self._host_table_ = cuts.potential_hosts.filter(self._master_table)
                 self._host_table_["SAGA_NAME"].fill_value = ""
                 self._host_table_ = self._host_table_.filled()
@@ -282,9 +278,7 @@ class HostCatalog(object):
     def add_object_stats(self, host_table, use_remote=False):
         data_obj = self._database["host_stats"]
         stats = data_obj.remote.read() if use_remote else data_obj.read()
-        cols_to_keep = [
-            c for c in stats.colnames if c not in host_table.colnames or c == "HOSTID"
-        ]
+        cols_to_keep = [c for c in stats.colnames if c not in host_table.colnames or c == "HOSTID"]
         stats = stats[cols_to_keep]
         d = join(host_table, stats, "HOSTID", "left")
         for col in cols_to_keep:
@@ -372,9 +366,7 @@ class HostCatalog(object):
                     ra, dec
                 )
             )
-        cat = self._annotate_table(
-            cat, add_coord=add_coord, include_stats=include_stats
-        )
+        cat = self._annotate_table(cat, add_coord=add_coord, include_stats=include_stats)
         return cat[0]
 
     def build_master_list(self, overwrite=False, overwrite_host_list=False):
@@ -449,10 +441,7 @@ class FieldCatalog(HostCatalog):
         if self._host_index_ is None:
             self._host_index_ = dict(
                 zip(
-                    (
-                        f.replace("_", "").lower()
-                        for f in self._host_table[self._ID_COLNAME]
-                    ),
+                    (f.replace("_", "").lower() for f in self._host_table[self._ID_COLNAME]),
                     [(i,) for i in range(len(self._host_table))],
                 )
             )

@@ -57,9 +57,7 @@ def read_2df(file_path):
 
     # LOWZ REDSHIFTS IN 2dF ARE PROBLEMATIC, SET ZQ = 2
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})
-    fill_values_by_query(
-        specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2}
-    )
+    fill_values_by_query(specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2})
 
     specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
     specs["TELNAME"] = "2dF"
@@ -87,9 +85,7 @@ def read_2dflens(file_path):
 
     # LOWZ REDSHIFTS IN 2dFLENS ARE PROBLEMATIC, SET ZQ = 2
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})
-    fill_values_by_query(
-        specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2}
-    )
+    fill_values_by_query(specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2})
 
     specs["SPECOBJID"] = ["2dFLenS_{}".format(i) for i in range(len(specs))]
     specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
@@ -178,9 +174,7 @@ def read_wigglez(file_path):
 
     # LOWZ REDSHIFTS IN WIGGLEZ ARE PROBLEMATIC, SET ZQ = 2
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})
-    fill_values_by_query(
-        specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2}
-    )
+    fill_values_by_query(specs, Query("ZQUALITY == 3", "SPEC_Z < 0.05"), {"ZQUALITY": 2})
 
     specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
     specs["TELNAME"] = "WIGGZ"
@@ -300,9 +294,7 @@ def read_alfalfa(file_path):
     del specs["RAdeg_OC"], specs["RAdeg_HI"], specs["DECdeg_OC"], specs["DECdeg_HI"]
 
     specs["SPEC_Z"] = specs["Vhelio"].astype(np.float64) / SPEED_OF_LIGHT
-    specs["SPEC_Z_ERR"] = (
-        specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
-    )
+    specs["SPEC_Z_ERR"] = specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
     specs["ZQUALITY"] = np.where(specs["HIcode"] == 1, 4, 3)
     del specs["Vhelio"], specs["W50"], specs["HIcode"]
 

@@ -62,7 +62,9 @@ class FileObject(DownloadableBase):
     @staticmethod
     def _gz_fallback(file_path):
         file_path_str = str(file_path)
-        file_path_alt = file_path_str[:-3] if file_path_str.lower().endswith(".gz") else (file_path_str + ".gz")
+        file_path_alt = (
+            file_path_str[:-3] if file_path_str.lower().endswith(".gz") else (file_path_str + ".gz")
+        )
         if (not os.path.isfile(file_path)) and os.path.isfile(file_path_alt):
             return file_path_alt
         return file_path
@@ -123,9 +125,7 @@ class GoogleSheets(FastCsvTable):
         path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
             key, gid
         )
-        self.url = "https://docs.google.com/spreadsheets/d/{0}/edit#gid={1}".format(
-            key, gid
-        )
+        self.url = "https://docs.google.com/spreadsheets/d/{0}/edit#gid={1}".format(key, gid)
         super(GoogleSheets, self).__init__(path, **kwargs)
 
     def read(self):
@@ -220,9 +220,7 @@ class DataObject(object):
     >>> dobj.download('data/file.fits')
     """
 
-    def __init__(
-        self, remote, local=None, cache_in_memory=False, use_local_first=False
-    ):
+    def __init__(self, remote, local=None, cache_in_memory=False, use_local_first=False):
         self._local = None
         self.remote = remote
         self.local = local
@@ -231,9 +229,7 @@ class DataObject(object):
         self._cached_table = None
 
         if use_local_first and local is None:
-            raise ValueError(
-                "Must specify `local` when setting `use_local_first=True`."
-            )
+            raise ValueError("Must specify `local` when setting `use_local_first=True`.")
 
     @property
     def local(self):
@@ -272,16 +268,12 @@ class DataObject(object):
 
         if self.use_local_first:
             if not self.local.isfile():
-                logging.warning(
-                    "Cannot find local file; attempt to download from remote..."
-                )
+                logging.warning("Cannot find local file; attempt to download from remote...")
                 self.download()
             try:
                 table = self.local.read()
             except (IOError, OSError):
-                logging.warning(
-                    "Failed to read local file; attempt to read remote file..."
-                )
+                logging.warning("Failed to read local file; attempt to read remote file...")
                 table = self.remote.read(**kwargs)
         else:
             try:
@@ -289,13 +281,9 @@ class DataObject(object):
             except Exception as read_exception:  # pylint: disable=W0703
                 if self.local is None:
                     raise read_exception
-                logging.warning(
-                    "Failed to read remote; fall back to read local file..."
-                )
+                logging.warning("Failed to read remote; fall back to read local file...")
                 if not self.local.isfile():
-                    logging.warning(
-                        "Cannot find local file; attempt to download from remote..."
-                    )
+                    logging.warning("Cannot find local file; attempt to download from remote...")
                     self.download()
                 table = self.local.read()
 
@@ -331,9 +319,7 @@ class DataObject(object):
 
         f.write(table)
 
-    def download(
-        self, local_file_path=None, overwrite=False, compress=False, set_as_local=True
-    ):
+    def download(self, local_file_path=None, overwrite=False, compress=False, set_as_local=True):
         """
         Download in the data as a file
 
@@ -355,9 +341,7 @@ class DataObject(object):
             else:
                 set_as_local = False  # no need to do this again
 
-        self.remote.download_as_file(
-            local_file_path, overwrite=overwrite, compress=compress
-        )
+        self.remote.download_as_file(local_file_path, overwrite=overwrite, compress=compress)
 
         if set_as_local:
             self.local = local_file_path

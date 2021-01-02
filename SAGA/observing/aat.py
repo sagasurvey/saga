@@ -38,9 +38,7 @@ def get_gaia_guidestars(
     Evans et al. 2018 r-to-G conversion
     """
     if gaia_catalog is None:
-        gaia_cat = table.Table.read(
-            "external_catalogs/astrometric/{}_gaia.ecsv".format(hostname)
-        )
+        gaia_cat = table.Table.read("external_catalogs/astrometric/{}_gaia.ecsv".format(hostname))
     else:
         gaia_cat = gaia_catalog
 
@@ -54,9 +52,7 @@ def get_gaia_guidestars(
     gmag = gaia_cat["phot_g_mean_mag"]
 
     omsk = (matchmagrng[0] < omag) & (omag < matchmagrng[1])
-    gmsk = ((matchmagrng[0] - d_matchmag) < gmag) & (
-        gmag < (matchmagrng[1] + d_matchmag)
-    )
+    gmsk = ((matchmagrng[0] - d_matchmag) < gmag) & (gmag < (matchmagrng[1] + d_matchmag))
     oscmsk = obj_cat["coord"][omsk]
     gscmsk = gaia_sc[gmsk]
 
@@ -86,9 +82,7 @@ def get_gaia_guidestars(
     print("Found", len(gstars), "Gaia guide stars")
 
     if neighbor_cut is not None:
-        possible_neighbor_stars = gaia_cat[
-            gaia_cat["g_as_r_mag"] < magrng[1] + nmagdown
-        ]
+        possible_neighbor_stars = gaia_cat[gaia_cat["g_as_r_mag"] < magrng[1] + nmagdown]
         nsc = SkyCoord(possible_neighbor_stars["ra"], possible_neighbor_stars["dec"])
         gsc = SkyCoord(gstars["ra"], gstars["dec"])
         idx, d2d, _ = gsc.match_to_catalog_sky(nsc, 2)
@@ -141,7 +135,13 @@ def get_sdss_guidestars(hostname, host_catalog, object_catalog, verbose=True):
 
 
 def write_fld_file(
-    target_catalog, host, obstime, fn, suffix=" master catalog", host_id_label="HOSTID", host_coord_label="coord",
+    target_catalog,
+    host,
+    obstime,
+    fn,
+    suffix=" master catalog",
+    host_id_label="HOSTID",
+    host_coord_label="coord",
 ):
     output = StringIO()
 
@@ -172,9 +172,7 @@ def write_fld_file(
                 day=obstime.datetime.day,
             )
         )
-        censtr = host[host_coord_label].to_string(
-            "hmsdms", sep=" ", precision=2, alwayssign=True
-        )
+        censtr = host[host_coord_label].to_string("hmsdms", sep=" ", precision=2, alwayssign=True)
         fh.write("CENTRE  " + censtr + "\n")
         fh.write("EQUINOX J2000.0\n")
         fh.write("# End of Header\n\n")
@@ -226,9 +224,7 @@ def subsample_catalog(
         del subcat[np.concatenate(idxs_to_rem)]
 
     if verbose:
-        npris = dict(
-            enumerate(np.bincount(subcat["Priority"][subcat["Notes"] == "Targets"]))
-        )
+        npris = dict(enumerate(np.bincount(subcat["Priority"][subcat["Notes"] == "Targets"])))
         npris = {k: v for k, v in npris.items() if v > 0}
         print(
             "Nflux:",
@@ -269,14 +265,10 @@ def make_decals_viewer_cutouts(
         imgurl = template_url.format(
             ra=row[raname], dec=row[decname], layer=survey, size=size, zoom=zoom
         )
-        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(
-            row[raname], row[decname]
-        )
+        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
 
         namestr = "" if namecol is None else (str(row[namecol]) + "<br>")
-        entries.append(
-            '{}<a href="{}"><img src="{}"></a>'.format(namestr, viewurl, imgurl)
-        )
+        entries.append('{}<a href="{}"><img src="{}"></a>'.format(namestr, viewurl, imgurl))
 
     entryrows = [[]]
     while entries:
@@ -359,9 +351,7 @@ def show_des_cutouts(
 ):
     base_url = "https://des.ncsa.illinois.edu"
 
-    list_url = base_url + "/easyweb/static/workdir/{}/{}/list.json".format(
-        username, jobname
-    )
+    list_url = base_url + "/easyweb/static/workdir/{}/{}/list.json".format(username, jobname)
     print(list_url)
     list_json = requests.get(list_url).json()
     img_urls = [base_url + img["name"] for img in list_json]
@@ -377,15 +367,11 @@ def show_des_cutouts(
     )
     entries = []
     for row, imgurl in zip(table, img_urls):
-        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(
-            row[raname], row[decname]
-        )
+        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
 
         namestr = "" if namecol is None else (str(row[namecol]) + "<br>")
         entries.append(
-            '{}<a href="{}"><img src="{}"{}></a>'.format(
-                namestr, viewurl, imgurl, sizestr
-            )
+            '{}<a href="{}"><img src="{}"{}></a>'.format(namestr, viewurl, imgurl, sizestr)
         )
 
     entryrows = [[]]

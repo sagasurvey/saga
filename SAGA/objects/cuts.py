@@ -84,13 +84,17 @@ valid_sb = Query("sb_r > 0", "sb_r < 35")
 gr_cut = Query("gr - abs(gr_err) * 2 < 0.85") | (~valid_g_mag)
 ri_cut = Query("ri - abs(ri_err) * 2 < 0.55") | (~valid_i_mag)
 rz_cut = Query("rz - abs(rz_err) * 2 < 1") | (~valid_z_mag)
-ug_cut = Query("ug + abs(ug_err) * 2 > (gr - abs(gr_err) * 2) * 1.5") | (~valid_u_mag) | (~valid_g_mag)
+ug_cut = (
+    Query("ug + abs(ug_err) * 2 > (gr - abs(gr_err) * 2) * 1.5") | (~valid_u_mag) | (~valid_g_mag)
+)
 gri_cut = gr_cut & ri_cut
 ugri_cut = gri_cut & ug_cut
 grz_cut = gr_cut & rz_cut
 paper1_targeting_cut = griz_cut = gri_or_grz_cut = gr_cut & ri_cut & rz_cut
 
-lsbg_cut = Query("HOST_DIST * 1000 * radius / 3600 / 90 * arccos(0) > 10 ** (-0.1 * (r_mag - log10(HOST_DIST) * 5 - 25 + 18))")
+lsbg_cut = Query(
+    "HOST_DIST * 1000 * radius / 3600 / 90 * arccos(0) > 10 ** (-0.1 * (r_mag - log10(HOST_DIST) * 5 - 25 + 18))"
+)
 high_priority_sb_tight = Query("sb_r + abs(sb_r_err) - 0.7 * (r_mag - 14) > 18.5") | (~valid_sb)
 gr_cut_tight = Query("gr - abs(gr_err) < 0.75") | (~valid_g_mag)
 
@@ -120,7 +124,9 @@ relaxed_targeting_cuts = Query(
 
 very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_approx >= 1e-4"
 
-paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = high_priority_sb_tight & high_priority_gr
+paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = (
+    high_priority_sb_tight & high_priority_gr
+)
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")

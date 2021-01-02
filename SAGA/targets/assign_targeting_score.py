@@ -3,8 +3,8 @@ module assign_targeting_score
 """
 from itertools import chain
 
-import numpy as np
 import numexpr as ne
+import numpy as np
 from easyquery import Query, QueryMaker
 
 from .. import utils
@@ -49,9 +49,7 @@ def _calc_simple_satellite_probability(base, model_parameters, colors):
     x = np.where(np.isfinite(x), x, 9999)
     return np.where(
         x > model_parameters[2],
-        np.minimum(
-            np.exp((x - model_parameters[3]) * model_parameters[4]), model_parameters[5]
-        ),
+        np.minimum(np.exp((x - model_parameters[3]) * model_parameters[4]), model_parameters[5]),
         0.0,
     )
 
@@ -99,13 +97,13 @@ def ensure_proper_prob(p):
 def add_cut_scores(base):
     base["score_sb_r"] = ne.evaluate("sb_r + abs(sb_r_err) - 0.6 * (r_mag - 14)", base, {})
     for c in ("gr", "ri", "rz"):
-        base["score_{}_r".format(c)] = ne.evaluate("{0} - abs({0}_err) + 0.06* (r_mag - 14)".format(c), base, {})
+        base["score_{}_r".format(c)] = ne.evaluate(
+            "{0} - abs({0}_err) + 0.06* (r_mag - 14)".format(c), base, {}
+        )
     return base
 
 
-def assign_targeting_score_v1(
-    base, manual_selected_objids=None, gmm_parameters=None, **kwargs
-):
+def assign_targeting_score_v1(base, manual_selected_objids=None, gmm_parameters=None, **kwargs):
     """
     Last updated: 05/07/2018
      100 Human selection and Special targets
@@ -126,9 +124,7 @@ def assign_targeting_score_v1(
     """
 
     base["P_simple"] = ensure_proper_prob(calc_simple_satellite_probability(base))
-    base["P_GMM_sdss"] = ensure_proper_prob(
-        calc_gmm_satellite_probability(base, gmm_parameters)
-    )
+    base["P_GMM_sdss"] = ensure_proper_prob(calc_gmm_satellite_probability(base, gmm_parameters))
     base["P_GMM"] = base["P_GMM_sdss"]
     base["log_L_GMM"] = calc_log_likelihood(
         *get_input_data(base), *(gmm_parameters[n] for n in param_labels_nosat)
@@ -156,9 +152,7 @@ def assign_targeting_score_v1(
 
     fill_values_by_query(base, outwith_host, {"TARGETING_SCORE": 900})
     fill_values_by_query(base, within_host, {"TARGETING_SCORE": 800})
-    fill_values_by_query(
-        base, basic_cut & veryhigh_p & (~C.sdss_limit), {"TARGETING_SCORE": 700}
-    )
+    fill_values_by_query(base, basic_cut & veryhigh_p & (~C.sdss_limit), {"TARGETING_SCORE": 700})
     fill_values_by_query(base, outwith_host & C.sdss_limit, {"TARGETING_SCORE": 500})
     fill_values_by_query(base, within_host & median_p, {"TARGETING_SCORE": 400})
     fill_values_by_query(base, within_host & high_p, {"TARGETING_SCORE": 300})
@@ -172,9 +166,7 @@ def assign_targeting_score_v1(
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 600
 
-    base["TARGETING_SCORE"] += (
-        np.round((1.0 - base["P_GMM_sdss"]) * 80.0).astype(np.int) + 10
-    )
+    base["TARGETING_SCORE"] += np.round((1.0 - base["P_GMM_sdss"]) * 80.0).astype(np.int) + 10
 
     fill_values_by_query(base, C.is_sat, {"TARGETING_SCORE": 150})
 
@@ -199,7 +191,7 @@ def assign_targeting_score_v2(
     seed=123,
     remove_lists=None,
     low_priority_objids=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Last updated: 05/19/2020
@@ -222,7 +214,12 @@ def assign_targeting_score_v2(
     1400 Has spec already
     """
 
-    basic_cut = (C.relaxed_targeting_cuts | C.paper1_targeting_cut) & C.is_clean2 & C.is_galaxy2 & Query("r_mag < 21")
+    basic_cut = (
+        (C.relaxed_targeting_cuts | C.paper1_targeting_cut)
+        & C.is_clean2
+        & C.is_galaxy2
+        & Query("r_mag < 21")
+    )
     if not ignore_specs:
         basic_cut &= ~C.has_spec
 
@@ -262,9 +259,7 @@ def assign_targeting_score_v2(
                         base_this["".join((b2, "_err", postfix))],
                     )
 
-            bands = getattr(  # pylint: disable=not-callable
-                utils, "get_{}_bands".format(survey)
-            )()
+            bands = getattr(utils, "get_{}_bands".format(survey))()  # pylint: disable=not-callable
 
             base_this["P_GMM"] = ensure_proper_prob(
                 calc_gmm_satellite_probability(
@@ -276,7 +271,9 @@ def assign_targeting_score_v2(
             )
             base_this["log_L_GMM"] = calc_log_likelihood(
                 *get_input_data(
-                    base_this, bands=bands, mag_err_postfix="_err" + postfix,
+                    base_this,
+                    bands=bands,
+                    mag_err_postfix="_err" + postfix,
                 ),
                 *(gmm_parameters_this[n] for n in param_labels_nosat),
             )
@@ -302,7 +299,8 @@ def assign_targeting_score_v2(
     if "sdss" in surveys and ("decals" in surveys or "des" in surveys):
         deep_survey = "des" if "des" in surveys else "decals"
         has_good_deep = Query(
-            "OBJID_{} != -1".format(deep_survey), "REMOVE_{} == 0".format(deep_survey),
+            "OBJID_{} != -1".format(deep_survey),
+            "REMOVE_{} == 0".format(deep_survey),
         )
         over_subtraction = Query(
             QueryMaker.equals("survey", "sdss"),
@@ -330,17 +328,21 @@ def assign_targeting_score_v2(
     very_low_sb_cut = Query(
         "r_mag < 20.8",
         (
-            Query(C.high_priority_cuts, Query("score_sb_r >= 21.25") | Query("sb_r >= 25.25"))
-            | Query(QueryMaker.equals("survey", "des"), Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"))
+            Query(
+                C.high_priority_cuts,
+                Query("score_sb_r >= 21.25") | Query("sb_r >= 25.25"),
+            )
+            | Query(
+                QueryMaker.equals("survey", "des"),
+                Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
+            )
         ),
         C.valid_sb,
         exclusion_cuts,
     )
 
     fill_values_by_query(base, C.faint_end_limit, {"TARGETING_SCORE": 900})
-    fill_values_by_query(
-        base, Query(C.sat_rcut, C.faint_end_limit), {"TARGETING_SCORE": 800}
-    )
+    fill_values_by_query(base, Query(C.sat_rcut, C.faint_end_limit), {"TARGETING_SCORE": 800})
     fill_values_by_query(
         base,
         Query(
@@ -439,7 +441,7 @@ def assign_targeting_score_v2plus(
     seed=123,
     remove_lists=None,
     low_priority_objids=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Last updated: 08/19/2020
@@ -484,7 +486,8 @@ def assign_targeting_score_v2plus(
     if "sdss" in surveys and ("decals" in surveys or "des" in surveys):
         deep_survey = "des" if "des" in surveys else "decals"
         has_good_deep = Query(
-            "OBJID_{} != -1".format(deep_survey), "REMOVE_{} == 0".format(deep_survey),
+            "OBJID_{} != -1".format(deep_survey),
+            "REMOVE_{} == 0".format(deep_survey),
         )
         over_subtraction = Query(
             QueryMaker.equals("survey", "sdss"),
@@ -517,10 +520,22 @@ def assign_targeting_score_v2plus(
     fill_values_by_query(base, Query(C.basic_cut2), {"TARGETING_SCORE": 900})
     fill_values_by_query(base, Query(basic), {"TARGETING_SCORE": 800})
     fill_values_by_query(base, Query(basic, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 700})
-    fill_values_by_query(base, Query(basic_loose, C.faint_end_limit, main_targeting_cuts), {"TARGETING_SCORE": 600})
-    fill_values_by_query(base, Query(basic_loose, bright_main) | Query(basic, bright, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 500})
+    fill_values_by_query(
+        base,
+        Query(basic_loose, C.faint_end_limit, main_targeting_cuts),
+        {"TARGETING_SCORE": 600},
+    )
+    fill_values_by_query(
+        base,
+        Query(basic_loose, bright_main) | Query(basic, bright, C.relaxed_targeting_cuts),
+        {"TARGETING_SCORE": 500},
+    )
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
-    fill_values_by_query(base, Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"), {"TARGETING_SCORE": 200})
+    fill_values_by_query(
+        base,
+        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        {"TARGETING_SCORE": 200},
+    )
 
     fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
     fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
@@ -536,7 +551,10 @@ def assign_targeting_score_v2plus(
 
         fill_values_by_query(
             base,
-            Query(C.is_sat, (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME")),
+            Query(
+                C.is_sat,
+                (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME"),
+            ),
             {"TARGETING_SCORE": 150},
         )
 
@@ -574,7 +592,9 @@ def assign_targeting_score_v2plus(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)  # pylint: disable=no-member
+                idx = np.random.RandomState(seed).choice(
+                    np.flatnonzero(score_this.mask(base)), n - n_limit, False
+                )  # pylint: disable=no-member
                 base["TARGETING_SCORE"][idx] = new_score
             else:
                 n_cut = (n_limit - 1) if n_limit else (n // 2)
@@ -596,9 +616,7 @@ def assign_targeting_score_v2plus(
 def assign_targeting_score_lowz(
     base, manual_selected_objids=None, gmm_parameters=None, ignore_specs=False, **kwargs
 ):
-    base["p_GMM"] = calc_gmm_satellite_probability(
-        base, gmm_parameters["des_lowz"], bands="grizy"
-    )
+    base["p_GMM"] = calc_gmm_satellite_probability(base, gmm_parameters["des_lowz"], bands="grizy")
     base["p_GMM_fsps"] = calc_gmm_satellite_probability(
         base, gmm_parameters["des_lowz_fake"], bands="griz"
     )
@@ -611,9 +629,7 @@ def assign_targeting_score_lowz(
     if not ignore_specs:
         basic &= ~C.has_spec
     fill_values_by_query(base, basic, {"TARGETING_SCORE": 900})
-    fill_values_by_query(
-        base, Query(basic, "p_GMM + p_GMM_fsps > 0.95"), {"TARGETING_SCORE": 800}
-    )
+    fill_values_by_query(base, Query(basic, "p_GMM + p_GMM_fsps > 0.95"), {"TARGETING_SCORE": 800})
     fill_values_by_query(
         base, Query(basic, "p_GMM > 0.6", "p_GMM_fsps > 0.6"), {"TARGETING_SCORE": 800}
     )
@@ -631,7 +647,12 @@ def assign_targeting_score_lowz(
 def assign_targeting_score_lowz_v2(base, manual_selected_objids=None, ignore_specs=False, **kwargs):
     base["TARGETING_SCORE"] = 1000
 
-    targeting_cuts = Query(C.griz_cut, C.relaxed_targeting_cuts, "gr + r_mag / 14 < 2", "sb_r - 0.9 * r_mag >= 5.25")
+    targeting_cuts = Query(
+        C.griz_cut,
+        C.relaxed_targeting_cuts,
+        "gr + r_mag / 14 < 2",
+        "sb_r - 0.9 * r_mag >= 5.25",
+    )
     if not ignore_specs:
         targeting_cuts = Query(targeting_cuts, ~C.has_spec)
 

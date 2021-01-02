@@ -75,9 +75,7 @@ def get_empty_str_array(array_length, string_length=48, initialize_with=""):
     return a
 
 
-def add_skycoord(
-    table, ra_label="RA", dec_label="DEC", coord_label="coord", unit="deg"
-):
+def add_skycoord(table, ra_label="RA", dec_label="DEC", coord_label="coord", unit="deg"):
     if coord_label not in table.colnames:
         table[coord_label] = SkyCoord(table[ra_label], table[dec_label], unit=unit)
     return table
@@ -218,10 +216,7 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
         return col_this.data
 
     return np.vstack(
-        [
-            _get_data(table[c][row_mask]).astype(dtype, casting="same_kind", copy=False)
-            for c in cols
-        ]
+        [_get_data(table[c][row_mask]).astype(dtype, casting="same_kind", copy=False) for c in cols]
     ).T
 
 

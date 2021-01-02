@@ -12,9 +12,10 @@ from easyquery import Query
 
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
+from ..observing.aat import get_gaia_guidestars, write_fld_file
 from ..utils import add_skycoord
-from ..observing.aat import write_fld_file, get_gaia_guidestars
-from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1, assign_targeting_score_v2plus)
+from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
+                                     assign_targeting_score_v2plus)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -101,9 +102,7 @@ class TargetSelection(object):
 
         try:
             self._manual_selected_objids = get_unique_objids(
-                self._database[manual_selected_objids or "manual_targets"].read()[
-                    "OBJID"
-                ]
+                self._database[manual_selected_objids or "manual_targets"].read()["OBJID"]
             )
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
@@ -115,9 +114,7 @@ class TargetSelection(object):
             ("decals", "decals_objid"),
         ):
             try:
-                objids = get_unique_objids(
-                    self._database["{}_remove".format(survey)].read()[col]
-                )
+                objids = get_unique_objids(self._database["{}_remove".format(survey)].read()[col])
             except KeyError:
                 pass
             else:
@@ -139,14 +136,12 @@ class TargetSelection(object):
         else:
             self.columns = None
             if additional_columns is not None:
-                raise ValueError(
-                    "`additional_columns` is not supported for version > 1"
-                )
+                raise ValueError("`additional_columns` is not supported for version > 1")
 
     def _load_gmm_parameters(self, gmm_parameters):
         prefix = "gmm_parameters_"
         keys = [
-            k[len(prefix):]
+            k[len(prefix) :]
             for k in self._database.keys()
             if not isinstance(k, tuple) and k.startswith(prefix)
         ]
@@ -159,7 +154,7 @@ class TargetSelection(object):
 
         try:
             if gmm_parameters.startswith(prefix):
-                gmm_parameters = gmm_parameters[len(prefix):]
+                gmm_parameters = gmm_parameters[len(prefix) :]
         except AttributeError:
             return gmm_parameters
 
@@ -196,9 +191,7 @@ class TargetSelection(object):
         """
         return_as = (return_as if return_as else "none").lower()
         if return_as[0] not in "ndsli":
-            raise ValueError(
-                '`return_as` should be None, "dict", "list", "stacked", or "iter"'
-            )
+            raise ValueError('`return_as` should be None, "dict", "list", "stacked", or "iter"')
 
         host_ids = self._host_catalog.resolve_id(hosts, "string")
 
@@ -212,10 +205,7 @@ class TargetSelection(object):
                     add_skycoord=False,
                 )
 
-            if (
-                recalculate_score
-                or "TARGETING_SCORE" not in self.target_catalogs[host_id].colnames
-            ):
+            if recalculate_score or "TARGETING_SCORE" not in self.target_catalogs[host_id].colnames:
                 self.assign_targeting_score(
                     self.target_catalogs[host_id],
                     manual_selected_objids=self._manual_selected_objids,
@@ -228,9 +218,7 @@ class TargetSelection(object):
             return
 
         output_iter = (
-            self.target_catalogs[host_id][columns]
-            if columns
-            else self.target_catalogs[host_id]
+            self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id]
             for host_id in host_ids
         )
         if return_as.startswith("item"):
@@ -316,9 +304,9 @@ def prepare_mmt_catalog(
         )
 
     if remove_outskirts:
-        target_catalog = (
-            Query("RHOST_KPC < 400.0") | Query("RHOST_ARCM < 40.0")
-        ).filter(target_catalog)
+        target_catalog = (Query("RHOST_KPC < 400.0") | Query("RHOST_ARCM < 40.0")).filter(
+            target_catalog
+        )
 
     is_target = Query(
         "TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold)
@@ -328,26 +316,16 @@ def prepare_mmt_catalog(
         is_star = Query("PHOTPTYPE == 6", "REMOVE == -1")
         mags = {b: "PSFMAG_{}".format(b.upper) for b in "ugr"}
     elif "OBJID_sdss" in target_catalog.colnames:
-        is_star = Query(
-            "OBJID_sdss != -1", "morphology_info_sdss == 6", "REMOVE_sdss == 0"
-        )
+        is_star = Query("OBJID_sdss != -1", "morphology_info_sdss == 6", "REMOVE_sdss == 0")
         mags = {b: "{}_mag_sdss".format(b) for b in "ugr"}
     else:
         is_star = Query(~Query("is_galaxy"), "REMOVE == 0")
         mags = {b: "{}_mag".format(b) for b in "ugr"}
 
-    is_guide_star = is_star & Query(
-        "{r} >= 14".format(**mags), "{r} < 15".format(**mags)
-    )
-    is_flux_star = is_star & Query(
-        "{r} >= 17".format(**mags), "{r} < 18".format(**mags)
-    )
-    is_flux_star &= Query(
-        "{u} - {g} >= 0.6".format(**mags), "{u} - {g} < 1.2".format(**mags)
-    )
-    is_flux_star &= Query(
-        "{g} - {r} >= 0".format(**mags), "{g} - {r} < 0.6".format(**mags)
-    )
+    is_guide_star = is_star & Query("{r} >= 14".format(**mags), "{r} < 15".format(**mags))
+    is_flux_star = is_star & Query("{r} >= 17".format(**mags), "{r} < 18".format(**mags))
+    is_flux_star &= Query("{u} - {g} >= 0.6".format(**mags), "{u} - {g} < 1.2".format(**mags))
+    is_flux_star &= Query("{g} - {r} >= 0".format(**mags), "{g} - {r} < 0.6".format(**mags))
     is_flux_star &= Query("({g} - {r}) > 0.75 * ({u} - {g}) - 0.45".format(**mags))
 
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
@@ -369,9 +347,7 @@ def prepare_mmt_catalog(
     if flux_star_kwargs is None:
         flux_star_kwargs = {}
 
-    fs_min_dist_to_target = max(
-        0, float(flux_star_kwargs.get("min_dist_to_target", 20))
-    )  # arcsec
+    fs_min_dist_to_target = max(0, float(flux_star_kwargs.get("min_dist_to_target", 20)))  # arcsec
     fs_rank = int(flux_star_kwargs.get("rank", 5))
 
     # move flux star rank
@@ -406,9 +382,7 @@ def prepare_mmt_catalog(
         )
         print("flux star ranked at    =", fs_rank)
         print("# of guide stars       =", is_guide_star.count(target_catalog))
-        print(
-            "# of total targets     =", (is_flux_star | is_target).count(target_catalog)
-        )
+        print("# of total targets     =", (is_flux_star | is_target).count(target_catalog))
         print("# of flux star targets =", is_flux_star.count(target_catalog))
         print("# of galaxy targets    =", is_target.count(target_catalog))
         for rank in range(1, 9):
@@ -447,9 +421,7 @@ def prepare_mmt_catalog(
                     "ra": lambda x: Angle(x, "deg")
                     .wrap_at(360 * u.deg)  # pylint: disable=no-member
                     .to_string("hr", sep=":", precision=3),  # pylint: disable=E1101
-                    "dec": lambda x: Angle(x, "deg").to_string(
-                        "deg", sep=":", precision=3
-                    ),
+                    "dec": lambda x: Angle(x, "deg").to_string("deg", sep=":", precision=3),
                     "mag": "%.2f",
                     "rank": lambda x: "" if x == 99 else "{:d}".format(x),
                 },
@@ -532,9 +504,7 @@ def prepare_aat_catalog(
         raise ValueError("`sky_fiber_max` too small, this host is larger than that!")
 
     if annulus_wanted < 0:
-        raise ValueError(
-            "`sky_fiber_max` must be larger than `sky_fiber_host_rvir_threshold`!"
-        )
+        raise ValueError("`sky_fiber_max` must be larger than `sky_fiber_host_rvir_threshold`!")
 
     def _gen_dist_rand(seed_this, size):
         U = np.random.RandomState(seed_this).rand(size)
@@ -547,13 +517,9 @@ def prepare_aat_catalog(
             size_in = size - size_out
             dist_rand_out = _gen_dist_rand(seed_this, size_out)
             index = 1.0 / (sky_fiber_radial_adjustment + 2.0)
-            dist_rand_in = (
-                np.random.RandomState(seed_this + 1).rand(size_in) ** index
-            ) * host_rvir
+            dist_rand_in = (np.random.RandomState(seed_this + 1).rand(size_in) ** index) * host_rvir
             return (
-                np.concatenate(
-                    [dist_rand_out.to_value("deg"), dist_rand_in.to_value("deg")]
-                )
+                np.concatenate([dist_rand_out.to_value("deg"), dist_rand_in.to_value("deg")])
                 * u.deg
             )
 
@@ -586,7 +552,9 @@ def prepare_aat_catalog(
 
     gaia_guidestars = None
     if gaia_catalog is not None:
-        gaia_guidestars = get_gaia_guidestars(object_catalog=target_catalog, gaia_catalog=gaia_catalog)
+        gaia_guidestars = get_gaia_guidestars(
+            object_catalog=target_catalog, gaia_catalog=gaia_catalog
+        )
         if len(gaia_guidestars) > guidestar_max:
             idx = np.random.RandomState(seed + 3).choice(len(gaia_guidestars), guidestar_max, False)
             gaia_guidestars = gaia_guidestars[idx]
@@ -625,7 +593,9 @@ def prepare_aat_catalog(
     flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_indices = flux_star_indices[sep > flux_star_removal_threshold]
     if len(flux_star_indices) > flux_star_max:
-        flux_star_indices = np.random.RandomState(seed + 4).choice(flux_star_indices, flux_star_max, False)
+        flux_star_indices = np.random.RandomState(seed + 4).choice(
+            flux_star_indices, flux_star_max, False
+        )
     target_catalog["Priority"][flux_star_indices] = 9
     target_catalog = Query("Priority > 0").filter(target_catalog)
     n_flux_star = Query("Priority == 9").count(target_catalog)

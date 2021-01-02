@@ -11,13 +11,17 @@ __all__ = ["SpectraData"]
 
 
 class SpectraData(object):
-    def __init__(
-        self, spectra_dir_path=None, external_specs_dict=None
-    ):
+    def __init__(self, spectra_dir_path=None, external_specs_dict=None):
         self.spectra_dir_path = spectra_dir_path
         self._external_specs_dict = external_specs_dict or {}
 
-    def read(self, add_coord=True, before_time=None, additional_specs=None, exclude_spec_masks=None):
+    def read(
+        self,
+        add_coord=True,
+        before_time=None,
+        additional_specs=None,
+        exclude_spec_masks=None,
+    ):
         all_specs = []
 
         for k, v in self._external_specs_dict.items():
@@ -59,12 +63,8 @@ class SpectraData(object):
                         before_time=before_time,
                         exclude_spec_masks=exclude_spec_masks,
                     ),
-                    read_observed.read_wiyn(
-                        os.path.join(self.spectra_dir_path, "WIYN")
-                    ),
-                    read_observed.read_imacs(
-                        os.path.join(self.spectra_dir_path, "IMACS")
-                    ),
+                    read_observed.read_wiyn(os.path.join(self.spectra_dir_path, "WIYN")),
+                    read_observed.read_imacs(os.path.join(self.spectra_dir_path, "IMACS")),
                 ]
             )
 

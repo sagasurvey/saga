@@ -21,14 +21,8 @@ _SPECS_COLUMNS = (
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
 
 
-def ensure_specs_dtype(
-    spectra, cols_definition=_SPECS_COLUMNS, skip_missing_cols=False
-):
-    cols_iter = (
-        cols_definition.items()
-        if isinstance(cols_definition, dict)
-        else cols_definition
-    )
+def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_cols=False):
+    cols_iter = cols_definition.items() if isinstance(cols_definition, dict) else cols_definition
     for c, t in cols_iter:
         if c not in spectra.colnames:
             if skip_missing_cols:

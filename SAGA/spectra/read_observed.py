@@ -63,7 +63,7 @@ def read_generic_spectra(
     before_time=None,
     table_read_kwargs=None,
     exclude_spec_masks=None,
-    **kwargs
+    **kwargs,
 ):
 
     names = [usecols.get(i + 1, "_{}".format(i)) for i in range(n_cols_total)]
@@ -80,11 +80,15 @@ def read_generic_spectra(
 
         if "conflicted copy" in filename:
             logging.warning(
-                "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(filepath)
+                "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(
+                    filepath
+                )
             )
             continue
 
-        if exclude_spec_masks and (rootname in exclude_spec_masks or filename in exclude_spec_masks):
+        if exclude_spec_masks and (
+            rootname in exclude_spec_masks or filename in exclude_spec_masks
+        ):
             continue
 
         helio_corr = None

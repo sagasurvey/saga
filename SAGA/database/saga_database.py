@@ -1,22 +1,16 @@
 import os
 
 from ..spectra import SpectraData
-from .core import (CsvTable, DataObject, FastCsvTable, EcsvTable, FileObject, FitsTable,
-                   GoogleSheets, NumpyBinary)
+from .core import (CsvTable, DataObject, EcsvTable, FastCsvTable, FileObject,
+                   FitsTable, GoogleSheets, NumpyBinary)
 from .external_masterlist import EddQuery, HyperledaQuery
 
 __all__ = ["known_google_sheets", "Database", "SpectraData"]
 
 known_google_sheets = {
-    "hosts_v1": GoogleSheets(
-        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1471095077
-    ),
-    "hosts_v2": GoogleSheets(
-        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1765625842
-    ),
-    "host_stats": GoogleSheets(
-        "1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1217798377
-    ),
+    "hosts_v1": GoogleSheets("1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1471095077),
+    "hosts_v2": GoogleSheets("1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1765625842),
+    "host_stats": GoogleSheets("1b3k2eyFjHFDtmHce1xi6JKuj3ATOWYduTBFftx5oPp8", 1217798377),
     "host_remove": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         1133875164,
@@ -105,9 +99,7 @@ known_google_sheets = {
         757836001,
         include_names=["OBJID"],
     ),
-    "lowz_fields": GoogleSheets(
-        "1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266
-    ),
+    "lowz_fields": GoogleSheets("1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266),
     "human_selected": GoogleSheets(
         "1WB3aK-DOgtUuSyMQ9Eb-83tJmHsGYWSDI-vHh16Xz8g",
         382210667,
@@ -168,20 +160,14 @@ class Database(object):
 
         self._tables = {
             "master_list_v1": DataObject(
-                FastCsvTable(
-                    os.path.join(self._shared_dir, "HostCatalogs", "master_list_v1.csv")
-                )
+                FastCsvTable(os.path.join(self._shared_dir, "HostCatalogs", "master_list_v1.csv"))
             ),
             "master_list_v2": DataObject(
-                FastCsvTable(
-                    os.path.join(self._shared_dir, "HostCatalogs", "master_list_v2.csv")
-                )
+                FastCsvTable(os.path.join(self._shared_dir, "HostCatalogs", "master_list_v2.csv"))
             ),
             "saga_spectra_May2017": DataObject(
                 FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Products", "saga_spectra_May2017.fits.gz"
-                    )
+                    os.path.join(self._shared_dir, "Products", "saga_spectra_May2017.fits.gz")
                 )
             ),
             "hyperleda_kt12": DataObject(
@@ -190,9 +176,7 @@ class Database(object):
                     "pgc,objname,al2000,de2000,l2,b2,bt,kt,vopt,v,vvir,modz,mod0,modbest,e_modbest",
                 ),
                 FastCsvTable(
-                    os.path.join(
-                        self._local_dir, "master_list_v2_sources", "hyperleda_kt12.csv"
-                    ),
+                    os.path.join(self._local_dir, "master_list_v2_sources", "hyperleda_kt12.csv"),
                     comment="#",
                 ),
                 use_local_first=True,
@@ -200,9 +184,7 @@ class Database(object):
             "edd_2mrs_slim": DataObject(
                 EddQuery("SELECT pgc, K_tc, H_tc, Vhel from k2m1175"),
                 FastCsvTable(
-                    os.path.join(
-                        self._local_dir, "master_list_v2_sources", "edd_2mrs_slim.csv"
-                    ),
+                    os.path.join(self._local_dir, "master_list_v2_sources", "edd_2mrs_slim.csv"),
                     comment="#",
                 ),
                 use_local_first=True,
@@ -210,48 +192,34 @@ class Database(object):
             "edd_lim17_slim": DataObject(
                 EddQuery("SELECT PGC, Mhalo from klimgroups"),
                 FastCsvTable(
-                    os.path.join(
-                        self._local_dir, "master_list_v2_sources", "edd_lim17_slim.csv"
-                    ),
+                    os.path.join(self._local_dir, "master_list_v2_sources", "edd_lim17_slim.csv"),
                     comment="#",
                 ),
                 use_local_first=True,
             ),
             "hipparcos2": DataObject(
+                FitsTable("http://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/fits?I/311/hip2.dat.gz"),
                 FitsTable(
-                    "http://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/fits?I/311/hip2.dat.gz"
-                ),
-                FitsTable(
-                    os.path.join(
-                        self._local_dir, "master_list_v2_sources", "hipparcos2.fits"
-                    )
+                    os.path.join(self._local_dir, "master_list_v2_sources", "hipparcos2.fits")
                 ),
                 use_local_first=True,
             ),
             "nsa_v1.0.1": DataObject(
+                FitsTable("https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits"),
                 FitsTable(
-                    "https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits"
-                ),
-                FitsTable(
-                    os.path.join(
-                        self._local_dir, "external_catalogs", "nsa", "nsa_v1_0_1.fits"
-                    )
+                    os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v1_0_1.fits")
                 ),
                 use_local_first=True,
             ),
             "nsa_v0.1.2": DataObject(
                 FitsTable("http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits"),
                 FitsTable(
-                    os.path.join(
-                        self._local_dir, "external_catalogs", "nsa", "nsa_v0_1_2.fits"
-                    )
+                    os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v0_1_2.fits")
                 ),
                 use_local_first=True,
             ),
             "spectra_gama_dr2": DataObject(
-                FitsTable(
-                    "http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits"
-                ),
+                FitsTable("http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits"),
                 FitsTable(
                     os.path.join(
                         self._shared_dir,
@@ -264,9 +232,7 @@ class Database(object):
                 use_local_first=True,
             ),
             "spectra_gama_dr3": DataObject(
-                FitsTable(
-                    "http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits"
-                ),
+                FitsTable("http://www.gama-survey.org/dr3/data/cat/SpecCat/v27/SpecObj.fits"),
                 FitsTable(
                     os.path.join(
                         self._shared_dir,
@@ -281,38 +247,24 @@ class Database(object):
             "spectra_ozdes_dr1": DataObject(
                 FitsTable("http://www.mso.anu.edu.au/ozdes/OzDES-DR1.fits"),
                 FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR1.fits"
-                    )
+                    os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR1.fits")
                 ),
                 use_local_first=True,
             ),
             "spectra_ozdes_dr2": DataObject(
                 FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR2.fits"
-                    )
+                    os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR2.fits")
                 ),
             ),
             "spectra_2df": DataObject(
-                FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "2dF", "2dF_best.fit"
-                    )
-                )
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "2dF", "2dF_best.fit"))
             ),
             "spectra_6df": DataObject(
-                FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "6dF", "6dF_DR3.fit"
-                    )
-                )
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "6dF", "6dF_DR3.fit"))
             ),
             "spectra_wigglez": DataObject(
                 FitsTable(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "WiggleZ", "WiggleZ.fits"
-                    )
+                    os.path.join(self._shared_dir, "Spectra", "Final", "WiggleZ", "WiggleZ.fits")
                 )
             ),
             "spectra_lcrs": DataObject(
@@ -338,9 +290,7 @@ class Database(object):
                 )
             ),
             "spectra_palomar": DataObject(
-                GoogleSheets(
-                    "12MM0KdnSb2RdieyUci6DSCnW-h7x0B-bLdxbTkAGhTI", 1276422948
-                ),
+                GoogleSheets("12MM0KdnSb2RdieyUci6DSCnW-h7x0B-bLdxbTkAGhTI", 1276422948),
                 CsvTable(
                     os.path.join(
                         self._shared_dir,
@@ -368,9 +318,7 @@ class Database(object):
                     format="ascii.fast_commented_header",
                 ),
                 FileObject(
-                    os.path.join(
-                        self._shared_dir, "Spectra", "Final", "2dF", "2dflens_final.dat"
-                    ),
+                    os.path.join(self._shared_dir, "Spectra", "Final", "2dF", "2dflens_final.dat"),
                     format="ascii.fast_commented_header",
                 ),
                 use_local_first=True,
@@ -421,9 +369,7 @@ class Database(object):
         if os.path.isdir(gmm_dir):
             for fname in os.listdir(gmm_dir):
                 if fname.startswith("gmm_parameters") and fname.endswith(".npz"):
-                    self._tables[fname[:-4]] = DataObject(
-                        NumpyBinary(os.path.join(gmm_dir, fname))
-                    )
+                    self._tables[fname[:-4]] = DataObject(NumpyBinary(os.path.join(gmm_dir, fname)))
 
         footprint_dir = os.path.join(self._shared_dir, "AuxiliaryData", "footprints")
         if os.path.isdir(footprint_dir):
@@ -458,15 +404,9 @@ class Database(object):
             "base_paper2": os.path.join(
                 self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"
             ),
-            "base_v2p1": os.path.join(
-                self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"
-            ),
-            "base_v2": os.path.join(
-                self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"
-            ),
-            "base_v1": os.path.join(
-                self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"
-            ),
+            "base_v2p1": os.path.join(self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"),
+            "base_v2": os.path.join(self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"),
+            "base_v1": os.path.join(self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"),
             "base_v0p1": os.path.join(
                 self._shared_dir, "Paper1", "base_catalogs", "base_sql_{}.fits.gz"
             ),
@@ -476,9 +416,7 @@ class Database(object):
             "sdss_dr12": os.path.join(
                 self._local_dir, "external_catalogs", "sdss_dr12", "{}.fits.gz"
             ),
-            "wise": os.path.join(
-                self._local_dir, "external_catalogs", "wise", "{}.fits.gz"
-            ),
+            "wise": os.path.join(self._local_dir, "external_catalogs", "wise", "{}.fits.gz"),
             "des_dr1": os.path.join(
                 self._local_dir, "external_catalogs", "des_dr1", "{}_des_dr1.fits.gz"
             ),
@@ -486,7 +424,10 @@ class Database(object):
                 self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
             ),
             "decals_dr8": os.path.join(
-                self._local_dir, "external_catalogs", "decals_dr8", "{}_decals_dr8.fits.gz"
+                self._local_dir,
+                "external_catalogs",
+                "decals_dr8",
+                "{}_decals_dr8.fits.gz",
             ),
             "gaia": os.path.join(
                 self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
@@ -494,9 +435,7 @@ class Database(object):
         }
 
         self._possible_base_versions = tuple(
-            k.partition("_")[2]
-            for k in self._file_path_pattern
-            if k.startswith("base_")
+            k.partition("_")[2] for k in self._file_path_pattern if k.startswith("base_")
         )
         self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
         self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
@@ -512,7 +451,7 @@ class Database(object):
         stats_path = self.base_file_path_pattern.format("host_stats")
         for ext in (".fits.gz", ".fits"):
             if stats_path.endswith(ext):
-                stats_path = stats_path[:-len(ext)]
+                stats_path = stats_path[: -len(ext)]
                 break
         stats_path += ".csv"
         t = FastCsvTable(stats_path)
@@ -532,9 +471,7 @@ class Database(object):
     def _set_file_path_pattern(self, key, value):
         self._file_path_pattern[key] = value
         keys_to_del = [
-            k
-            for k in self._tables
-            if isinstance(k, tuple) and len(k) == 2 and k[0] == key
+            k for k in self._tables if isinstance(k, tuple) and len(k) == 2 and k[0] == key
         ]
         for k in keys_to_del:
             del self._tables[k]
@@ -588,11 +525,7 @@ class Database(object):
         if key in self._tables:
             return self._tables[key]
 
-        if (
-            isinstance(key, tuple)
-            and len(key) == 2
-            and key[0] in self._file_path_pattern
-        ):
+        if isinstance(key, tuple) and len(key) == 2 and key[0] in self._file_path_pattern:
             path = self._file_path_pattern[key[0]].format(key[1])
             data_type = EcsvTable if path.endswith(".ecsv") else FitsTable
             self._tables[key] = DataObject(data_type(path))
