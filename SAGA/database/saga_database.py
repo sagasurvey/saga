@@ -410,7 +410,7 @@ class Database(object):
                 self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"
             ),
             "base_v2p1": os.path.join(self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"),
-            "base_v3": os.path.join(self._local_dir, "base_catalogs", "base_v3_{}.fits.gz"),
+            "base_v3": os.path.join(self._local_dir, "base_catalogs_v3", "base_v3_{}.fits.gz"),
             "base_v2": os.path.join(self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"),
             "base_v1": os.path.join(self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"),
             "base_v0p1": os.path.join(

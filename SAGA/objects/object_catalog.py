@@ -497,7 +497,7 @@ class ObjectCatalog(object):
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
             "base_file_path_pattern =",
-            self._database.base_file_path_pattern
+            self._database._file_path_pattern["base_" + version_postfix]
             if base_file_path_pattern is None
             else base_file_path_pattern,
         )
@@ -522,7 +522,7 @@ class ObjectCatalog(object):
                 ("decals_dr9", "OBJID"),
                 ("shreds", "OBJID"),
             ]
-            catalogs = ["decals_dr9"]
+            catalogs = ["sdss", "decals_dr9"]
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
