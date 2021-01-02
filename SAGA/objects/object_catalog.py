@@ -13,7 +13,7 @@ from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
 from ..hosts import HostCatalog
 from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
 from ..utils.distance import d2m
-from . import build, build2
+from . import build, build2, build3
 from . import cuts as C
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 
@@ -441,7 +441,12 @@ class ObjectCatalog(object):
             else base_file_path_pattern,
         )
 
-        build_module = build if build_version < 2 else build2
+        if build_version < 2:
+            build_module = build
+        elif build_version < 3:
+            build_module = build2
+        else:
+            build_module = build3
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
