@@ -478,6 +478,8 @@ class ObjectCatalog(object):
         build_version, version_postfix = self._database.resolve_base_version(version)
         if build_version == 0:
             raise ValueError("Cannot build v0 base catalogs")
+        if version_postfix and not version_postfix.startswith("_"):
+            version_postfix = "_" + version_postfix
 
         if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
             overwrite = Time(overwrite)
@@ -497,7 +499,7 @@ class ObjectCatalog(object):
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
             "base_file_path_pattern =",
-            self._database._file_path_pattern["base_" + version_postfix]
+            self._database._file_path_pattern["base" + version_postfix]
             if base_file_path_pattern is None
             else base_file_path_pattern,
         )
@@ -562,8 +564,7 @@ class ObjectCatalog(object):
         for i, host in enumerate(host_table):
             host_id = host[HOSTID_COLNAME]
             if base_file_path_pattern is None:
-                base_key = "base" + version_postfix
-                data_obj = self._database[base_key, host_id].remote
+                data_obj = self._database["base" + version_postfix, host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
