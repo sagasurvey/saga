@@ -1,7 +1,6 @@
 """
 base catalog building pipeline 3.0
 """
-import numexpr as ne
 import numpy as np
 from astropy.table import vstack
 from easyquery import Query
@@ -18,6 +17,11 @@ def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
             return catalog
 
 
+def _ivar2err(ivar):
+    with np.errstate(divide="ignore"):
+        return 1.0 / np.sqrt(ivar)
+
+
 def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     """
     Ref: https://www.legacysurvey.org/dr9/files/#sweep-catalogs-region-sweep
@@ -32,34 +36,14 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     catalog["is_galaxy"] = (catalog["TYPE"] != "PSF") & (catalog["TYPE"] != "DUP")
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-    catalog["radius"] = (
-        catalog["FRACDEV"] * catalog["SHAPEDEV_R"]
-        + (1.0 - catalog["FRACDEV"]) * catalog["SHAPEEXP_R"]
-    )
-    catalog["radius_err"] = np.float32(0)
-    mask = catalog["TYPE"] == "DEV"
-    catalog["radius_err"][mask] = 1.0 / np.sqrt(catalog["SHAPEDEV_R_IVAR"][mask])
-    mask = (catalog["TYPE"] == "EXP") | (catalog["TYPE"] == "REX")
-    catalog["radius_err"][mask] = 1.0 / np.sqrt(catalog["SHAPEEXP_R_IVAR"][mask])
-    mask = catalog["TYPE"] == "COMP"
-    catalog["radius_err"][mask] = ne.evaluate(
-        "sqrt(f**2.0 / dev_ivar + (1.0-f)**2.0 / exp_ivar + (r_dev - r_exp)**2.0 / f_ivar)",
-        {
-            "f": catalog["FRACDEV"][mask],
-            "r_dev": catalog["SHAPEDEV_R"][mask],
-            "r_exp": catalog["SHAPEEXP_R"][mask],
-            "f_ivar": catalog["FRACDEV_IVAR"][mask],
-            "dev_ivar": catalog["SHAPEDEV_R_IVAR"][mask],
-            "exp_ivar": catalog["SHAPEEXP_R_IVAR"][mask],
-        },
-        {},
-    )
-    del mask
+    catalog["radius"] = catalog["SHAPE_R"]
+    catalog["radius_err"] = _ivar2err(catalog["SHAPE_R_IVAR"])
 
-    e_tot = catalog["FRACDEV"] * np.hypot(catalog["SHAPEDEV_E1"], catalog["SHAPEDEV_E2"]) + (
-        1.0 - catalog["FRACDEV"]
-    ) * np.hypot(catalog["SHAPEEXP_E1"], catalog["SHAPEEXP_E2"])
+    catalog["ell1"] = catalog["SHAPE_E1"]
+    catalog["ell2"] = catalog["SHAPE_E2"]
+    e_tot = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
     catalog["b_to_a"] = np.sqrt((1 - e_tot) / (1 + e_tot))
+    del e_tot
 
     fill_values_by_query(
         catalog,
@@ -118,7 +102,21 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     ]
 
     catalog = build2.set_remove_flag(catalog, remove_queries, to_remove, to_recover)
-    return catalog[build2.MERGED_CATALOG_COLUMNS]
+
+    needed_cols = list(build2.MERGED_CATALOG_COLUMNS) + ["ell1", "ell2"]
+
+    for col in ["PARALLAX", "PMRA", "PMDEC"]:
+        col_lower = col.lower()
+        catalog[col_lower] = catalog[col]
+        catalog[col_lower + "_err"] = _ivar2err(catalog[col + "_IVAR"])
+        needed_cols.append(col_lower)
+        needed_cols.append(col_lower + "_err")
+
+    catalog = catalog[needed_cols]
+    catalog["survey"] = "decals"
+    catalog["OBJID_decals"] = catalog["OBJID"]
+    catalog["REMOVE_decals"] = catalog["REMOVE"]
+    return catalog
 
 
 def update_sga_photometry(base, sga):
