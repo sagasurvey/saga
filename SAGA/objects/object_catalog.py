@@ -89,7 +89,11 @@ def _get_coverage(host, survey):
         return 0.0
 
 
-def _determine_v2_raw_catalogs_saga(host, using_dr8_by_default=False):
+def _determine_raw_catalogs_saga_v1(**kwargs):
+    return ("sdss", "wise")
+
+
+def _determine_raw_catalogs_saga_v2(host, using_dr8_by_default=False, **kwargs):
     coverage = {
         s: _get_coverage(host, s)
         for s in (
@@ -131,16 +135,23 @@ def _determine_v2_raw_catalogs_saga(host, using_dr8_by_default=False):
         ):
             catalogs.append("decals_dr8")
 
-    return list(set(catalogs))
+    return tuple(set(catalogs))
 
 
-def _determine_v2_raw_catalogs_lowz(field_name):
-    field_name = str(field_name)
+def _determine_raw_catalogs_saga_v3(host, **kwargs):
+    catalogs = ["decals_dr9"]
+    if _get_coverage(host, "sdss") >= 0.85:
+        catalogs.append("sdss")
+    return tuple(catalogs)
+
+
+def _determine_raw_catalogs_lowz(host_id, **kwargs):
+    field_name = str(host_id)
     if any(field_name.startswith(s) for s in ["GD1", "300S", "Jet", "Styx"]):
-        return ["decals_dr67"]
+        return ("decals_dr67",)
     if any(field_name.startswith(s) for s in ["p13"]):
-        return ["decals_dr8"]
-    return ["des"]
+        return ("decals_dr8",)
+    return ("des",)
 
 
 class ObjectCatalog(object):
@@ -507,7 +518,16 @@ class ObjectCatalog(object):
         if build_version < 2:
             build_module = build
             manual_keys = [("sdss", "SDSS ID")]
-            catalogs = ["sdss", "wise"]
+            catalogs_determining_func = _determine_raw_catalogs_saga_v1
+        elif HOSTID_COLNAME == "field_id":
+            build_module = build2
+            manual_keys = [
+                ("des", "DES_OBJID"),
+                ("decals", "decals_objid"),
+                ("decals_dr8", "OBJID"),
+                ("shreds", "OBJID"),
+            ]
+            catalogs_determining_func = _determine_raw_catalogs_lowz
         elif build_version < 3:
             build_module = build2
             manual_keys = [
@@ -517,14 +537,14 @@ class ObjectCatalog(object):
                 ("decals_dr8", "OBJID"),
                 ("shreds", "OBJID"),
             ]
-            catalogs = None  # To be determine in the host loop
+            catalogs_determining_func = _determine_raw_catalogs_saga_v2
         else:
             build_module = build3
             manual_keys = [
                 ("decals_dr9", "OBJID"),
                 ("shreds", "OBJID"),
             ]
-            catalogs = ["sdss", "decals_dr9"]
+            catalogs_determining_func = _determine_raw_catalogs_saga_v3
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
@@ -591,17 +611,13 @@ class ObjectCatalog(object):
                     )
                     continue
 
-            catalogs_this = catalogs
-            if catalogs_this is None:
-                if HOSTID_COLNAME == "field_id":
-                    catalogs_this = _determine_v2_raw_catalogs_lowz(host_id)
-                else:
-                    catalogs_this = _determine_v2_raw_catalogs_saga(
-                        host, "dr8" in self._database.decals_file_path_pattern
-                    )
-
             catalog_dict = dict()
-            for catalog_name in catalogs_this:
+            catalogs = catalogs_determining_func(
+                host=host,
+                host_id=host_id,
+                using_dr8_by_default=("dr8" in self._database.decals_file_path_pattern),
+            )
+            for catalog_name in catalogs:
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
