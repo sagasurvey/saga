@@ -140,7 +140,7 @@ def _determine_raw_catalogs_saga_v2(host, using_dr8_by_default=False, **kwargs):
 
 def _determine_raw_catalogs_saga_v3(host, **kwargs):
     catalogs = ["decals_dr9"]
-    if _get_coverage(host, "sdss") >= 0:
+    if _get_coverage(host, "sdss") > 0:
         catalogs.append("sdss_dr16")
     return tuple(catalogs)
 
