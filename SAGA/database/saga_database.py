@@ -99,6 +99,11 @@ known_google_sheets = {
         757836001,
         include_names=["OBJID"],
     ),
+    "manual_targets_2021_spring": GoogleSheets(
+        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
+        1544191200,
+        include_names=["OBJID"],
+    ),
     "lowz_fields": GoogleSheets("1COd0BjZz0x_9O74Xi0ovVhNZgWeAWNIkVzrZ5UUZr9c", 1883640266),
     "human_selected": GoogleSheets(
         "1WB3aK-DOgtUuSyMQ9Eb-83tJmHsGYWSDI-vHh16Xz8g",
