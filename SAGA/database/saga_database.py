@@ -573,7 +573,7 @@ class Database(object):
         """
 
         if version is None:
-            return 2, ""
+            return 3, ""
         version = str(version).lower().strip()
         if version in ("paper1", "p1"):
             return 0, "v0p1"
@@ -590,5 +590,5 @@ class Database(object):
 
     def set_default_base_version(self, version=None):
         _, version_postfix = self.resolve_base_version(version)
-        version_postfix = version_postfix or "v2p1"
+        version_postfix = version_postfix or "v3"
         self.base_file_path_pattern = self._file_path_pattern["base_" + version_postfix]
