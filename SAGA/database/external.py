@@ -12,6 +12,7 @@ import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, vstack
+from astropy.io import ascii
 
 try:
     from astroquery.gaia import Gaia
@@ -180,6 +181,14 @@ class SdssQuery(DownloadableBase):
         WHERE n.objID = p.objID
     """
 
+    _spec_query_template = """
+        SELECT s.specObjID as OBJID, s.bestObjID, s.ra as RA, s.dec as DEC, s.survey,
+        ISNULL(s.z, -1) as SPEC_Z, ISNULL(s.zErr, -1) as SPEC_Z_ERR, ISNULL(s.zWarning, -1) as SPEC_Z_WARN
+        FROM dbo.fGetNearbySpecObjEq({ra:.10g}, {dec:.10g}, {r_arcmin:.10g}) n, SpecObj s
+        INTO mydb.{db_table_name}
+        WHERE n.specObjID = s.specObjID
+    """
+
     def __init__(
         self,
         ra,
@@ -190,6 +199,8 @@ class SdssQuery(DownloadableBase):
         user=None,
         password=None,
         default_use_sciserver=True,
+        specs_only=False,
+        sciserver_via_csv=False,
     ):
 
         self.sciserver_user = user or os.getenv("SCISERVER_USER")
@@ -212,8 +223,9 @@ class SdssQuery(DownloadableBase):
             if not db_table_name:
                 db_table_name = "SAGA" + get_random_string(4)
             self.db_table_name = re.sub("[^A-Za-z]", "", db_table_name)
-        self.query = self.construct_query(ra, dec, radius, self.db_table_name)
+        self.query = self.construct_query(ra, dec, radius, self.db_table_name, specs_only)
         self.context = context
+        self.sciserver_via_csv = sciserver_via_csv
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
@@ -227,6 +239,7 @@ class SdssQuery(DownloadableBase):
                 context=self.context,
                 username=self.sciserver_user,
                 password=self.sciserver_pass,
+                via_csv=self.sciserver_via_csv,
             )
         else:
             self.run_casjobs_with_casjobs(
@@ -240,7 +253,7 @@ class SdssQuery(DownloadableBase):
             )
 
     @classmethod
-    def construct_query(cls, ra, dec, radius=1.0, db_table_name=None):
+    def construct_query(cls, ra, dec, radius=1.0, db_table_name=None, specs_only=False):
         """
         Generates the query to send to the SDSS to get the full SDSS catalog around
         a target.
@@ -261,21 +274,16 @@ class SdssQuery(DownloadableBase):
             The SQL query to send to the SDSS skyserver
         """
 
-        select_into_mydb = True
-        if db_table_name is None:
-            db_table_name = "TO_BE_REMOVED"
-            select_into_mydb = False
-
-        # pylint: disable=possibly-unused-variable
-        ra = ensure_deg(ra)
-        dec = ensure_deg(dec)
-        r_arcmin = ensure_deg(radius) * 60.0
-
-        # ``**locals()`` means "use the local variable names to fill the template"
-        q = cls._query_template.format(**locals())
-        q = re.sub(r"[^\S\n]+", " ", q).strip()
-        if not select_into_mydb:
-            q = q.replace("INTO mydb.{}".format(db_table_name), "")
+        params = {
+            "ra": ensure_deg(ra),
+            "dec": ensure_deg(dec),
+            "r_arcmin": ensure_deg(radius) * 60.0,
+            "db_table_name": (db_table_name or "__TO_BE_REMOVED__"),
+        }
+        query_template = cls._spec_query_template if specs_only else cls._query_template
+        q = query_template.format(**params)
+        q = re.sub(r"\s+", " ", q).strip()
+        q = q.replace("INTO mydb.__TO_BE_REMOVED__", "")
         return q
 
     @staticmethod
@@ -356,7 +364,7 @@ class SdssQuery(DownloadableBase):
 
     @staticmethod
     def run_casjobs_with_sciserver(
-        query, output_path, compress=True, context="DR14", username=None, password=None
+        query, output_path, compress=True, context="DR14", username=None, password=None, via_csv=False
     ):
         """
         Run a single casjobs and download casjobs output using SciServer
@@ -388,10 +396,14 @@ class SdssQuery(DownloadableBase):
         if not (_HAS_SCISERVER_ and username and password):
             raise ValueError("You are not setup to run casjobs with SciServer")
         SciServer.Authentication.login(username, password)
-        r = SciServer.CasJobs.executeQuery(query, context=context, format="fits")
+        return_format = "csv" if via_csv else "fits"
+        r = SciServer.CasJobs.executeQuery(query, context=context, format=return_format)
         file_open = gzip.open if compress else open
         with file_open(output_path, "wb") as f_out:
-            shutil.copyfileobj(r, f_out)
+            if via_csv:
+                ascii.read(r, format="csv").write(f_out, format="fits")
+            else:
+                shutil.copyfileobj(r, f_out)
 
 
 class DesQuery(DownloadableBase):
