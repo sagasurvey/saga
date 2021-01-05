@@ -416,6 +416,9 @@ class Database(object):
             "base_v0p1": os.path.join(
                 self._shared_dir, "Paper1", "base_catalogs", "base_sql_{}.fits.gz"
             ),
+            "sdss_dr16": os.path.join(
+                self._local_dir, "external_catalogs", "sdss_dr16", "{}.fits.gz"
+            ),
             "sdss_dr14": os.path.join(
                 self._local_dir, "external_catalogs", "sdss_dr14", "{}.fits.gz"
             ),
