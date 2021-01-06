@@ -423,7 +423,7 @@ def prepare_mmt_catalog(
                     .to_string("hr", sep=":", precision=3),  # pylint: disable=E1101
                     "dec": lambda x: Angle(x, "deg").to_string("deg", sep=":", precision=3),
                     "mag": "%.2f",
-                    "rank": lambda x: "" if x == 99 else "{:d}".format(x),
+                    "rank": lambda x: "" if int(x) == 99 else "{:d}".format(int(x)),
                 },
             )
 
