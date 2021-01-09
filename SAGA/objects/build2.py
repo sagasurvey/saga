@@ -17,7 +17,7 @@ from fast3tree import find_friends_of_friends
 from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
                        extract_nsa_spectra, extract_sdss_spectra)
 from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
-                     get_remove_flag, get_sdss_bands, group_by)
+                     get_remove_flag, get_sdss_bands, group_by, calc_normalized_dist)
 from ..utils.distance import v2z
 from . import build
 from . import cuts as C
@@ -604,7 +604,15 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
             spec_idx_this = specs_idx[group_slice.start]
             possible_match = base[base_idx[group_slice]]
             possible_match["sep"] = sep[group_slice]
-            possible_match["sep_norm"] = possible_match["sep"] / possible_match["radius_for_match"]
+            possible_match["sep_norm"] = 0.5 * calc_normalized_dist(
+                specs["RA"][spec_idx_this],
+                specs["DEC"][spec_idx_this],
+                possible_match["RA"],
+                possible_match["DEC"],
+                possible_match["radius_for_match"],
+                possible_match["ba"] if "ba" in possible_match.colnames else None,
+                possible_match["phi"] if "phi" in possible_match.colnames else None,
+            )
 
             # using following criteria one by one to find matching photo obj, stop when found
             for q, sorter in (
@@ -776,7 +784,10 @@ def add_spectra(base, specs, debug=None):
     fill_values_by_query(specs, "ZQUALITY_sort_key > 3", {"ZQUALITY_sort_key": 3})
 
     add_skycoord(base)
-    base_this = base["REMOVE", "is_galaxy", "r_mag", "coord"]
+    cols = ["RA", "DEC", "REMOVE", "is_galaxy", "r_mag", "coord"]
+    if "ba" in base.colnames and "phi" in base.colnames:
+        cols.extend(["ba", "phi"])
+    base_this = base[cols]
     base_this["index"] = np.arange(len(base))
     with np.errstate(over="ignore"):
         base_this["radius_for_match"] = np.where(
@@ -845,20 +856,17 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         if nsa is not None and obj_this["OBJ_NSAID"] > -1:
             nsa_obj = Query("NSAID == {}".format(obj_this["OBJ_NSAID"])).filter(nsa)[0]
-            ellipse_calculation = dict()
-            ellipse_calculation["a"] = nsa_obj["PETRO_TH90"] * 2.0 / 3600.0
-            ellipse_calculation["b"] = ellipse_calculation["a"] * nsa_obj["PETRO_BA90"]
-            ellipse_calculation["t"] = np.deg2rad(nsa_obj["PETRO_PHI90"] + 270.0)
-            ellipse_calculation["s"] = np.sin(ellipse_calculation["t"])
-            ellipse_calculation["c"] = np.cos(ellipse_calculation["t"])
-            ellipse_calculation["x"] = base["RA"] - nsa_obj["RA"]
-            ellipse_calculation["y"] = base["DEC"] - nsa_obj["DEC"]
-            nearby_obj_mask = ne.evaluate(
-                "((x*c - y*s)/a)**2.0 + ((x*s + y*c)/b)**2.0 < 1.0",
-                local_dict=ellipse_calculation,
-                global_dict={},
+            dist = calc_normalized_dist(
+                base["RA"],
+                base["DEC"],
+                nsa_obj["RA"],
+                nsa_obj["DEC"],
+                nsa_obj["PETRO_TH90"],
+                nsa_obj["PETRO_BA90"],
+                nsa_obj["PETRO_PHI90"],
             )
-            del ellipse_calculation
+            nearby_obj_mask = (dist < 1)
+            del dist
 
             remove_flag = 28
 
@@ -894,14 +902,26 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         elif obj_this["REMOVE"] == 0:  # any other good, non-NSA objects
 
-            remove_radius = 2.0 * obj_this["radius"]
+            radius = obj_this["radius"]
 
             # HOT FIX for 219806824 in pgc67817
             if obj_this["OBJID"] == 219806824:
-                remove_radius = 90.0
+                radius = 45.0
 
-            nearby_obj_mask = base["coord"].separation(obj_this["coord"]).arcsec < remove_radius
+            dist = calc_normalized_dist(
+                base["RA"],
+                base["DEC"],
+                obj_this["RA"],
+                obj_this["DEC"],
+                radius,
+                obj_this["ba"] if "ba" in obj_this.colnames else None,
+                obj_this["phi"] if "phi" in obj_this.colnames else None,
+            )
+            nearby_obj_mask = (dist < 1)
+            del dist
+
             remove_flag = 29
+            remove_radius = radius * 2.0
 
         else:
             continue  # skip anything else

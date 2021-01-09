@@ -28,6 +28,7 @@ __all__ = [
     "group_by",
     "decode_flag",
     "join_str_arr",
+    "calc_normalized_dist",
 ]
 
 
@@ -255,3 +256,25 @@ def join_str_arr(*arrays):
     for b in arrays_iter:
         a = np.char.add(a, b)
     return a
+
+
+def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, cen_phi=None):
+    """
+    obj_ra, obj_dec, cen_ra, cen_dec in degrees
+    cen_r is half-light radius in arcseconds
+    """
+    a = cen_r * 2.0 / 3600.0
+    cos_dec = np.cos(np.deg2rad((obj_dec + cen_dec) * 0.5))
+    dx = (obj_ra - cen_ra) * cos_dec
+    dy = obj_dec - cen_dec
+
+    if cen_ba is None:
+        with np.errstate(divide="ignore"):
+            return np.hypot(dx, dy) / a
+
+    b = a * cen_ba
+    theta = np.deg2rad(90 - cen_phi)
+    sin_t = np.sin(theta)
+    cos_t = np.cos(theta)
+    with np.errstate(divide="ignore"):
+        return np.hypot((dx * cos_t + dy * sin_t) / a, (-dx * sin_t + dy * cos_t) / b)
