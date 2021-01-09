@@ -1,3 +1,4 @@
+import gc
 import os
 import time
 import traceback
@@ -691,6 +692,9 @@ class ObjectCatalog(object):
                 traceback.print_exc()
                 failed_count += 1
                 continue
+
+            del base
+            gc.collect()
 
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
