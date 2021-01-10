@@ -569,7 +569,25 @@ def add_columns_for_spectra(base):
     return base
 
 
-def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
+SPEC_MATCHING_ORDER = (
+    (Query("REMOVE == 0", "is_galaxy == 0", "sep < 1"), "sep"),
+    (Query("REMOVE % 2 == 0", "is_galaxy == 0", "sep < 1"), "sep"),
+    (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 0.5"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 0.5"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "sep < 3"), "sep"),
+    (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 0.5"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 0.5"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE  > 0", "sep < 3"), "sep"),
+    (Query("REMOVE == 0", "sep < 10"), "sep"),
+    (Query("REMOVE  > 0", "sep < 10"), "sep"),
+)
+
+
+def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching_order=None):
     """
     This function first match unmerged spectra to base catalog,
     and then merge the spectra that are assigned to the same photo obj.
@@ -599,12 +617,14 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     # matched_idx will store the index of the matched photo obj.
     specs["matched_idx"] = -1
 
+    matching_order = matching_order or SPEC_MATCHING_ORDER
+
     if len(specs_idx):
         for group_slice in group_by(specs_idx, True):
             spec_idx_this = specs_idx[group_slice.start]
             possible_match = base[base_idx[group_slice]]
             possible_match["sep"] = sep[group_slice]
-            possible_match["sep_norm"] = 0.5 * calc_normalized_dist(
+            possible_match["sep_norm"] = calc_normalized_dist(
                 specs["RA"][spec_idx_this],
                 specs["DEC"][spec_idx_this],
                 possible_match["RA"],
@@ -615,24 +635,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
             )
 
             # using following criteria one by one to find matching photo obj, stop when found
-            for q, sorter in (
-                # fmt: off
-                (Query("REMOVE == 0", "is_galaxy == 0", "sep < 1"), "sep"),
-                (Query("REMOVE % 2 == 0", "is_galaxy == 0", "sep < 1"), "sep"),
-                (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
-                (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 2"), "r_mag"),
-                (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
-                (Query("REMOVE == 0", "is_galaxy", "sep_norm < 2"), "r_mag"),
-                (Query("REMOVE == 0", "sep < 3"), "sep"),
-                (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
-                (Query("REMOVE  > 0", "is_galaxy", C.faint_end_limit, "sep_norm < 2"), "r_mag"),
-                (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
-                (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 2"), "r_mag"),
-                (Query("REMOVE  > 0", "sep < 3"), "sep"),
-                (Query("REMOVE == 0", "sep < 10"), "sep"),
-                (Query("REMOVE  > 0", "sep < 10"), "sep"),
-                # fmt: on
-            ):
+            for q, sorter in matching_order:
                 mask = q.mask(possible_match)
                 if mask.any():
                     possible_match_this = possible_match[mask]
@@ -776,7 +779,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
     return Query("chosen").filter(specs), Query("matched_idx == -2").filter(specs)
 
 
-def add_spectra(base, specs, debug=None):
+def add_spectra(base, specs, debug=None, matching_order=None):
 
     # map ZQ >=4, 3, 2, <=1 to 0, 1, 2, 3
     specs["ZQUALITY_sort_key"] = 4 - specs["ZQUALITY"]
@@ -804,7 +807,7 @@ def add_spectra(base, specs, debug=None):
     needs_rematch_count = 0
     for _ in range(5):
         specs_matched, specs_need_rematch = match_spectra_to_base_and_merge_duplicates(
-            specs, base_this, debug=debug
+            specs, base_this, debug=debug, matching_order=matching_order
         )
 
         # for matched specs, copy their info to base catalog
@@ -995,11 +998,15 @@ def remove_too_close_to_host(base):
 
 
 def add_surface_brightness(base):
-    radius = np.maximum(base["radius"], 1e-20)
     # the factor 2 inside log10 is to account for that the magnitude we are using is total magnitude
     # but radius is half-light radius
-    base["sb_r"] = base["r_mag"] + 2.5 * np.log10(2 * np.pi * radius * radius)
-    base["sb_r_err"] = np.hypot(base["r_err"], (5 / np.log(10)) * base["radius_err"] / radius)
+    with np.errstate(divide="ignore"):
+        sb_r = base["r_mag"] + 2.5 * np.log10(2 * np.pi * base["radius"] * base["radius"])
+        sb_r_err = np.hypot(base["r_err"], (5 / np.log(10)) * base["radius_err"] / base["radius"])
+
+    has_radius_mask = base["radius"] > 0
+    base["sb_r"] = np.where(has_radius_mask, sb_r, 99.0)
+    base["sb_r_err"] = np.where(has_radius_mask, sb_r_err, 99.0)
     return base
 
 

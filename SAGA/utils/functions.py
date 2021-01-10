@@ -163,9 +163,15 @@ def find_near_coord(table, coord, within_arcsec=3.0):
     """
     table = add_skycoord(table)
     sep = table["coord"].separation(coord).arcsec
-    nearby_indices = np.flatnonzero(sep < within_arcsec)
-    nearby_indices = nearby_indices[sep[nearby_indices].argsort()]
-    return table[nearby_indices]
+
+    nearby_mask = sep < within_arcsec
+    sep = sep[nearby_mask]
+    table = table[nearby_mask]
+
+    sorter = sep.argsort()
+    table = table[sorter]
+    table["sep"] = sep[sorter]
+    return table
 
 
 def find_near_ra_dec(table, ra, dec, within_arcsec=3.0):
