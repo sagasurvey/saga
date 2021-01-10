@@ -4,6 +4,7 @@ base catalog building pipeline 3.0
 from itertools import chain
 import numpy as np
 from astropy.table import vstack
+from astropy.coordinates import SkyCoord
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
@@ -157,6 +158,35 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     return catalog
 
 
+SPEC_MATCHING_ORDER = (
+    (Query("REMOVE == 0", "r_mag < 21", "sep < 1"), "sep"),
+    (Query("REMOVE  > 0", "r_mag < 21", "sep < 1"), "sep"),
+    (Query("REMOVE == 0", "is_galaxy", "r_mag < 21", "sep_norm < 1", "sep < 20"), "sep_norm"),
+    (Query("REMOVE  > 0", "is_galaxy", "r_mag < 21", "sep_norm < 1", "sep < 20"), "sep_norm"),
+    (Query("REMOVE == 0", "is_galaxy", "r_mag < 21", "sep_norm < 2", "sep < 10"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "r_mag < 21", "sep_norm < 2", "sep < 10"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "sep_norm"),
+    (Query("sep < 10", "r_mag < 21"), "sep"),
+    (Query("sep < 10"), "sep"),
+)
+
+
+def add_spec_phot_sep(base):
+    has_any_spec_mask = base["ZQUALITY"] > -1
+
+    spec_coord = SkyCoord(
+        np.where(has_any_spec_mask, base["RA_spec"], 0),
+        np.where(has_any_spec_mask, base["DEC_spec"], 0),
+        unit="deg"
+    )
+
+    base = add_skycoord(base)
+    sep = base["coord"].separation(spec_coord).arcsec
+    sep = np.where(has_any_spec_mask, sep, -1)
+    base["spec_phot_sep"] = sep
+    return base
+
+
 def build_full_stack(  # pylint: disable=unused-argument
     host,
     decals=None,
@@ -199,7 +229,7 @@ def build_full_stack(  # pylint: disable=unused-argument
         all_spectra = vstack(all_spectra, "exact")
         if halpha is not None:
             all_spectra = build2.add_halpha_to_spectra(all_spectra, halpha)
-        base = build2.add_spectra(base, all_spectra, debug=debug)
+        base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
     del all_spectra
 
     base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)
@@ -211,5 +241,6 @@ def build_full_stack(  # pylint: disable=unused-argument
 
     base = build2.add_surface_brightness(base)
     base = build.add_stellar_mass(base)
+    base = add_spec_phot_sep(base)
 
     return base
