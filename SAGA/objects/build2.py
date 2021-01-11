@@ -16,8 +16,9 @@ from fast3tree import find_friends_of_friends
 
 from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
                        extract_nsa_spectra, extract_sdss_spectra)
-from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
-                     get_remove_flag, get_sdss_bands, group_by, calc_normalized_dist)
+from ..utils import (add_skycoord, calc_normalized_dist, fill_values_by_query,
+                     get_empty_str_array, get_remove_flag, get_sdss_bands,
+                     group_by)
 from ..utils.distance import v2z
 from . import build
 from . import cuts as C
@@ -868,7 +869,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
                 nsa_obj["PETRO_BA90"],
                 nsa_obj["PETRO_PHI90"],
             )
-            nearby_obj_mask = (dist < 1)
+            nearby_obj_mask = dist < 1
             del dist
 
             remove_flag = 28
@@ -920,7 +921,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
                 obj_this["ba"] if "ba" in obj_this.colnames else None,
                 obj_this["phi"] if "phi" in obj_this.colnames else None,
             )
-            nearby_obj_mask = (dist < 1)
+            nearby_obj_mask = dist < 1
             del dist
 
             remove_flag = 29
@@ -953,13 +954,14 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         if shreds_recover is not None:
             to_remove = to_remove & QueryMaker.in1d("OBJID", shreds_recover, invert=True)
 
-        to_remove_count = to_remove.count(nearby_obj)
-        if not to_remove_count:
+        if not to_remove.mask(nearby_obj).any():  # Nothing to remove, carry on
             continue
 
-        if to_remove_count > 25 and remove_flag == 29:
+        new_remove_count = Query(to_remove, "REMOVE == 0").count(nearby_obj)
+        if new_remove_count > 25 and remove_flag == 29:
             logging.warning(
-                'More than 25 photo obj to be removed within ~ {:.3f}" of {} spec obj {} ({}, {})'.format(
+                '{} photo obj newly removed within ~{:.3f}" of {} spec obj {} ({}, {})'.format(
+                    new_remove_count,
                     remove_radius,
                     obj_this["TELNAME"],
                     obj_this["OBJID"],
