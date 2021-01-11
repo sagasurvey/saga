@@ -282,5 +282,5 @@ def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, c
     theta = np.deg2rad(90 - cen_phi)
     sin_t = np.sin(theta)
     cos_t = np.cos(theta)
-    with np.errstate(divide="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore"):
         return np.hypot((dx * cos_t + dy * sin_t) / a, (-dx * sin_t + dy * cos_t) / b)

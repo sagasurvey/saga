@@ -11,8 +11,8 @@ import numpy as np
 import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, vstack
 from astropy.io import ascii
+from astropy.table import Table, vstack
 
 try:
     from astroquery.gaia import Gaia
@@ -364,7 +364,13 @@ class SdssQuery(DownloadableBase):
 
     @staticmethod
     def run_casjobs_with_sciserver(
-        query, output_path, compress=True, context="DR14", username=None, password=None, via_csv=False
+        query,
+        output_path,
+        compress=True,
+        context="DR14",
+        username=None,
+        password=None,
+        via_csv=False,
     ):
         """
         Run a single casjobs and download casjobs output using SciServer
@@ -636,10 +642,7 @@ class DecalsQuery(DownloadableBase):
                 d["FLUX_" + BAND] / d["MW_TRANSMISSION_" + BAND]
             )
             d[band + "_err"] = (
-                2.5
-                / np.log(10)
-                / (d["FLUX_" + BAND] / d["MW_TRANSMISSION_" + BAND])
-                / np.sqrt(d["FLUX_IVAR_" + BAND])
+                2.5 / np.log(10) / np.abs(d["FLUX_" + BAND]) / np.sqrt(d["FLUX_IVAR_" + BAND])
             )
         return d
 

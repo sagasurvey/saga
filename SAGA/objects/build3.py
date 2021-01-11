@@ -2,13 +2,14 @@
 base catalog building pipeline 3.0
 """
 from itertools import chain
+
 import numpy as np
-from astropy.table import vstack
 from astropy.coordinates import SkyCoord
+from astropy.table import vstack
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
-from ..utils import fill_values_by_query, add_skycoord, get_remove_flag
+from ..utils import add_skycoord, fill_values_by_query, get_remove_flag
 from . import build, build2
 
 
@@ -32,6 +33,14 @@ def _median_cut(cut):
     def _median_cut_this(*arrays, cut=cut):
         return np.median(np.stack(arrays), axis=0) >= cut
     return _median_cut_this
+
+
+def _flux_sigma_cut(sigma_cut, n_bands=2):
+    def _flux_sigma_cut_this(*args, cut=sigma_cut, n=n_bands):
+        i = len(args) // 2
+        sigma_iter = ((flux * np.sqrt(ivar)) for flux, ivar in zip(args[:i], args[i:]))
+        return np.count_nonzero(np.stack(list(sigma_iter)) < sigma_cut, axis=0) >= n
+    return _flux_sigma_cut_this
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -79,8 +88,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog = (is_decam | count_bass_mzls).filter(catalog)
     del catalog["coord"]
 
-    # Remove objects fainter than 3 mag of survey limit
-    catalog = Query("r_mag < 23.75").filter(catalog)
+    # Remove objects fainter than 3 mag of survey limit (r < 23.75)
+    flux_limit = 10 ** ((22.5 - 23.75) / 2.5)
+    catalog = Query("FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit)).filter(catalog)
 
     # Assign OBJID
     release_short = np.where(is_decam.mask(catalog), 90, 91)
@@ -92,10 +102,11 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     del release_short
 
     # Do galaxy/star separation
-    in_sga = QueryMaker.equal("REF_CAT", "L3")
     catalog["is_galaxy"] = QueryMaker.not_equal("TYPE", "PSF").mask(catalog)
-    catalog["is_galaxy"] &= Query("abs(PMRA * sqrt(PMRA_IVAR)) < 2", "abs(PMDEC * sqrt(PMDEC_IVAR)) < 2").mask(catalog)
-    catalog["is_galaxy"] |= in_sga.mask(catalog)
+    catalog["is_galaxy"] &= Query(
+        "abs(PMRA * sqrt(PMRA_IVAR)) < 2", "abs(PMDEC * sqrt(PMDEC_IVAR)) < 2"
+    ).mask(catalog)
+    catalog["is_galaxy"] |= QueryMaker.equal("REF_CAT", "L3").mask(catalog)  # SGA
 
     # Rename/add columns
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
@@ -106,48 +117,77 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
 
-    for band in "grz":
-        catalog[f"{band}_mag"] = _fill_not_finite(catalog[f"{band}_mag"])
-        catalog[f"{band}_err"] = _fill_not_finite(catalog[f"{band}_err"])
+    # Recalculate mag and err to fix old bugs in the raw catalogs
+    with np.errstate(divide="ignore", invalid="ignore"):
+        for band in "grz":
+            BAND = band.upper()
+            catalog[f"{band}_mag"] = _fill_not_finite(
+                22.5 - 2.5 * np.log10(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
+            )
+            catalog[f"{band}_err"] = _fill_not_finite(
+                2.5
+                / np.log(10)
+                / np.abs(catalog[f"FLUX_{BAND}"])
+                / np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
+            )
 
     for band in "ui":
         catalog["{}_mag".format(band)] = 99.0
         catalog["{}_err".format(band)] = 99.0
-
-    has_band = {band: Query(f"NOBS_{band} > 0", f"FLUX_{band} > 0", f"FLUX_IVAR_{band} > 0") for band in "GRZ"}
 
     to_remove = [] if to_remove is None else to_remove
     to_recover = [] if to_recover is None else to_recover
 
     remove_queries = [
         QueryMaker.isin("OBJID", to_remove),
-        ~has_band["R"],
         "(MASKBITS >> 1) % 2 > 0",
         "(MASKBITS >> 5) % 2 > 0",
         "(MASKBITS >> 6) % 2 > 0",
         "(MASKBITS >> 7) % 2 > 0",
         "(MASKBITS >> 12) % 2 > 0",
         "(MASKBITS >> 13) % 2 > 0",
-        (_median_cut(0.35), "FRACMASKED_G", "FRACMASKED_R", "FRACMASKED_Z"),
-        (_median_cut(5), "FRACFLUX_G", "FRACFLUX_R", "FRACFLUX_Z"),
-        Query("RCHISQ_W1 >= 50", (_median_cut(50), "RCHISQ_G", "RCHISQ_R", "RCHISQ_Z")),
-        Query(has_band["G"], Query("g_mag - r_mag < -1") | Query("g_mag - r_mag > 4")),
-        Query(has_band["Z"], Query("r_mag - z_mag < -1") | Query("r_mag - z_mag > 4")),
         Query(
-            "NOBS_W1 > 0",
-            "FLUX_IVAR_W1 > 0",
-            "FLUX_W1 <= 0",
-            "NOBS_W2 > 0",
-            "FLUX_IVAR_W2 > 0",
-            "FLUX_W2 <= 0",
+            (
+                _flux_sigma_cut(1),
+                *(f"FLUX_{b}" for b in "GRZ"),
+                *(f"FLUX_IVAR_{b}" for b in "GRZ"),
+            )
+        ),
+        Query((_median_cut(0.35), "FRACMASKED_G", "FRACMASKED_R", "FRACMASKED_Z")),
+        Query((_median_cut(5), "FRACFLUX_G", "FRACFLUX_R", "FRACFLUX_Z")),
+        Query("RCHISQ_W1 >= 50", (_median_cut(50), "RCHISQ_G", "RCHISQ_R", "RCHISQ_Z")),
+        Query(
+            "FLUX_G * sqrt(FLUX_IVAR_G) >= 1",
+            Query("g_mag - r_mag < -1") | Query("g_mag - r_mag > 4"),
+        ),
+        Query(
+            "FLUX_Z * sqrt(FLUX_IVAR_Z) >= 1",
+            Query("r_mag - z_mag < -1") | Query("r_mag - z_mag > 4"),
+        ),
+        Query(
+            (
+                _flux_sigma_cut(-1),
+                *(f"FLUX_W{i}" for i in range(1, 5)),
+                *(f"FLUX_IVAR_W{i}" for i in range(1, 5)),
+            )
+        ),
+        Query(
+            (
+                _flux_sigma_cut(1, n_bands=3),
+                *(f"FLUX_W{i}" for i in range(1, 5)),
+                *(f"FLUX_IVAR_W{i}" for i in range(1, 5)),
+            ),
+            *(f"NOBS_W{i} > 0" for i in range(1, 5)),
         ),
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
+    has_ref = Query((np.char.isalnum, "REF_CAT"))
+    manual_recover = QueryMaker.isin("OBJID", to_recover)
     fill_values_by_query(
         catalog,
-        Query(in_sga, "REMOVE % 2 == 0") | QueryMaker.isin("OBJID", to_recover),
-        {"REMOVE": 0}
+        Query(has_ref, "REMOVE % 2 == 0") | manual_recover,
+        {"REMOVE": 0},
     )
 
     catalog = catalog[MERGED_CATALOG_COLUMNS]
@@ -177,7 +217,7 @@ def add_spec_phot_sep(base):
     spec_coord = SkyCoord(
         np.where(has_any_spec_mask, base["RA_spec"], 0),
         np.where(has_any_spec_mask, base["DEC_spec"], 0),
-        unit="deg"
+        unit="deg",
     )
 
     base = add_skycoord(base)
@@ -229,7 +269,9 @@ def build_full_stack(  # pylint: disable=unused-argument
         all_spectra = vstack(all_spectra, "exact")
         if halpha is not None:
             all_spectra = build2.add_halpha_to_spectra(all_spectra, halpha)
-        base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
+        base = build2.add_spectra(
+            base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER
+        )
     del all_spectra
 
     base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)
