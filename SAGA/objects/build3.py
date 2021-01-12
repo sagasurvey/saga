@@ -29,18 +29,20 @@ def _ivar2err(ivar):
         return 1.0 / np.sqrt(ivar)
 
 
-def _median_cut(cut):
-    def _median_cut_this(*arrays, cut=cut):
-        return np.median(np.stack(arrays), axis=0) >= cut
-    return _median_cut_this
+def _n_or_more_gt(n, cut):
+    def _n_or_more_gt_this(*arrays, n=n, cut=cut):
+        return np.count_nonzero((np.stack(arrays) > cut), axis=0) >= n
+    return _n_or_more_gt_this
 
 
-def _flux_sigma_cut(sigma_cut, n_bands=2):
-    def _flux_sigma_cut_this(*args, cut=sigma_cut, n=n_bands):
-        i = len(args) // 2
-        sigma_iter = ((flux * np.sqrt(ivar)) for flux, ivar in zip(args[:i], args[i:]))
-        return np.count_nonzero(np.stack(list(sigma_iter)) < sigma_cut, axis=0) >= n
-    return _flux_sigma_cut_this
+def _n_or_more_lt(n, cut):
+    def _n_or_more_lt_this(*arrays, n=n, cut=cut):
+        return np.count_nonzero((np.stack(arrays) < cut), axis=0) >= n
+    return _n_or_more_lt_this
+
+
+def _sigma_cut(bands, n, cut):
+    return Query((_n_or_more_lt(n, cut), *(f"SIGMA_{b}" for b in bands)))
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -117,68 +119,50 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
 
+    for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
+        catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
+
     # Recalculate mag and err to fix old bugs in the raw catalogs
-    with np.errstate(divide="ignore", invalid="ignore"):
-        for band in "grz":
-            BAND = band.upper()
+    const = 2.5 / np.log(10)
+    for band in "grz":
+        BAND = band.upper()
+        with np.errstate(divide="ignore", invalid="ignore"):
             catalog[f"{band}_mag"] = _fill_not_finite(
-                22.5 - 2.5 * np.log10(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
+                22.5 - const * np.log(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
             )
-            catalog[f"{band}_err"] = _fill_not_finite(
-                2.5
-                / np.log(10)
-                / np.abs(catalog[f"FLUX_{BAND}"])
-                / np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
-            )
+            catalog[f"{band}_err"] = _fill_not_finite(const / np.abs(catalog[f"SIGMA_{BAND}"]))
 
     for band in "ui":
-        catalog["{}_mag".format(band)] = 99.0
-        catalog["{}_err".format(band)] = 99.0
+        catalog[f"{band}_mag"] = 99.0
+        catalog[f"{band}_err"] = 99.0
 
     to_remove = [] if to_remove is None else to_remove
     to_recover = [] if to_recover is None else to_recover
 
+    grz = tuple("GRZ")
+    wise = tuple((f"W{i}" for i in range(1, 5)))
+
     remove_queries = [
-        QueryMaker.isin("OBJID", to_remove),
-        "(MASKBITS >> 1) % 2 > 0",
-        "(MASKBITS >> 5) % 2 > 0",
-        "(MASKBITS >> 6) % 2 > 0",
-        "(MASKBITS >> 7) % 2 > 0",
-        "(MASKBITS >> 12) % 2 > 0",
-        "(MASKBITS >> 13) % 2 > 0",
+        QueryMaker.isin("OBJID", to_remove),  # 0
+        "(MASKBITS >> 1) % 2 > 0",  # 1
+        "(MASKBITS >> 5) % 2 > 0",  # 2
+        "(MASKBITS >> 6) % 2 > 0",  # 3
+        "(MASKBITS >> 7) % 2 > 0",  # 4
+        "(MASKBITS >> 12) % 2 > 0",  # 5
+        "(MASKBITS >> 13) % 2 > 0",  # 6
+        _sigma_cut(grz, 2, 1),  # 7
+        Query((_n_or_more_gt(2, 0.35), *(f"FRACMASKED_{b}" for b in grz))),  # 8
+        Query((_n_or_more_gt(2, 5), *(f"FRACFLUX_{b}" for b in grz))),  # 9
+        Query("RCHISQ_W1 > 50", (_n_or_more_gt(2, 50), *(f"RCHISQ_{b}" for b in grz))),  # 9
+        Query("SIGMA_G > 1", Query("g_mag - r_mag < -1") | Query("g_mag - r_mag > 4")),  # 11
+        Query("SIGMA_Z > 1", Query("r_mag - z_mag < -1") | Query("r_mag - z_mag > 4")),  # 12
         Query(
-            (
-                _flux_sigma_cut(1),
-                *(f"FLUX_{b}" for b in "GRZ"),
-                *(f"FLUX_IVAR_{b}" for b in "GRZ"),
-            )
-        ),
-        Query((_median_cut(0.35), "FRACMASKED_G", "FRACMASKED_R", "FRACMASKED_Z")),
-        Query((_median_cut(5), "FRACFLUX_G", "FRACFLUX_R", "FRACFLUX_Z")),
-        Query("RCHISQ_W1 >= 50", (_median_cut(50), "RCHISQ_G", "RCHISQ_R", "RCHISQ_Z")),
+            _sigma_cut(grz, 3, 30) | _sigma_cut(grz, 2, 10),
+            _sigma_cut(wise, 3, 1) | _sigma_cut(wise, 2, -1),
+        ),  # 14
         Query(
-            "FLUX_G * sqrt(FLUX_IVAR_G) >= 1",
-            Query("g_mag - r_mag < -1") | Query("g_mag - r_mag > 4"),
-        ),
-        Query(
-            "FLUX_Z * sqrt(FLUX_IVAR_Z) >= 1",
-            Query("r_mag - z_mag < -1") | Query("r_mag - z_mag > 4"),
-        ),
-        Query(
-            (
-                _flux_sigma_cut(-1),
-                *(f"FLUX_W{i}" for i in range(1, 5)),
-                *(f"FLUX_IVAR_W{i}" for i in range(1, 5)),
-            )
-        ),
-        Query(
-            (
-                _flux_sigma_cut(1, n_bands=3),
-                *(f"FLUX_W{i}" for i in range(1, 5)),
-                *(f"FLUX_IVAR_W{i}" for i in range(1, 5)),
-            ),
-            *(f"NOBS_W{i} > 0" for i in range(1, 5)),
-        ),
+            _sigma_cut(grz, 3, 40), _sigma_cut(wise, 4, 10), _sigma_cut(wise, 2, 0),
+        ),  # 15
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
