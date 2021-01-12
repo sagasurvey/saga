@@ -163,6 +163,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         Query(
             _sigma_cut(grz, 3, 40), _sigma_cut(wise, 4, 10), _sigma_cut(wise, 2, 0),
         ),  # 15
+        Query(
+            _sigma_cut(grz, 3, 30), _sigma_cut(wise, 4, 5), _sigma_cut(wise, 1, 2),
+        ),  # 16
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
