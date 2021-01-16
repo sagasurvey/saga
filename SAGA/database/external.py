@@ -638,11 +638,13 @@ class DecalsQuery(DownloadableBase):
                 ):
                     continue
                 d = FitsTable(os.path.join(sweep_dir, filename)).read()
-                sep = SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg
-                d = d[sep <= self.radius]
-                if len(d):
-                    output.append(d)
-                del d
+                mask = (
+                    SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg
+                    <= self.radius
+                )
+                if mask.any():
+                    output.append(d[mask])
+                del d, mask
 
         if not output:
             return Table()
