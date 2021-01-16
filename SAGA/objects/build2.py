@@ -303,6 +303,18 @@ def prepare_decals_catalog_for_merging(
         {"radius_err": 9999.0},
     )
 
+    # Recalculate mag and err to fix old bugs in the raw catalogs
+    const = 2.5 / np.log(10)
+    for band in "grz":
+        BAND = band.upper()
+        with np.errstate(divide="ignore", invalid="ignore"):
+            catalog[f"{band}_mag"] = 22.5 - const * np.log(
+                catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"]
+            )
+            catalog[f"{band}_err"] = const / np.abs(
+                catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
+            )
+
     for band in "uiy":
         catalog["{}_mag".format(band)] = 99.0
         catalog["{}_err".format(band)] = 99.0
