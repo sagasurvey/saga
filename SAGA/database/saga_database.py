@@ -441,8 +441,8 @@ class Database(object):
             "decals_dr9": os.path.join(
                 self._local_dir,
                 "external_catalogs",
-                "decals_dr9m",
-                "{}_decals_dr9m.fits.gz",
+                "decals_dr9",
+                "{}_decals_dr9.fits.gz",
             ),
             "gaia": os.path.join(
                 self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
