@@ -23,6 +23,7 @@ else:
     Gaia.ROW_LIMIT = 0
 
 from ..utils import makedirs_if_needed
+from ..utils.overlap_checker import is_within
 from .core import DownloadableBase, FitsTable
 
 _HAS_CASJOBS_ = True
@@ -571,7 +572,7 @@ class DecalsQuery(DownloadableBase):
         ra,
         dec,
         radius=1.0,
-        decals_dr="dr7",
+        decals_dr="dr9",
         decals_base_dir="/global/project/projectdirs/cosmo/data/legacysurvey",
     ):
 
@@ -625,48 +626,19 @@ class DecalsQuery(DownloadableBase):
         ra_max, dec_max = cls.brickname_to_ra_dec(bmax)
         return ra_min, ra_max, dec_min, dec_max
 
-    @staticmethod
-    def is_within(ra, dec, ra_min, ra_max, dec_min, dec_max, margin_ra=0, margin_dec=0):
-        return (
-            (ra_min - margin_ra <= ra)
-            & (ra_max + margin_ra >= ra)
-            & (dec_min - margin_dec <= dec)
-            & (dec_max + margin_dec >= dec)
-        )
-
-    @staticmethod
-    def annotate_catalog(d):
-        for band in "grz":
-            BAND = band.upper()
-            d[band + "_mag"] = 22.5 - 2.5 * np.log10(
-                d["FLUX_" + BAND] / d["MW_TRANSMISSION_" + BAND]
-            )
-            d[band + "_err"] = (
-                2.5 / np.log(10) / np.abs(d["FLUX_" + BAND]) / np.sqrt(d["FLUX_IVAR_" + BAND])
-            )
-        return d
-
     def get_decals_catalog(self):
+        center_coord = SkyCoord(self.ra, self.dec, unit="deg")
         output = []
         for sweep_dir in self.sweep_dirs:
             for filename in sorted(os.listdir(sweep_dir)):
                 if not filename.startswith("sweep-") or not filename.endswith(".fits"):
                     continue
-                if not self.is_within(
-                    self.ra,
-                    self.dec,
-                    *self.get_ra_dec_range(filename),
-                    margin_ra=(self.radius * 1.01 / max(np.cos(np.deg2rad(self.dec)), 1.0e-8)),
-                    margin_dec=(self.radius * 1.01),
+                if not is_within(
+                    self.ra, self.dec, *self.get_ra_dec_range(filename), margin=self.radius
                 ):
                     continue
-
                 d = FitsTable(os.path.join(sweep_dir, filename)).read()
-                sep = (
-                    SkyCoord(d["RA"], d["DEC"], unit="deg")
-                    .separation(SkyCoord(self.ra, self.dec, unit="deg"))
-                    .deg
-                )
+                sep = SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg
                 d = d[sep <= self.radius]
                 if len(d):
                     output.append(d)
@@ -675,8 +647,7 @@ class DecalsQuery(DownloadableBase):
         if not output:
             return Table()
 
-        output = vstack(output, "exact")
-        return self.annotate_catalog(output)
+        return vstack(output, "exact")
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
