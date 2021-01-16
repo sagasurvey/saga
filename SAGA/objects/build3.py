@@ -32,12 +32,14 @@ def _ivar2err(ivar):
 def _n_or_more_gt(n, cut):
     def _n_or_more_gt_this(*arrays, n=n, cut=cut):
         return np.count_nonzero((np.stack(arrays) > cut), axis=0) >= n
+
     return _n_or_more_gt_this
 
 
 def _n_or_more_lt(n, cut):
     def _n_or_more_lt_this(*arrays, n=n, cut=cut):
         return np.count_nonzero((np.stack(arrays) < cut), axis=0) >= n
+
     return _n_or_more_lt_this
 
 
@@ -161,10 +163,14 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
             _sigma_cut(wise, 3, 1) | _sigma_cut(wise, 2, -1),
         ),  # 14
         Query(
-            _sigma_cut(grz, 3, 40), _sigma_cut(wise, 4, 10), _sigma_cut(wise, 2, 0),
+            _sigma_cut(grz, 3, 40),
+            _sigma_cut(wise, 4, 10),
+            _sigma_cut(wise, 2, 0),
         ),  # 15
         Query(
-            _sigma_cut(grz, 3, 30), _sigma_cut(wise, 4, 5), _sigma_cut(wise, 1, 2),
+            _sigma_cut(grz, 3, 30),
+            _sigma_cut(wise, 4, 5),
+            _sigma_cut(wise, 1, 2),
         ),  # 16
     ]
 
