@@ -271,7 +271,7 @@ def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, c
     """
     a = cen_r * 2.0 / 3600.0
     cos_dec = np.cos(np.deg2rad((obj_dec + cen_dec) * 0.5))
-    dx = (obj_ra - cen_ra) * cos_dec
+    dx = np.rad2deg(np.arcsin(np.sin(np.deg2rad(obj_ra - cen_ra)))) * cos_dec
     dy = obj_dec - cen_dec
 
     if cen_ba is None:
