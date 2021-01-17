@@ -78,7 +78,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     - https://www.legacysurvey.org/dr9/bitmasks/#maskbits
     """
 
-    is_decam = Query("RELEASE == 9010")
+    is_decam = Query("RELEASE == 9010") | Query("RELEASE == 9012")
     is_bass_mzls = Query("RELEASE == 9011")
     count_bass_mzls = Query("DEC > 32.375", (lambda coord: coord.galactic.b.deg > 0, "coord"))
 
@@ -97,7 +97,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog = Query("FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit)).filter(catalog)
 
     # Assign OBJID
-    release_short = np.where(is_decam.mask(catalog), 90, 91)
+    release_short = catalog["RELEASE"] // 1000 + catalog["RELEASE"] % 10
     catalog["OBJID"] = (
         release_short * np.int64(1e16)
         + catalog["BRICKID"] * np.int64(1e10)
@@ -123,9 +123,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
         catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
-        catalog[f"SIGMA_GOOD_{BAND}"] = np.where(
-            catalog[f"RCHISQ_{BAND}"] < 100, catalog[f"SIGMA_{BAND}"], 0.0
-        )
+        catalog[f"SIGMA_GOOD_{BAND}"] = np.where(catalog[f"RCHISQ_{BAND}"] < 100, catalog[f"SIGMA_{BAND}"], 0.0)
 
     # Recalculate mag and err to fix old bugs in the raw catalogs
     const = 2.5 / np.log(10)
