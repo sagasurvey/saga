@@ -176,7 +176,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
 SPEC_MATCHING_ORDER = (
     (Query("REMOVE == 0", "r_mag < 21", "sep < 1"), "sep"),
-    (Query("REMOVE  > 0", "r_mag < 21", "sep < 1"), "sep"),
+    (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 1"), "sep"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5", "sep < 30"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1", "sep < 30"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 2", "sep < 10"), "r_mag"),
