@@ -156,8 +156,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         Query((_n_or_more_gt(2, 0.35), *(f"FRACMASKED_{b}" for b in grz))),  # 7
         Query((_n_or_more_gt(2, 5), *(f"FRACFLUX_{b}" for b in grz))),  # 8
         _sigma_lt(grz, 2, 1),  # 9
-        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 1, -2)),  # 10
-        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(grz, 1, 20)),  # 11
+        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 2, 0), _sigma_lt(wise, 1, -1)),
+        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 2, 10), _sigma_lt(wise, 1, -3)),
+        Query(_sigma_lt(grz + wise, 6, 40), _sigma_lt(wise, 2, 10), _sigma_lt(grz, 1, 20)),
+        Query(_sigma_lt(grz + wise, 6, 30), _sigma_lt(wise, 2, 10), _sigma_lt(wise, 1, 2)),
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
