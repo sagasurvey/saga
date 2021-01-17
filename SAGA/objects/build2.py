@@ -1025,13 +1025,19 @@ def add_surface_brightness(base):
 
 
 def identify_host(base):
-    for q in (
+    host_search_queries = [
         C.obj_is_host2,
         Query("RHOST_ARCM < 0.5", "r_mag < 14", C.has_spec, C.sat_vcut),
         Query("RHOST_ARCM < 0.5", "r_mag < 14"),
         Query("RHOST_ARCM < 0.3", "r_mag < 16", C.has_spec, C.sat_vcut),
         Query("RHOST_ARCM < 0.3", "r_mag < 16"),
-    ):
+    ]
+
+    # for base v3
+    if "REF_CAT" in base.colnames:
+        host_search_queries.insert(1, Query(host_search_queries[1], QueryMaker.equal("REF_CAT", "L3")))
+
+    for q in host_search_queries:
         candidate_idx = np.flatnonzero(q.mask(base))
         if len(candidate_idx):
             host_idx = candidate_idx[base["RHOST_ARCM"][candidate_idx].argmin()]
