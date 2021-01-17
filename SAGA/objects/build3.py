@@ -43,8 +43,8 @@ def _n_or_more_lt(n, cut):
     return _n_or_more_lt_this
 
 
-def _sigma_cut(bands, n, cut):
-    return Query((_n_or_more_lt(n, cut), *(f"SIGMA_{b}" for b in bands)))
+def _sigma_lt(bands, n, cut):
+    return Query((_n_or_more_lt(n, cut), *(f"SIGMA_GOOD_{b}" for b in bands)))
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -123,6 +123,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
         catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
+        catalog[f"SIGMA_GOOD_{BAND}"] = np.where(
+            catalog[f"RCHISQ_{BAND}"] < 100, catalog[f"SIGMA_{BAND}"], 0.0
+        )
 
     # Recalculate mag and err to fix old bugs in the raw catalogs
     const = 2.5 / np.log(10)
@@ -152,26 +155,11 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         "(MASKBITS >> 7) % 2 > 0",  # 4
         "(MASKBITS >> 12) % 2 > 0",  # 5
         "(MASKBITS >> 13) % 2 > 0",  # 6
-        _sigma_cut(grz, 2, 1),  # 7
-        Query((_n_or_more_gt(2, 0.35), *(f"FRACMASKED_{b}" for b in grz))),  # 8
-        Query((_n_or_more_gt(2, 5), *(f"FRACFLUX_{b}" for b in grz))),  # 9
-        Query("RCHISQ_W1 > 50", (_n_or_more_gt(2, 50), *(f"RCHISQ_{b}" for b in grz))),  # 9
-        Query("SIGMA_G > 1", Query("g_mag - r_mag < -1") | Query("g_mag - r_mag > 4")),  # 11
-        Query("SIGMA_Z > 1", Query("r_mag - z_mag < -1") | Query("r_mag - z_mag > 4")),  # 12
-        Query(
-            _sigma_cut(grz, 3, 30) | _sigma_cut(grz, 2, 10),
-            _sigma_cut(wise, 3, 1) | _sigma_cut(wise, 2, -1),
-        ),  # 14
-        Query(
-            _sigma_cut(grz, 3, 40),
-            _sigma_cut(wise, 4, 10),
-            _sigma_cut(wise, 2, 0),
-        ),  # 15
-        Query(
-            _sigma_cut(grz, 3, 30),
-            _sigma_cut(wise, 4, 5),
-            _sigma_cut(wise, 1, 2),
-        ),  # 16
+        Query((_n_or_more_gt(2, 0.35), *(f"FRACMASKED_{b}" for b in grz))),  # 7
+        Query((_n_or_more_gt(2, 5), *(f"FRACFLUX_{b}" for b in grz))),  # 8
+        _sigma_lt(grz, 2, 1),  # 9
+        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 1, -2)),  # 10
+        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(grz, 1, 20)),  # 11
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
@@ -194,12 +182,21 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 SPEC_MATCHING_ORDER = (
     (Query("REMOVE == 0", "r_mag < 21", "sep < 1"), "sep"),
     (Query("REMOVE  > 0", "r_mag < 21", "sep < 1"), "sep"),
-    (Query("REMOVE == 0", "is_galaxy", "r_mag < 21", "sep_norm < 1", "sep < 20"), "sep_norm"),
-    (Query("REMOVE  > 0", "is_galaxy", "r_mag < 21", "sep_norm < 1", "sep < 20"), "sep_norm"),
-    (Query("REMOVE == 0", "is_galaxy", "r_mag < 21", "sep_norm < 2", "sep < 10"), "r_mag"),
-    (Query("REMOVE  > 0", "is_galaxy", "r_mag < 21", "sep_norm < 2", "sep < 10"), "r_mag"),
-    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "sep_norm"),
-    (Query("sep < 10", "r_mag < 21"), "sep"),
+    (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5", "sep < 30"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1", "sep < 30"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep < 3"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 0.5", "sep < 10"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep < 3"), "r_mag"),
+    (Query("REMOVE  > 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5", "sep < 30"), "r_mag"),
+    (Query("REMOVE  > 0", "r_mag < 21", "is_galaxy", "sep_norm < 1", "sep < 30"), "r_mag"),
+    (Query("REMOVE  > 0", "r_mag < 21", "is_galaxy", "sep < 3"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 0.5", "sep < 10"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "r_mag"),
+    (Query("REMOVE  > 0", "is_galaxy", "sep < 3"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", "sep < 10"), "sep"),
+    (Query("REMOVE  > 0", "r_mag < 21", "sep < 10"), "sep"),
+    (Query("REMOVE == 0", "sep < 10"), "sep"),
     (Query("sep < 10"), "sep"),
 )
 
