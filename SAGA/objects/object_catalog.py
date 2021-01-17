@@ -543,7 +543,6 @@ class ObjectCatalog(object):
             build_module = build3
             manual_keys = [
                 ("decals_dr9", "OBJID"),
-                ("shreds", "OBJID"),
             ]
             catalogs_determining_func = _determine_raw_catalogs_saga_v3
 
