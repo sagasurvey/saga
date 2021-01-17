@@ -97,7 +97,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog = Query("FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit)).filter(catalog)
 
     # Assign OBJID
-    release_short = catalog["RELEASE"] // 1000 + catalog["RELEASE"] % 10
+    release_short = (catalog["RELEASE"] // 1000) * 10 + catalog["RELEASE"] % 10
     catalog["OBJID"] = (
         release_short * np.int64(1e16)
         + catalog["BRICKID"] * np.int64(1e10)
