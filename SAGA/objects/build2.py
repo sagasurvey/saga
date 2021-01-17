@@ -104,15 +104,17 @@ def set_remove_flag(catalog, remove_queries=None, manual_remove=None, manual_rec
 
     remove_queries = [] if remove_queries is None else list(remove_queries)
 
-    if manual_remove is not None:
-        remove_queries.append((lambda x: np.in1d(x, manual_remove), "OBJID"))
+    if manual_remove is None:
+        manual_remove = np.array([], dtype=np.int)
+
+    remove_queries.insert(0, QueryMaker.in1d("OBJID", manual_remove))
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
 
     if manual_recover is not None:
         fill_values_by_query(
             catalog,
-            Query((lambda x: np.in1d(x, manual_recover), "OBJID")),
+            QueryMaker.in1d("OBJID", manual_recover),
             {"REMOVE": 0},
         )
 
@@ -608,7 +610,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None):
             for q, sorter in (
                 # fmt: off
                 (Query("REMOVE == 0", "is_galaxy == 0", "sep < 1"), "sep"),
-                (Query("REMOVE  > 0", "is_galaxy == 0", "sep < 1"), "sep"),
+                (Query("REMOVE % 2 == 0", "is_galaxy == 0", "sep < 1"), "sep"),
                 (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 1"), "r_mag"),
                 (Query("REMOVE == 0", "is_galaxy", C.faint_end_limit, "sep_norm < 2"), "r_mag"),
                 (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1"), "r_mag"),
