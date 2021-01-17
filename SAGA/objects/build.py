@@ -812,9 +812,11 @@ def find_satellites(base, version=1):
 
     # fixes for overlapping hosts
     if base["HOSTID"][0] == "pgc67817":  # overlapping with pgc67782
+        objid_v2 = [247126789, 247129294]
+        objid_v3 = [901029380000003058, 901029390000006275]
         fill_values_by_query(
             base,
-            QueryMaker.in1d("OBJID", [247126789, 247129294]) & "SATS == 1",
+            QueryMaker.in1d("OBJID", objid_v2 + objid_v3) & "SATS == 1",
             {"SATS": 5},
         )
 

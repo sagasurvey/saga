@@ -56,6 +56,7 @@ MERGED_CATALOG_COLUMNS = list(
             "radius_err",
             "ba",
             "phi",
+            "REF_CAT",
         ),
         (b + "_mag" for b in "ugriz"),
         (b + "_err" for b in "ugriz"),
@@ -157,6 +158,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         Query(_n_or_more_lt(sigma_grz, 3, 30) | _n_or_more_lt(sigma_grz, 2, 20), _n_or_more_lt(sigma_wise, 2, 10)),  # 10
     ]
 
+    catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
     has_ref = Query((np.char.isalnum, "REF_CAT"))
     manual_recover = QueryMaker.isin("OBJID", to_recover)
@@ -175,8 +177,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
 
 SPEC_MATCHING_ORDER = (
+    (Query((np.char.isalnum, "REF_CAT"), "r_mag < 21", "sep < 1"), "sep"),
     (Query("REMOVE == 0", "r_mag < 21", "sep < 1"), "sep"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 1"), "sep"),
+    (Query("REMOVE == 0", (np.char.isalnum, "REF_CAT"), "r_mag < 21", "is_galaxy", "sep_norm < 0.5", "sep < 30"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5", "sep < 30"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1", "sep < 30"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 2", "sep < 10"), "r_mag"),
