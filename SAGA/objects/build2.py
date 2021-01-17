@@ -803,6 +803,8 @@ def add_spectra(base, specs, debug=None, matching_order=None):
     cols = ["RA", "DEC", "REMOVE", "is_galaxy", "r_mag", "coord"]
     if "ba" in base.colnames and "phi" in base.colnames:
         cols.extend(["ba", "phi"])
+    if "REF_CAT" in base.colnames:
+        cols.append("REF_CAT")
     base_this = base[cols]
     base_this["index"] = np.arange(len(base))
     with np.errstate(over="ignore"):
