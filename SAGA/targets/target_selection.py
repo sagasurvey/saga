@@ -117,7 +117,7 @@ class TargetSelection(object):
         ):
             survey = list_name.partition("_")[0]
             try:
-                d = self._database["{}_remove".format(survey)]
+                d = self._database["{}_remove".format(list_name)]
             except KeyError:
                 continue
 
