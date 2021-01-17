@@ -86,7 +86,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     # Retain only unique entries
     catalog = add_skycoord(catalog)
-    catalog = (is_decam | count_bass_mzls).filter(catalog)
+    catalog = (is_decam ^ count_bass_mzls).filter(catalog)
     del catalog["coord"]
 
     # Remove objects fainter than 3 mag of survey limit (r < 23.75)
