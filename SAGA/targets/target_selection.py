@@ -108,17 +108,24 @@ class TargetSelection(object):
             self._manual_selected_objids = manual_selected_objids
 
         self._remove_lists = {}
-        for survey, col in (
+        for list_name, col in (
             ("sdss", "SDSS ID"),
             ("des", "DES_OBJID"),
             ("decals", "decals_objid"),
+            ("decals_dr8", "OBJID"),
+            ("decals_dr9", "OBJID"),
         ):
+            survey = list_name.partition("_")[0]
             try:
-                objids = get_unique_objids(self._database["{}_remove".format(survey)].read()[col])
+                d = self._database["{}_remove".format(survey)]
             except KeyError:
-                pass
-            else:
-                if len(objids):
+                continue
+
+            objids = get_unique_objids(d.read()[col])
+            if len(objids):
+                if survey in self._remove_lists:
+                    self._remove_lists = np.concatenate((self._remove_lists[survey], objids))
+                else:
                     self._remove_lists[survey] = objids
 
         self._cuts = cuts
