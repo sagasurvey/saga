@@ -29,22 +29,18 @@ def _ivar2err(ivar):
         return 1.0 / np.sqrt(ivar)
 
 
-def _n_or_more_gt(n, cut):
+def _n_or_more_gt(cols, n, cut):
     def _n_or_more_gt_this(*arrays, n=n, cut=cut):
         return np.count_nonzero((np.stack(arrays) > cut), axis=0) >= n
 
-    return _n_or_more_gt_this
+    return Query((_n_or_more_gt_this,) + tuple(cols))
 
 
-def _n_or_more_lt(n, cut):
+def _n_or_more_lt(cols, n, cut):
     def _n_or_more_lt_this(*arrays, n=n, cut=cut):
         return np.count_nonzero((np.stack(arrays) < cut), axis=0) >= n
 
-    return _n_or_more_lt_this
-
-
-def _sigma_lt(bands, n, cut):
-    return Query((_n_or_more_lt(n, cut), *(f"SIGMA_GOOD_{b}" for b in bands)))
+    return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -142,8 +138,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     to_remove = [] if to_remove is None else to_remove
     to_recover = [] if to_recover is None else to_recover
 
-    grz = tuple("GRZ")
-    wise = tuple((f"W{i}" for i in range(1, 5)))
+    sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
+    sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
+    fracmasked_grz = [f"FRACMASKED_{b}" for b in "GRZ"]
+    fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
 
     remove_queries = [
         QueryMaker.isin("OBJID", to_remove),  # 0
@@ -153,13 +151,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         "(MASKBITS >> 7) % 2 > 0",  # 4
         "(MASKBITS >> 12) % 2 > 0",  # 5
         "(MASKBITS >> 13) % 2 > 0",  # 6
-        Query((_n_or_more_gt(2, 0.35), *(f"FRACMASKED_{b}" for b in grz))),  # 7
-        Query((_n_or_more_gt(2, 5), *(f"FRACFLUX_{b}" for b in grz))),  # 8
-        _sigma_lt(grz, 2, 1),  # 9
-        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 2, 0), _sigma_lt(wise, 1, -1)),
-        Query(_sigma_lt(grz + wise, 6, 60), _sigma_lt(wise, 2, 10), _sigma_lt(wise, 1, -3)),
-        Query(_sigma_lt(grz + wise, 6, 40), _sigma_lt(wise, 2, 10), _sigma_lt(grz, 1, 20)),
-        Query(_sigma_lt(grz + wise, 6, 30), _sigma_lt(wise, 2, 10), _sigma_lt(wise, 1, 2)),
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1)),  # 7
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 8
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_lt(sigma_wise, 2, -5)),  # 9
+        Query(_n_or_more_lt(sigma_grz, 3, 30) | _n_or_more_lt(sigma_grz, 2, 20), _n_or_more_lt(sigma_wise, 2, 10)),  # 10
     ]
 
     catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
