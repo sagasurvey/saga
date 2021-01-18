@@ -217,12 +217,23 @@ SPEC_MATCHING_ORDER = (
 
 
 def apply_manual_fixes(base):
-    fill_values_by_query(base, "OBJID == 903255060000002115", {
-        "radius": 120.0,
-        "radius_err": 0.006,
-        "ba": 0.25,
-        "phi": 84.0,
-    })
+
+    # NGC5792 (224.5945, -1.0910)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 903255060000002115),
+        dict(radius=120.0, radius_err=0.006, ba=0.25, phi=84.0),
+    )
+
+    # NSA (v1.0.1) 343647 (255.5115, 22.9355)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 904604600000003107),
+        dict(
+            is_galaxy=True, REMOVE=0, radius=40.0, radius_err=0.002, ba=0.7, phi=97.0,
+            g_mag=13.86, r_mag=13.14, z_mag=12.54, g_err=0.005, r_err=0.002, z_err=0.005, REF_CAT="N1",
+        ),
+    )
 
     return base
 
