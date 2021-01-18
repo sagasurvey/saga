@@ -89,8 +89,8 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog = (is_decam ^ count_bass_mzls).filter(catalog)
     del catalog["coord"]
 
-    # Remove objects fainter than 3 mag of survey limit (r < 23.75)
-    flux_limit = 10 ** ((22.5 - 23.75) / 2.5)
+    # Remove objects fainter than r = 23
+    flux_limit = 10 ** ((22.5 - 23) / 2.5)
     catalog = Query("FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit)).filter(catalog)
 
     # Assign OBJID
@@ -104,10 +104,21 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     # Do galaxy/star separation
     catalog["is_galaxy"] = QueryMaker.not_equal("TYPE", "PSF").mask(catalog)
-    catalog["is_galaxy"] &= Query(
-        "abs(PMRA * sqrt(PMRA_IVAR)) < 2", "abs(PMDEC * sqrt(PMDEC_IVAR)) < 2"
+
+    # Bright (r < 17) stars that are misclassified as galaxies
+    flux_limit = 10 ** ((22.5 - 17) / 2.5)
+    bright_stars = Query(
+        "SHAPE_R < 1",
+        "FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit),
+        (
+            Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") |
+            Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")
+        ),
     ).mask(catalog)
-    catalog["is_galaxy"] |= QueryMaker.equal("REF_CAT", "L3").mask(catalog)  # SGA
+
+    # Fix galaxy/star separation with bright_stars and SGA masks
+    catalog["is_galaxy"] &= (~bright_stars)
+    catalog["is_galaxy"] |= QueryMaker.equal("REF_CAT", "L3").mask(catalog)
 
     # Rename/add columns
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
@@ -177,7 +188,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
 
 SPEC_MATCHING_ORDER = (
-    (Query("REMOVE == 0", "r_mag < 21", (np.char.isalnum, "REF_CAT"), "sep < 1"), "sep"),
+    (Query("REMOVE == 0", "r_mag < 21", (np.char.isalnum, "REF_CAT"), "sep < 0.5"), "sep"),
     (Query("REMOVE == 0", "r_mag < 21", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep < 0.5"), "sep"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 0.5"), "sep"),

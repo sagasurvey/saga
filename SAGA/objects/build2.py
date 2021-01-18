@@ -855,21 +855,27 @@ def _join_spec_repeat(current, new):
 def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
     has_nsa = Query("OBJ_NSAID > -1")
+    has_sga = QueryMaker.equal("REF_CAT", "L3")
     has_spec_z = Query(
         "SPEC_Z > 0",
         "ZQUALITY >= 3",
         "is_galaxy",
         "radius > abs(radius_err) * 2.0",
-        ~has_nsa,
     )
 
-    has_nsa_indices = np.flatnonzero(has_nsa.mask(base))
-    has_nsa_indices = has_nsa_indices[base["r_mag"][has_nsa_indices].argsort()]
+    if "REF_CAT" in base.colnames:
+        base["spec_rank"] = 1 - has_sga.mask(base).astype(np.int)
+    elif "OBJ_NSAID" in base.colnames:
+        base["spec_rank"] = 1 - has_nsa.mask(base).astype(np.int)
+    else:
+        base["spec_rank"] = 0
 
+    cols = ["spec_rank", "r_mag"]
     has_spec_z_indices = np.flatnonzero(has_spec_z.mask(base))
-    has_spec_z_indices = has_spec_z_indices[base["r_mag"][has_spec_z_indices].argsort()]
+    has_spec_z_indices = has_spec_z_indices[base[cols][has_spec_z_indices].argsort(cols)]
+    del base["spec_rank"]
 
-    for obj_this_idx in chain(has_nsa_indices, has_spec_z_indices):
+    for obj_this_idx in has_spec_z_indices:
         obj_this = base[obj_this_idx]
 
         if nsa is not None and obj_this["OBJ_NSAID"] > -1:
@@ -952,7 +958,13 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         nearby_obj["_idx"] = np.flatnonzero(nearby_obj_mask)
         del nearby_obj_mask
 
-        remove_basic_conditions = Query("is_galaxy", ~has_nsa, "r_mag > 14")
+        remove_basic_conditions = Query("is_galaxy", "r_mag > 14")
+        if "REF_CAT" in base.colnames:
+            remove_basic_conditions &= (~has_sga)
+            remove_basic_conditions |= has_nsa
+        elif "OBJ_NSAID" in base.colnames:
+            remove_basic_conditions &= (~has_nsa)
+
         close_spec_z = Query(
             remove_basic_conditions,
             "ZQUALITY >= 0",
@@ -1037,7 +1049,7 @@ def identify_host(base):
 
     # for base v3
     if "REF_CAT" in base.colnames:
-        host_search_queries.insert(1, Query(host_search_queries[1], QueryMaker.equal("REF_CAT", "L3")))
+        host_search_queries.insert(0, Query(host_search_queries[1], QueryMaker.equal("REF_CAT", "L3")))
 
     for q in host_search_queries:
         candidate_idx = np.flatnonzero(q.mask(base))
