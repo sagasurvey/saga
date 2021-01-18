@@ -216,6 +216,17 @@ SPEC_MATCHING_ORDER = (
 )
 
 
+def apply_manual_fixes(base):
+    fill_values_by_query(base, "OBJID == 903255060000002115", {
+        "radius": 120.0,
+        "radius_err": 0.006,
+        "ba": 0.25,
+        "phi": 84.0,
+    })
+
+    return base
+
+
 def add_spec_phot_sep(base):
     has_any_spec_mask = base["ZQUALITY"] > -1
 
@@ -258,6 +269,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
     del decals, decals_remove, decals_recover
 
+    base = apply_manual_fixes(base)
     base = build.add_host_info(base, host)
     base = build2.add_columns_for_spectra(base)
 
