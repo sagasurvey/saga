@@ -57,7 +57,7 @@ def show_images(
         "ZQUALITY",
         "TELNAME",
     ),
-    layer="dr8",
+    layer="ls-dr9",
     ra_label="RA",
     dec_label="DEC",
     use_dev=False,
@@ -73,15 +73,8 @@ def show_images(
     if ra_label not in keys_used:
         keys_used = [ra_label] + keys_used
     for row in table:
-        if layer == "auto":
-            if row["survey"] == "des":
-                layer = "des-dr1"
-            elif row["survey"] == "decals":
-                layer = "ls-dr67"
-            else:
-                layer = "sdss2"
 
-        url = "http://legacysurvey.org/viewer{dev}/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
+        url = "https://www.legacysurvey.org/viewer{dev}/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
             ra=row[ra_label],
             dec=row[dec_label],
             layer=layer,
@@ -90,7 +83,7 @@ def show_images(
             dev=dev,
         )
 
-        link = "http://legacysurvey.org/viewer{dev}?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
+        link = "https://www.legacysurvey.org/viewer{dev}?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
             ra=row[ra_label],
             dec=row[dec_label],
             layer=layer,
