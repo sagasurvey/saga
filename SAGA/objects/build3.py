@@ -163,10 +163,12 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         "(MASKBITS >> 7) % 2 > 0",  # 4
         "(MASKBITS >> 12) % 2 > 0",  # 5
         "(MASKBITS >> 13) % 2 > 0",  # 6
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1)),  # 7
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 8
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_lt(sigma_wise, 2, -5)),  # 9
-        Query(_n_or_more_lt(sigma_grz, 3, 30) | _n_or_more_lt(sigma_grz, 2, 20), _n_or_more_lt(sigma_wise, 2, 10)),  # 10
+        _n_or_more_lt(sigma_grz, 2, 1),  # 7
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1.5)),  # 8
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1), _n_or_more_lt(sigma_wise, 1, -1)),  # 9
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 10
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_lt(sigma_wise, 2, -5)),  # 11
+        Query(_n_or_more_lt(sigma_grz + sigma_wise, 7, 25)),  # 12
     ]
 
     catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
