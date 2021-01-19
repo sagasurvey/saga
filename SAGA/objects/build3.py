@@ -89,9 +89,13 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog = (is_decam ^ count_bass_mzls).filter(catalog)
     del catalog["coord"]
 
-    # Remove objects fainter than r = 23
-    flux_limit = 10 ** ((22.5 - 23) / 2.5)
-    catalog = Query("FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit)).filter(catalog)
+    # Remove objects fainter than r = 23 (unless g or z < 22.5)
+    # flux = 10 ** ((22.5 - mag) / 2.5)
+    catalog = (
+        Query("FLUX_R >= MW_TRANSMISSION_R * 0.63") |  # r <= 23
+        Query("FLUX_G >= MW_TRANSMISSION_G") |         # g <= 22.5
+        Query("FLUX_Z >= MW_TRANSMISSION_Z")           # z <= 22.5
+    ).filter(catalog)
 
     # Assign OBJID
     release_short = (catalog["RELEASE"] // 1000) * 10 + catalog["RELEASE"] % 10
@@ -120,7 +124,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     catalog["radius"] = catalog["SHAPE_R"]
     catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]), 9999.0)
     e_abs = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
-    catalog["ba"] = ((1 - e_abs) / (1 + e_abs))
+    catalog["ba"] = (1 - e_abs) / (1 + e_abs)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
 
@@ -188,11 +192,11 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
 SPEC_MATCHING_ORDER = (
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy == 0", (np.char.isalnum, "REF_CAT"), "sep < 0.5"), "sep"),
+    (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy == 0", "sep < 0.5"), "sep"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy == 0", "sep < 0.5"), "sep"),
-    (Query("REMOVE == 0", "r_mag < 21", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
-    (Query("REMOVE == 0", "r_mag < 21", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 1"), "r_mag"),
-    (Query("REMOVE == 0", "r_mag < 21", QueryMaker.equal("REF_CAT", "L3")), "r_mag"),
+    (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", "sep < 0.5"), "sep"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 2", "sep < 10"), "r_mag"),

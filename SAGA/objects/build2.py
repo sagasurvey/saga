@@ -734,7 +734,6 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
             "BINO",
             "IMACS",
             "WIYN",
-            "SDSS",
             "NSA",
             "PAL",
             "SALT",
