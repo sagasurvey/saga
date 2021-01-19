@@ -24,16 +24,13 @@ class HyperledaQuery(FastCsvTable):
     _default_conditions = ""
 
     def __init__(self, conditions=None, fields=None, **kwargs):
-        path = (
-            "http://leda.univ-lyon1.fr/fG.cgi?n=meandata&c=o&of=1,leda,simbad&nra=l&nakd=1&"
-            + urlencode(
-                {
-                    "d": self._default_fields if fields is None else fields,
-                    "sql": self._default_conditions if conditions is None else conditions,
-                    "ob": "pgc",
-                    "a": "csv[,]",
-                }
-            )
+        path = "http://leda.univ-lyon1.fr/fG.cgi?n=meandata&c=o&of=1,leda,simbad&nra=l&nakd=1&" + urlencode(
+            {
+                "d": self._default_fields if fields is None else fields,
+                "sql": self._default_conditions if conditions is None else conditions,
+                "ob": "pgc",
+                "a": "csv[,]",
+            }
         )
         super().__init__(path, **kwargs)
 

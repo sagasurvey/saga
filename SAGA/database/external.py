@@ -210,12 +210,7 @@ class SdssQuery(DownloadableBase):
         self.casjobs_pass = password or os.getenv("CASJOBS_PW")
 
         self.use_sciserver = False
-        if (
-            default_use_sciserver
-            and _HAS_SCISERVER_
-            and self.sciserver_user
-            and self.sciserver_pass
-        ):
+        if default_use_sciserver and _HAS_SCISERVER_ and self.sciserver_user and self.sciserver_pass:
             self.use_sciserver = True
 
         if self.use_sciserver:
@@ -333,9 +328,7 @@ class SdssQuery(DownloadableBase):
             "POST",
         )
 
-        job_id = cjob.submit(
-            query, context=context, task_name="casjobs_" + db_table_name, estimate=1
-        )
+        job_id = cjob.submit(query, context=context, task_name="casjobs_" + db_table_name, estimate=1)
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
             "casjob ({}) submitted...".format(db_table_name),
@@ -633,15 +626,10 @@ class DecalsQuery(DownloadableBase):
             for filename in sorted(os.listdir(sweep_dir)):
                 if not filename.startswith("sweep-") or not filename.endswith(".fits"):
                     continue
-                if not is_within(
-                    self.ra, self.dec, *self.get_ra_dec_range(filename), margin=self.radius
-                ):
+                if not is_within(self.ra, self.dec, *self.get_ra_dec_range(filename), margin=self.radius):
                     continue
                 d = FitsTable(os.path.join(sweep_dir, filename)).read()
-                mask = (
-                    SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg
-                    <= self.radius
-                )
+                mask = SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg <= self.radius
                 if mask.any():
                     output.append(d[mask])
                 del d, mask

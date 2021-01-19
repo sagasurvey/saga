@@ -62,31 +62,23 @@ class TargetSelection(object):
 
         if host_catalog_instance is not None:
             if not isinstance(host_catalog_instance, host_catalog_class):
-                raise ValueError(
-                    "`host_catalog_instance` must be an instance of `host_catalog_class`."
-                )
+                raise ValueError("`host_catalog_instance` must be an instance of `host_catalog_class`.")
             self._host_catalog = host_catalog_instance
         else:
             self._host_catalog = host_catalog_class(self._database)
 
         if object_catalog_instance is not None:
             if not isinstance(object_catalog_instance, ObjectCatalog):
-                raise ValueError(
-                    "`object_catalog_instance` must be an instance of `ObjectCatalog`."
-                )
+                raise ValueError("`object_catalog_instance` must be an instance of `ObjectCatalog`.")
             self._object_catalog = object_catalog_instance
         else:
-            self._object_catalog = ObjectCatalog(
-                self._database, host_catalog_class, self._host_catalog
-            )
+            self._object_catalog = ObjectCatalog(self._database, host_catalog_class, self._host_catalog)
 
         self.target_catalogs = dict()
 
         if assign_targeting_score_func is None:
             self.assign_targeting_score = (
-                assign_targeting_score_v1
-                if self._build_version < 2
-                else assign_targeting_score_v2plus
+                assign_targeting_score_v1 if self._build_version < 2 else assign_targeting_score_v2plus
             )
         else:
             self.assign_targeting_score = assign_targeting_score_func
@@ -147,11 +139,7 @@ class TargetSelection(object):
 
     def _load_gmm_parameters(self, gmm_parameters):
         prefix = "gmm_parameters_"
-        keys = [
-            k[len(prefix) :]
-            for k in self._database.keys()
-            if not isinstance(k, tuple) and k.startswith(prefix)
-        ]
+        keys = [k[len(prefix) :] for k in self._database.keys() if not isinstance(k, tuple) and k.startswith(prefix)]
 
         if gmm_parameters is None:
             return {k: self._database[prefix + k].read() for k in keys}
@@ -225,8 +213,7 @@ class TargetSelection(object):
             return
 
         output_iter = (
-            self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id]
-            for host_id in host_ids
+            self.target_catalogs[host_id][columns] if columns else self.target_catalogs[host_id] for host_id in host_ids
         )
         if return_as.startswith("item"):
             return zip(host_ids, output_iter)
@@ -311,13 +298,9 @@ def prepare_mmt_catalog(
         )
 
     if remove_outskirts:
-        target_catalog = (Query("RHOST_KPC < 400.0") | Query("RHOST_ARCM < 40.0")).filter(
-            target_catalog
-        )
+        target_catalog = (Query("RHOST_KPC < 400.0") | Query("RHOST_ARCM < 40.0")).filter(target_catalog)
 
-    is_target = Query(
-        "TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold)
-    )
+    is_target = Query("TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold))
 
     if "PHOTPTYPE" in target_catalog.colnames:
         is_star = Query("PHOTPTYPE == 6", "REMOVE == -1")
@@ -362,9 +345,7 @@ def prepare_mmt_catalog(
         raise ValueError("not a valid rank value for flux stars")
     if fs_rank > 1:
         target_catalog["rank"][is_flux_star.mask(target_catalog)] = 0
-        target_catalog["rank"][
-            Query("rank >= 2", "rank <= {}".format(fs_rank)).mask(target_catalog)
-        ] -= 1
+        target_catalog["rank"][Query("rank >= 2", "rank <= {}".format(fs_rank)).mask(target_catalog)] -= 1
         target_catalog["rank"][Query("rank == 0").mask(target_catalog)] = fs_rank
         is_flux_star = Query("rank == {}".format(fs_rank))
         is_target = Query("rank >= 1", "rank <= 8", "rank != {}".format(fs_rank))
@@ -525,10 +506,7 @@ def prepare_aat_catalog(
             dist_rand_out = _gen_dist_rand(seed_this, size_out)
             index = 1.0 / (sky_fiber_radial_adjustment + 2.0)
             dist_rand_in = (np.random.RandomState(seed_this + 1).rand(size_in) ** index) * host_rvir
-            return (
-                np.concatenate([dist_rand_out.to_value("deg"), dist_rand_in.to_value("deg")])
-                * u.deg
-            )
+            return np.concatenate([dist_rand_out.to_value("deg"), dist_rand_in.to_value("deg")]) * u.deg
 
     else:
         gen_dist_rand = _gen_dist_rand
@@ -559,16 +537,12 @@ def prepare_aat_catalog(
 
     gaia_guidestars = None
     if gaia_catalog is not None:
-        gaia_guidestars = get_gaia_guidestars(
-            object_catalog=target_catalog, gaia_catalog=gaia_catalog
-        )
+        gaia_guidestars = get_gaia_guidestars(object_catalog=target_catalog, gaia_catalog=gaia_catalog)
         if len(gaia_guidestars) > guidestar_max:
             idx = np.random.RandomState(seed + 3).choice(len(gaia_guidestars), guidestar_max, False)
             gaia_guidestars = gaia_guidestars[idx]
 
-    is_target = Query(
-        "TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold)
-    )
+    is_target = Query("TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold))
 
     is_star = Query(~Query("is_galaxy"), "REMOVE == 0")
     if "morphology_info_sdss" in target_catalog.colnames:
@@ -600,9 +574,7 @@ def prepare_aat_catalog(
     flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
     flux_star_indices = flux_star_indices[sep > flux_star_removal_threshold]
     if len(flux_star_indices) > flux_star_max:
-        flux_star_indices = np.random.RandomState(seed + 4).choice(
-            flux_star_indices, flux_star_max, False
-        )
+        flux_star_indices = np.random.RandomState(seed + 4).choice(flux_star_indices, flux_star_max, False)
     target_catalog["Priority"][flux_star_indices] = 9
     target_catalog = Query("Priority > 0").filter(target_catalog)
     n_flux_star = Query("Priority == 9").count(target_catalog)
@@ -618,9 +590,7 @@ def prepare_aat_catalog(
     target_catalog.rename_column("r_mag", "Magnitude")
 
     target_catalog.sort(["TARGETING_SCORE", "Magnitude"])
-    target_catalog = target_catalog[
-        ["TargetName", "RA", "Dec", "TargetType", "Priority", "Magnitude", "0", "Notes"]
-    ]
+    target_catalog = target_catalog[["TargetName", "RA", "Dec", "TargetType", "Priority", "Magnitude", "0", "Notes"]]
 
     sky_catalog = Table(
         {

@@ -129,11 +129,7 @@ def _determine_raw_catalogs_saga_v2(host, using_dr8_by_default=False, **kwargs):
         ):
             catalogs.remove("decals")
             catalogs.append("decals_dr8")
-        elif (
-            "decals" not in catalogs
-            and coverage["decals_dr8"] >= 0.95
-            and coverage["des_dr1"] < 0.95
-        ):
+        elif "decals" not in catalogs and coverage["decals_dr8"] >= 0.95 and coverage["des_dr1"] < 0.95:
             catalogs.append("decals_dr8")
 
     return tuple(set(catalogs))
@@ -185,9 +181,7 @@ class ObjectCatalog(object):
         self._database = database or Database()
         if host_catalog_instance is not None:
             if not isinstance(host_catalog_instance, host_catalog_class):
-                raise ValueError(
-                    "`host_catalog_instance` must be an instance of `host_catalog_class`."
-                )
+                raise ValueError("`host_catalog_instance` must be an instance of `host_catalog_class`.")
             self._host_catalog = host_catalog_instance
         else:
             self._host_catalog = host_catalog_class(self._database)
@@ -205,10 +199,7 @@ class ObjectCatalog(object):
                 table["{}_mag".format(b)] = table[b] - table["EXTINCTION_{}".format(b.upper())]
 
         for color in get_all_colors():
-            if (
-                "{}_mag".format(color[0]) not in table.colnames
-                or "{}_mag".format(color[1]) not in table.colnames
-            ):
+            if "{}_mag".format(color[0]) not in table.colnames or "{}_mag".format(color[1]) not in table.colnames:
                 continue
             with np.errstate(invalid="ignore"):
                 table[color] = table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
@@ -235,9 +226,7 @@ class ObjectCatalog(object):
                 )
                 p_sat_dict["p_sat_corrected"] = 0
 
-        good_obj = (
-            Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        )
+        good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
         fill_values_by_query(table, ~good_obj, p_sat_dict)
 
         if add_skycoord:
@@ -354,10 +343,7 @@ class ObjectCatalog(object):
             if hosts is None:
                 host_ids = np.unique(t["HOST_NSAID"])
             output_iterator = (
-                self._slice_table(
-                    t, Query(cuts, "HOST_NSAID == {}".format(i)), columns, add_skycoord
-                )
-                for i in host_ids
+                self._slice_table(t, Query(cuts, "HOST_NSAID == {}".format(i)), columns, add_skycoord) for i in host_ids
             )
             if return_as[0] == "i":
                 return output_iterator
@@ -424,9 +410,7 @@ class ObjectCatalog(object):
             fixes_dict = fixes_to_nsa_v012
             cols = build.NSA_COLS_USED
         elif version == "1.0.1":
-            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (nsa["DFLAGS"][:, 3:6]).all(
-                axis=1
-            )
+            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (nsa["DFLAGS"][:, 3:6]).all(axis=1)
             objs_to_remove = [614276, 632725, 628283, 694072, 667243, 219164]
             fixes_dict = fixes_to_nsa_v101
             cols = build2.NSA_COLS_USED
@@ -604,9 +588,7 @@ class ObjectCatalog(object):
                 if file_time > overwrite:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "Base catalog {} ({}) is newer than {}.".format(
-                            host_id, file_time.isot, overwrite.isot
-                        ),
+                        "Base catalog {} ({}) is newer than {}.".format(host_id, file_time.isot, overwrite.isot),
                         "({}/{})".format(i + 1, nhosts),
                     )
                     continue
@@ -623,9 +605,7 @@ class ObjectCatalog(object):
                 except OSError:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "[WARNING] Not found: {} catalog for {}!!.".format(
-                            catalog_name.upper(), host_id
-                        ),
+                        "[WARNING] Not found: {} catalog for {}!!.".format(catalog_name.upper(), host_id),
                     )
                     continue
                 if catalog_name == "wise":
@@ -697,9 +677,7 @@ class ObjectCatalog(object):
 
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
-            "All done building base catalogs for {}/{} hosts.".format(
-                nhosts - failed_count, nhosts
-            ),
+            "All done building base catalogs for {}/{} hosts.".format(nhosts - failed_count, nhosts),
         )
 
         if return_catalogs:
@@ -803,18 +781,14 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_approx"].append(
-            Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum()
-        )
+        data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
         data["sats_missed_corrected"].append(
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )
 
         return data
 
-    def generate_object_stats(
-        self, hosts="build_default", save_to=None, overwrite=False, generate_func=None
-    ):
+    def generate_object_stats(self, hosts="build_default", save_to=None, overwrite=False, generate_func=None):
         """
         generate object statistics for *hosts*
         """

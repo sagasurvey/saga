@@ -145,9 +145,7 @@ def add_host_info(base, host, overwrite_if_different_host=False):
         base["FIELD_ID"] = get_empty_str_array(len(base), 48, host["field_id"])
         return base
 
-    if (
-        "HOSTID" in base.colnames and base["HOSTID"][0] != host["HOSTID"]
-    ) and not overwrite_if_different_host:
+    if ("HOSTID" in base.colnames and base["HOSTID"][0] != host["HOSTID"]) and not overwrite_if_different_host:
         raise ValueError("Host info exists and differs from input host info.")
 
     base["HOSTID"] = get_empty_str_array(len(base), 48, host["HOSTID"] or "")
@@ -247,9 +245,7 @@ def remove_human_inspected(base, objects_to_remove):
     -------
     base : astropy.table.Table
     """
-    fill_values_by_query(
-        base, Query((lambda x: np.in1d(x, objects_to_remove), "OBJID")), {"REMOVE": 1}
-    )
+    fill_values_by_query(base, Query((lambda x: np.in1d(x, objects_to_remove), "OBJID")), {"REMOVE": 1})
     return base
 
 
@@ -305,9 +301,7 @@ def remove_shreds_with_nsa(base, nsa):
         raise KeyError("`nsa` does not have all needed columns")
 
     host_sc = SkyCoord(base["HOST_RA"][0], base["HOST_DEC"][0], unit="deg")
-    nsa_sc = (
-        nsa["coord"] if "coord" in nsa.colnames else SkyCoord(nsa["RA"], nsa["DEC"], unit="deg")
-    )
+    nsa_sc = nsa["coord"] if "coord" in nsa.colnames else SkyCoord(nsa["RA"], nsa["DEC"], unit="deg")
     nsa = nsa[nsa_sc.separation(host_sc).deg < 1.0]
     del nsa_sc
 
@@ -368,18 +362,14 @@ def remove_shreds_with_nsa(base, nsa):
         nsa_sersic_flux[invalid_mag] = 1.0
 
         mag = 22.5 - 2.5 * np.log10(nsa_sersic_flux)
-        mag_err = np.fabs(
-            (2.5 / np.log(10.0)) / nsa_sersic_flux / np.sqrt(nsa_obj["SERSICFLUX_IVAR"])
-        )
+        mag_err = np.fabs((2.5 / np.log(10.0)) / nsa_sersic_flux / np.sqrt(nsa_obj["SERSICFLUX_IVAR"]))
         mag[invalid_mag] = -9999.0
         mag_err[invalid_mag] = -9999.0
 
         for i, b in enumerate(get_sdss_bands()):
             values_to_rewrite[b] = mag[i + 2]
             values_to_rewrite["{}_err".format(b)] = mag_err[i + 2]
-        values_to_rewrite["SB_EXP_R"] = mag[4] + 2.5 * np.log10(
-            2.0 * np.pi * nsa_obj["PETROTH50"] ** 2.0 + 1.0e-20
-        )
+        values_to_rewrite["SB_EXP_R"] = mag[4] + 2.5 * np.log10(2.0 * np.pi * nsa_obj["PETROTH50"] ** 2.0 + 1.0e-20)
 
         for k, v in values_to_rewrite.items():
             base[k][closest_base_obj_index] = v
@@ -432,9 +422,7 @@ def recover_whitelisted_objects(base, objects_to_recover):
     -------
     base : astropy.table.Table
     """
-    fill_values_by_query(
-        base, Query((lambda x: np.in1d(x, objects_to_recover), "OBJID")), {"REMOVE": -1}
-    )
+    fill_values_by_query(base, Query((lambda x: np.in1d(x, objects_to_recover), "OBJID")), {"REMOVE": -1})
     return base
 
 
@@ -471,9 +459,7 @@ def remove_shreds_with_highz(base):
         if base["REMOVE"][idx] != -1:
             continue
 
-        nearby_obj_mask = (
-            base["coord"].separation(base["coord"][idx]).arcsec < 1.25 * base["PETRORAD_R"][idx]
-        )
+        nearby_obj_mask = base["coord"].separation(base["coord"][idx]).arcsec < 1.25 * base["PETRORAD_R"][idx]
         nearby_obj_mask &= base["REMOVE"] == -1
 
         assert nearby_obj_mask[idx]
@@ -547,9 +533,7 @@ def clean_repeat_spectra(spectra):
 
         # search nearby spectra in 3D
         nearby_mask = np.fabs(spectra["SPEC_Z"] - spec["SPEC_Z"]) < _spec_search_dz
-        nearby_mask &= spectra["coord"].separation(spec["coord"]).arcsec < _get_spec_search_radius(
-            spec["SPEC_Z"]
-        )
+        nearby_mask &= spectra["coord"].separation(spec["coord"]).arcsec < _get_spec_search_radius(spec["SPEC_Z"])
         nearby_mask &= not_done
         nearby_mask = np.flatnonzero(nearby_mask)
         assert len(nearby_mask) >= 1
@@ -749,13 +733,9 @@ def clean_sdss_spectra(base):
             len(t),
         )
 
-    sdss_specs_indices = np.flatnonzero(
-        Query("ZQUALITY == 4", "REMOVE == -1", find_sdss_only).mask(base)
-    )
+    sdss_specs_indices = np.flatnonzero(Query("ZQUALITY == 4", "REMOVE == -1", find_sdss_only).mask(base))
     if len(sdss_specs_indices) > 0:
-        sdss_specs = base[["SPEC_REPEAT", "SPEC_Z", "TELNAME", "ZQUALITY", "coord"]][
-            sdss_specs_indices
-        ]
+        sdss_specs = base[["SPEC_REPEAT", "SPEC_Z", "TELNAME", "ZQUALITY", "coord"]][sdss_specs_indices]
         sdss_specs["indices"] = sdss_specs_indices
         # line below makes `clean_repeat_spectra` prefer NSA
         sdss_specs["ZQUALITY"][sdss_specs["TELNAME"] == "NSA"] = 5
@@ -866,9 +846,7 @@ def add_z_cosmo(base):
     base = add_skycoord(base)
     has_spec_mask = C.has_spec.mask(base)
     base["z_cosmo"] = np.nan
-    base["z_cosmo"][has_spec_mask] = v2z(
-        vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask])
-    )
+    base["z_cosmo"][has_spec_mask] = v2z(vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask]))
 
     if "SATS" in base.colnames:
         host_or_sats_mask = (C.is_sat | "SATS == 3").mask(base)

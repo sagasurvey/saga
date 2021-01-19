@@ -80,15 +80,11 @@ def read_generic_spectra(
 
         if "conflicted copy" in filename:
             logging.warning(
-                "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(
-                    filepath
-                )
+                "SKIPPING spectra file {} - it's a conflicted copy; check what went wrong!".format(filepath)
             )
             continue
 
-        if exclude_spec_masks and (
-            rootname in exclude_spec_masks or filename in exclude_spec_masks
-        ):
+        if exclude_spec_masks and (rootname in exclude_spec_masks or filename in exclude_spec_masks):
             continue
 
         helio_corr = None
@@ -105,9 +101,7 @@ def read_generic_spectra(
             sc, obstime = get_obs_info_from_fits(fits_path, **(fits_hdr_kwargs or {}))
         except (IOError, OSError):
             if fits_hdr_kwargs or helio_corr_site or before_time is not None:
-                logging.warning(
-                    "Cannot find or read corresponding fits file for {}".format(filepath)
-                )
+                logging.warning("Cannot find or read corresponding fits file for {}".format(filepath))
         else:
             if before_time is not None and obstime > before_time:
                 continue
@@ -125,9 +119,7 @@ def read_generic_spectra(
                 table_read_kwargs_this.update(table_read_kwargs)
             this = Table.read(filepath, **table_read_kwargs_this)
         except (IOError, CParserError) as e:
-            logging.warning(
-                "SKIPPING spectra file {} - could not read or parse\n{}".format(filepath, e)
-            )
+            logging.warning("SKIPPING spectra file {} - could not read or parse\n{}".format(filepath, e))
             continue
 
         this = ensure_specs_dtype(this, skip_missing_cols=True)
@@ -277,9 +269,7 @@ def read_wiyn(dir_path):
     for f in os.listdir(dir_path):
         if not f.endswith(".fits.gz"):
             continue
-        this = FitsTable(os.path.join(dir_path, f)).read()[
-            ["RA", "DEC", "ZQUALITY", "FID", "Z", "Z_ERR"]
-        ]
+        this = FitsTable(os.path.join(dir_path, f)).read()[["RA", "DEC", "ZQUALITY", "FID", "Z", "Z_ERR"]]
         this = Query("ZQUALITY >= 1").filter(this)
         this["MASKNAME"] = f
         output.append(this)

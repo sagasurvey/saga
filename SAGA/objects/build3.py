@@ -96,9 +96,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     # Assign OBJID
     release_short = (catalog["RELEASE"] // 1000) * 10 + catalog["RELEASE"] % 10
     catalog["OBJID"] = (
-        release_short * np.int64(1e16)
-        + catalog["BRICKID"] * np.int64(1e10)
-        + catalog["OBJID"].astype(np.int64)
+        release_short * np.int64(1e16) + catalog["BRICKID"] * np.int64(1e10) + catalog["OBJID"].astype(np.int64)
     )
     del release_short
 
@@ -110,14 +108,11 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
     bright_stars = Query(
         "SHAPE_R < 1",
         "FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit),
-        (
-            Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") |
-            Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")
-        ),
+        (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
     ).mask(catalog)
 
     # Fix galaxy/star separation with bright_stars and SGA masks
-    catalog["is_galaxy"] &= (~bright_stars)
+    catalog["is_galaxy"] &= ~bright_stars
     catalog["is_galaxy"] |= QueryMaker.equal("REF_CAT", "L3").mask(catalog)
 
     # Rename/add columns
@@ -166,7 +161,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         _n_or_more_lt(sigma_grz, 2, 1),  # 7
         Query(_n_or_more_gt(fracflux_grz, 2, 5)),  # 8
         Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1.5)),  # 9
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1), _n_or_more_lt(sigma_wise, 1, 0)),  # 10
+        Query(
+            _n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1), _n_or_more_lt(sigma_wise, 1, 0)
+        ),  # 10
         Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 11
         Query(_n_or_more_lt(sigma_grz + sigma_wise, 7, 25)),  # 12
     ]
@@ -233,8 +230,19 @@ def apply_manual_fixes(base):
         base,
         QueryMaker.equal("OBJID", 904604600000003107),
         dict(
-            is_galaxy=True, REMOVE=0, radius=40.0, radius_err=0.002, ba=0.7, phi=97.0,
-            g_mag=13.86, r_mag=13.14, z_mag=12.54, g_err=0.005, r_err=0.002, z_err=0.005, REF_CAT="N1",
+            is_galaxy=True,
+            REMOVE=0,
+            radius=40.0,
+            radius_err=0.002,
+            ba=0.7,
+            phi=97.0,
+            g_mag=13.86,
+            r_mag=13.14,
+            z_mag=12.54,
+            g_err=0.005,
+            r_err=0.002,
+            z_err=0.005,
+            REF_CAT="N1",
         ),
     )
 
@@ -300,9 +308,7 @@ def build_full_stack(  # pylint: disable=unused-argument
         all_spectra = vstack(all_spectra, "exact")
         if halpha is not None:
             all_spectra = build2.add_halpha_to_spectra(all_spectra, halpha)
-        base = build2.add_spectra(
-            base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER
-        )
+        base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
     del all_spectra
 
     base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)

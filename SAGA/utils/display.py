@@ -26,9 +26,7 @@ def print_for_viewer(table, keys=("OBJID", "RA", "DEC"), additional_keys=None):
     print(output)
 
 
-def read_marks_from_clipboard(
-    extract_marked_value=True, extract_cols="objid", marked_col_name="marked"
-):
+def read_marks_from_clipboard(extract_marked_value=True, extract_cols="objid", marked_col_name="marked"):
     if not _HAS_CLIP:
         raise RuntimeError("needs pyperclip to work")
     t = ascii.read(table=pyperclip.paste(), format="fast_tab")

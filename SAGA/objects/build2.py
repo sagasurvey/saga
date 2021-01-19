@@ -167,9 +167,7 @@ def prepare_sdss_catalog_for_merging(catalog, to_remove=None, to_recover=None):
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_des_catalog_for_merging(
-    catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True
-):
+def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True):
 
     catalog["radius"] = catalog["radius_r"]
     catalog["radius_err"] = np.float32(0)
@@ -180,15 +178,9 @@ def prepare_des_catalog_for_merging(
         catalog["morphology_info"] = catalog["wavg_extended_coadd_i"].astype(np.int32)
 
     else:
-        extended_coadd = (
-            catalog["spread_model_r"] + catalog["spreaderr_model_r"] * 3.0 > 0.005
-        ).astype(np.int32)
-        extended_coadd += (catalog["spread_model_r"] + catalog["spreaderr_model_r"] > 0.003).astype(
-            np.int32
-        )
-        extended_coadd += (catalog["spread_model_r"] - catalog["spreaderr_model_r"] > 0.003).astype(
-            np.int32
-        )
+        extended_coadd = (catalog["spread_model_r"] + catalog["spreaderr_model_r"] * 3.0 > 0.005).astype(np.int32)
+        extended_coadd += (catalog["spread_model_r"] + catalog["spreaderr_model_r"] > 0.003).astype(np.int32)
+        extended_coadd += (catalog["spread_model_r"] - catalog["spreaderr_model_r"] > 0.003).astype(np.int32)
         catalog["is_galaxy"] = extended_coadd == 3
         catalog["morphology_info"] = extended_coadd
 
@@ -245,9 +237,7 @@ def prepare_des_catalog_for_merging(
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def prepare_decals_catalog_for_merging(
-    catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True
-):
+def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None, convert_to_sdss_filters=True):
     """
     Ref:
     - DR6/7: https://www.legacysurvey.org/dr7/files/#sweep-7-0-sweep-brickmin-brickmax-fits
@@ -268,10 +258,7 @@ def prepare_decals_catalog_for_merging(
     if is_dr8plus:
         catalog["is_galaxy"] &= catalog["TYPE"] != "DUP"
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-    catalog["radius"] = (
-        catalog["FRACDEV"] * catalog["SHAPEDEV_R"]
-        + (1.0 - catalog["FRACDEV"]) * catalog["SHAPEEXP_R"]
-    )
+    catalog["radius"] = catalog["FRACDEV"] * catalog["SHAPEDEV_R"] + (1.0 - catalog["FRACDEV"]) * catalog["SHAPEEXP_R"]
     catalog["radius_err"] = np.float32(0)
     mask = catalog["TYPE"] == "DEV"
     catalog["radius_err"][mask] = 1.0 / np.sqrt(catalog["SHAPEDEV_R_IVAR"][mask])
@@ -308,12 +295,8 @@ def prepare_decals_catalog_for_merging(
     for band in "grz":
         BAND = band.upper()
         with np.errstate(divide="ignore", invalid="ignore"):
-            catalog[f"{band}_mag"] = 22.5 - const * np.log(
-                catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"]
-            )
-            catalog[f"{band}_err"] = const / np.abs(
-                catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
-            )
+            catalog[f"{band}_mag"] = 22.5 - const * np.log(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
+            catalog[f"{band}_err"] = const / np.abs(catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"]))
 
     for band in "uiy":
         catalog["{}_mag".format(band)] = 99.0
@@ -405,9 +388,7 @@ def prepare_decals_catalog_for_merging(
 def add_halpha_to_spectra(spectra, halpha):
     halpha = halpha["EW_Halpha", "EW_Halpha_err", "SPECOBJID1", "MASKNAME"]
     halpha.rename_column("SPECOBJID1", "SPECOBJID")
-    halpha = ensure_specs_dtype(
-        halpha, cols_definition=EXTENDED_SPECS_COLUMNS, skip_missing_cols=True
-    )
+    halpha = ensure_specs_dtype(halpha, cols_definition=EXTENDED_SPECS_COLUMNS, skip_missing_cols=True)
     spectra = join(spectra, halpha, ["SPECOBJID", "MASKNAME"], "left")
     spectra["EW_Halpha"].fill_value = np.nan
     spectra["EW_Halpha_err"].fill_value = np.nan
@@ -448,8 +429,7 @@ def assign_photometry_choice(stacked_catalog, indices, is_last):
         return choices
 
     if not_selected_good.size < len(survey_count) and (
-        stacked_catalog["r_mag"][not_selected_good].min()
-        > stacked_catalog["r_mag"][indices[sorter[0]]] + 1
+        stacked_catalog["r_mag"][not_selected_good].min() > stacked_catalog["r_mag"][indices[sorter[0]]] + 1
     ):
         return choices
 
@@ -466,9 +446,7 @@ def merge_catalogs(debug=None, **catalog_dict):
 
     elif n_catalogs == 1:
         survey, stacked_catalog = next(iter(catalog_dict.items()))
-        stacked_catalog["survey"] = get_empty_str_array(
-            len(stacked_catalog), max(6, len(survey)), survey
-        )
+        stacked_catalog["survey"] = get_empty_str_array(len(stacked_catalog), max(6, len(survey)), survey)
         stacked_catalog["group_id"] = find_friends_of_friends(
             get_cartesian_coord(stacked_catalog),
             arcsec2dist(0.5),
@@ -482,9 +460,7 @@ def merge_catalogs(debug=None, **catalog_dict):
 
     else:
         stacked_catalog = vstack(list(catalog_dict.values()), "exact")
-        stacked_catalog["survey"] = get_empty_str_array(
-            len(stacked_catalog), max(6, max(len(s) for s in catalog_dict))
-        )
+        stacked_catalog["survey"] = get_empty_str_array(len(stacked_catalog), max(6, max(len(s) for s in catalog_dict)))
         stacked_catalog["survey_p"] = 999
         counter = 0
         for name, cat in catalog_dict.items():
@@ -652,9 +628,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
                 mask = q.mask(possible_match)
                 if mask.any():
                     possible_match_this = possible_match[mask]
-                    matched_base_idx = possible_match_this["index"][
-                        possible_match_this[sorter].argmin()
-                    ]
+                    matched_base_idx = possible_match_this["index"][possible_match_this[sorter].argmin()]
                     specs["matched_idx"][spec_idx_this] = matched_base_idx
                     break
 
@@ -698,14 +672,10 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         # now it's the real thing, we have more than one specs
         # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
         specs_to_merge = specs[group_slice]
-        rank = np.fromiter(
-            map(get_tel_rank, specs_to_merge["TELNAME"]), np.int, len(specs_to_merge)
-        )
+        rank = np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.int, len(specs_to_merge))
         rank += (10 - specs_to_merge["ZQUALITY"]) * (rank.max() + 1)
         rank = rank.astype(np.float) + np.where(
-            Query((np.isfinite, "SPEC_Z_ERR"), "SPEC_Z_ERR > 0", "SPEC_Z_ERR < 1").mask(
-                specs_to_merge
-            ),
+            Query((np.isfinite, "SPEC_Z_ERR"), "SPEC_Z_ERR > 0", "SPEC_Z_ERR < 1").mask(specs_to_merge),
             specs_to_merge["SPEC_Z_ERR"],
             0.99999,
         )
@@ -716,13 +686,11 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         # If so, and those specs are good or as good as the best spec (mask_same_zq_class),
         #        and those specs are at least 0.5 arcsec away (mask_coord_offset),
         # then, we push them out of this merge process (to_rematch).
-        mask_within_dz = (
-            np.fabs(specs_to_merge["SPEC_Z"] - best_spec["SPEC_Z"]) < 150.0 / SPEED_OF_LIGHT
-        )
+        mask_within_dz = np.fabs(specs_to_merge["SPEC_Z"] - best_spec["SPEC_Z"]) < 150.0 / SPEED_OF_LIGHT
 
-        mask_same_zq_class = (
-            specs_to_merge["ZQUALITY_sort_key"] == best_spec["ZQUALITY_sort_key"]
-        ) | (specs_to_merge["ZQUALITY"] >= 3)
+        mask_same_zq_class = (specs_to_merge["ZQUALITY_sort_key"] == best_spec["ZQUALITY_sort_key"]) | (
+            specs_to_merge["ZQUALITY"] >= 3
+        )
 
         mask_coord_offset = (
             SkyCoord(specs_to_merge["RA"], specs_to_merge["DEC"], unit="deg")
@@ -733,9 +701,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
 
         if ((~mask_within_dz) & mask_coord_offset & mask_same_zq_class).any():
             to_rematch = (~mask_within_dz) & mask_coord_offset
-            specs["matched_idx"][
-                specs_to_merge["index"][to_rematch]
-            ] = -2  # we will deal with these -2 later
+            specs["matched_idx"][specs_to_merge["index"][to_rematch]] = -2  # we will deal with these -2 later
             specs_to_merge = specs_to_merge[~to_rematch]
             mask_same_zq_class = mask_same_zq_class[~to_rematch]
             mask_within_dz = mask_within_dz[~to_rematch]
@@ -750,9 +716,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         specs["SPEC_REPEAT_ALL"][best_spec_index] = "+".join(set(specs_to_merge["TELNAME"]))
 
         nsa_specs = specs_to_merge[specs_to_merge["TELNAME"] == "NSA"]
-        specs["OBJ_NSAID"][best_spec_index] = (
-            int(nsa_specs["SPECOBJID"][0]) if len(nsa_specs) else -1
-        )
+        specs["OBJ_NSAID"][best_spec_index] = int(nsa_specs["SPECOBJID"][0]) if len(nsa_specs) else -1
         if len(nsa_specs) > 1:
             logging.warning(
                 "More than one NSA obj near ({}, {}): {}".format(
@@ -910,9 +874,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
             nsa_sersic_flux[invalid_mag] = 1.0
 
             mag = 22.5 - 2.5 * np.log10(nsa_sersic_flux)
-            mag_err = np.fabs(
-                (2.5 / np.log(10.0)) / nsa_sersic_flux / np.sqrt(nsa_obj["SERSIC_FLUX_IVAR"])
-            )
+            mag_err = np.fabs((2.5 / np.log(10.0)) / nsa_sersic_flux / np.sqrt(nsa_obj["SERSIC_FLUX_IVAR"]))
 
             for i, b in enumerate(get_sdss_bands()):
                 j = i + 2  # first two bands not needed
@@ -960,10 +922,10 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         remove_basic_conditions = Query("is_galaxy", "r_mag > 14")
         if "REF_CAT" in base.colnames:
-            remove_basic_conditions &= (~has_sga)
+            remove_basic_conditions &= ~has_sga
             remove_basic_conditions |= has_nsa
         elif "OBJ_NSAID" in base.colnames:
-            remove_basic_conditions &= (~has_nsa)
+            remove_basic_conditions &= ~has_nsa
 
         close_spec_z = Query(
             remove_basic_conditions,
@@ -1128,9 +1090,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     if decals is not None:
         if "decals_dr8_remove" in kwargs:
             decals_remove = np.concatenate([decals_remove, kwargs["decals_dr8_remove"]])
-        decals = prepare_decals_catalog_for_merging(
-            decals, decals_remove, decals_recover, convert_to_sdss_filters
-        )
+        decals = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover, convert_to_sdss_filters)
 
     if nsa is not None:
         nsa = filter_nearby_object(nsa, host)

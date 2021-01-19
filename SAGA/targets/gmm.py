@@ -37,13 +37,9 @@ def logsumexp(a, axis=None, b=None, keepdims=False):
 class XDGMM(object):
     def __init__(self, n_components=1, initial_iter=20, **kwargs):
         if not _XDGMM_AVAILABLE:
-            raise RuntimeError(
-                "You need to have both sklearn and extreme_deconvolution installed to use XDGMM"
-            )
+            raise RuntimeError("You need to have both sklearn and extreme_deconvolution installed to use XDGMM")
         self._kwargs = kwargs
-        self._gmm = GaussianMixture(
-            int(n_components), max_iter=int(initial_iter), covariance_type="full"
-        )
+        self._gmm = GaussianMixture(int(n_components), max_iter=int(initial_iter), covariance_type="full")
 
     def fit(self, data, data_cov, **kwargs):
         self._gmm.fit(data)
@@ -79,10 +75,7 @@ def get_input_data(
     Xcov = np.stack([np.diag(e * e) for e in view_table_as_2d_array(catalog, color_errors)])
     if include_covariance:
         Xcov -= np.stack(
-            [
-                (np.diag(e * e, 1) + np.diag(e * e, -1))
-                for e in view_table_as_2d_array(catalog, mag_errors)
-            ]
+            [(np.diag(e * e, 1) + np.diag(e * e, -1)) for e in view_table_as_2d_array(catalog, mag_errors)]
         )
     return X, Xcov
 
@@ -117,12 +110,7 @@ def calc_log_likelihood(data, data_cov, gmm_means, gmm_covs, gmm_weights):
 
 
 def calc_model1_prob(data, data_cov, model_params, priors=None):
-    p = np.stack(
-        [
-            calc_log_likelihood(data, data_cov, *model_params_this)
-            for model_params_this in model_params
-        ]
-    )
+    p = np.stack([calc_log_likelihood(data, data_cov, *model_params_this) for model_params_this in model_params])
     if priors is not None:
         priors = np.asarray(priors)
         assert len(priors) == len(p) and (priors > 0).all()

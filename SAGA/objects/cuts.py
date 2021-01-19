@@ -84,9 +84,7 @@ valid_sb = Query("sb_r > 0", "sb_r < 35")
 gr_cut = Query("gr - abs(gr_err) * 2 < 0.85") | (~valid_g_mag)
 ri_cut = Query("ri - abs(ri_err) * 2 < 0.55") | (~valid_i_mag)
 rz_cut = Query("rz - abs(rz_err) * 2 < 1") | (~valid_z_mag)
-ug_cut = (
-    Query("ug + abs(ug_err) * 2 > (gr - abs(gr_err) * 2) * 1.5") | (~valid_u_mag) | (~valid_g_mag)
-)
+ug_cut = Query("ug + abs(ug_err) * 2 > (gr - abs(gr_err) * 2) * 1.5") | (~valid_u_mag) | (~valid_g_mag)
 gri_cut = gr_cut & ri_cut
 ugri_cut = gri_cut & ug_cut
 grz_cut = gr_cut & rz_cut
@@ -124,9 +122,7 @@ relaxed_targeting_cuts = Query(
 
 very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_approx >= 1e-4"
 
-paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = (
-    high_priority_sb_tight & high_priority_gr
-)
+paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = high_priority_sb_tight & high_priority_gr
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")
@@ -165,12 +161,8 @@ _known_telnames = {
     "slack",
     "ALFALF",
 }
-has_our_specs_only = QueryMaker.vectorize(
-    lambda x: x and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT"
-)
-has_our_specs = QueryMaker.vectorize(
-    lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT"
-)
+has_our_specs_only = QueryMaker.vectorize(lambda x: x and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT")
+has_our_specs = QueryMaker.vectorize(lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT")
 has_been_targeted = QueryMaker.vectorize(
     lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT_ALL"
 )
