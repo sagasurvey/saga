@@ -122,11 +122,11 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     # Rename/add columns
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-    catalog["radius"] = catalog["SHAPE_R"]
-    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]), 9999.0)
+    catalog["radius"] = catalog["SHAPE_R"].astype(np.float32)
+    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]), 9999.0).astype(np.float32)
     e_abs = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
-    catalog["ba"] = (1 - e_abs) / (1 + e_abs)
-    catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
+    catalog["ba"] = ((1 - e_abs) / (1 + e_abs)).astype(np.float32)
+    catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5).astype(np.float32)
     del e_abs
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
@@ -140,12 +140,12 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         with np.errstate(divide="ignore", invalid="ignore"):
             catalog[f"{band}_mag"] = _fill_not_finite(
                 22.5 - const * np.log(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
-            )
-            catalog[f"{band}_err"] = _fill_not_finite(const / np.abs(catalog[f"SIGMA_{BAND}"]))
+            ).astype(np.float32)
+            catalog[f"{band}_err"] = _fill_not_finite(const / np.abs(catalog[f"SIGMA_{BAND}"])).astype(np.float32)
 
     for band in "ui":
-        catalog[f"{band}_mag"] = 99.0
-        catalog[f"{band}_err"] = 99.0
+        catalog[f"{band}_mag"] = np.float32(99.0)
+        catalog[f"{band}_err"] = np.float32(99.0)
 
     to_remove = [] if to_remove is None else to_remove
     to_recover = [] if to_recover is None else to_recover
