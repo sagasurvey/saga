@@ -229,6 +229,13 @@ def apply_manual_fixes(base):
         dict(radius=120.0, radius_err=0.006, ba=0.25, phi=84.0),
     )
 
+    # NGC7162A (330.1482, -43.1405)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 901050380000007338),
+        dict(ba=0.72, phi=50.3),
+    )
+
     # NSA (v1.0.1) 343647 (255.5115, 22.9355)
     fill_values_by_query(
         base,
