@@ -73,8 +73,8 @@ NSA_COLS_USED = list(_NSA_COLS_USED)
 
 EXTENDED_SPECS_COLUMNS = dict(
     SPECS_COLUMNS,
-    EW_Halpha="<f8",
-    EW_Halpha_err="<f8",
+    EW_Halpha="<f4",
+    EW_Halpha_err="<f4",
     OBJ_NSAID="<i4",
     SPEC_REPEAT="<U48",
     SPEC_REPEAT_ALL="<U48",

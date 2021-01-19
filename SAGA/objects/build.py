@@ -845,7 +845,7 @@ def add_z_cosmo(base):
 
     base = add_skycoord(base)
     has_spec_mask = C.has_spec.mask(base)
-    base["z_cosmo"] = np.nan
+    base["z_cosmo"] = np.float32(np.nan)
     base["z_cosmo"][has_spec_mask] = v2z(vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask]))
 
     if "SATS" in base.colnames:
@@ -895,10 +895,10 @@ def add_stellar_mass(base):
     z = base["z_cosmo"][ok_to_calculate]
     Mr = r - z2m(z) - calc_kcor("r", z, "g - r", gr)
 
-    base["Mr"] = np.nan
+    base["Mr"] = np.float32(np.nan)
     base["Mr"][ok_to_calculate] = Mr
 
-    base["log_sm"] = np.nan
+    base["log_sm"] = np.float32(np.nan)
     base["log_sm"][ok_to_calculate] = 1.254 + 1.0976 * gr - 0.4 * Mr
 
     return base
