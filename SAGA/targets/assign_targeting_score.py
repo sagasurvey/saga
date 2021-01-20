@@ -18,6 +18,7 @@ __all__ = [
     "assign_targeting_score_v1",
     "assign_targeting_score_v2",
     "assign_targeting_score_v2plus",
+    "assign_targeting_score_v3",
     "assign_targeting_score_lowz",
     "assign_targeting_score_lowz_v2",
     "calc_simple_satellite_probability",
@@ -589,6 +590,162 @@ def assign_targeting_score_v2plus(
 
     base.sort("TARGETING_SCORE")
     return base
+
+
+def assign_targeting_score_v3(
+    base,
+    manual_selected_objids=None,
+    ignore_specs=False,
+    debug=False,
+    n_random=50,
+    seed=123,
+    remove_lists=None,
+    low_priority_objids=None,
+    **kwargs,
+):
+    """
+    Last updated: 08/19/2020
+     100 Human selection and Special targets
+     150 sats without AAT/MMT/PAL specs
+     180 low-z (z < 0.05) but ZQUALITY = 2
+     200 within host & r < 20.75, bright in primary targeting region -OR- very low SB -OR- very high p_sat
+     300 within host & r < 20.75, primary targeting region, the higher p_sat half
+     400 within host & r < 20.75, primary targeting region, the lower p_sat half
+     500 within host & bright (relaxed) -OR- outwith host & bright in primary targeting region
+     600 outwith host & r < 20.75, main targeting cuts, limit to 100
+     700 within host, relaxed targeting cuts (i.e., slightly outside of primary targeting region)
+     800 within host, everything else in griz cuts
+     900 within host, everything else
+    1000 everything else
+    1200 Not galaxy
+    1300 Not clean
+    1350 Removed by hand
+    1400 Has spec already
+    """
+
+    main_targeting_cuts = C.paper2_targeting_cut
+
+    basic_loose = Query(C.very_relaxed_targeting_cuts, C.is_clean2, C.is_galaxy2, "r_mag < 21")
+    basic = Query(C.very_relaxed_targeting_cuts, C.basic_cut2)
+
+    if not ignore_specs:
+        basic_loose = Query(basic_loose, ~C.has_spec)
+        basic = Query(basic, ~C.has_spec)
+
+    base = add_cut_scores(base)
+    base["TARGETING_SCORE"] = 1000
+    surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
+
+    exclusion_cuts = Query()
+
+    if low_priority_objids is not None:
+        exclusion_cuts = Query(exclusion_cuts, QueryMaker.in1d("OBJID", low_priority_objids, invert=True))
+
+    very_low_sb_cut = Query(
+        "r_mag < 20.7",
+        C.valid_sb,
+        C.paper2_targeting_cut,
+        Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
+    )
+
+    bright = Query(exclusion_cuts, C.sdss_limit)
+    bright_main = Query(bright, main_targeting_cuts)
+
+    fill_values_by_query(base, Query(C.basic_cut2), {"TARGETING_SCORE": 900})
+    fill_values_by_query(base, Query(basic), {"TARGETING_SCORE": 800})
+    fill_values_by_query(base, Query(basic, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 700})
+    fill_values_by_query(
+        base,
+        Query(basic_loose, C.faint_end_limit, main_targeting_cuts),
+        {"TARGETING_SCORE": 600},
+    )
+    fill_values_by_query(
+        base,
+        Query(basic_loose, bright_main) | Query(basic, bright, C.relaxed_targeting_cuts),
+        {"TARGETING_SCORE": 500},
+    )
+    fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
+    fill_values_by_query(
+        base,
+        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        {"TARGETING_SCORE": 200},
+    )
+
+    fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
+    fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
+
+    if not ignore_specs:
+        fill_values_by_query(base, C.has_spec, {"TARGETING_SCORE": 1400})
+
+        fill_values_by_query(
+            base,
+            Query(basic_loose, "ZQUALITY == 2", "SPEC_Z < 0.05"),
+            {"TARGETING_SCORE": 180},
+        )
+
+        fill_values_by_query(
+            base,
+            Query(
+                C.is_sat,
+                (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME"),
+            ),
+            {"TARGETING_SCORE": 150},
+        )
+
+    if remove_lists is not None:
+        for survey in surveys:
+            if survey not in remove_lists:
+                continue
+            fill_values_by_query(
+                base,
+                Query(
+                    C.is_clean2,
+                    (lambda x: np.in1d(x, remove_lists[survey]), "OBJID"),
+                    (lambda x: x == survey, "survey"),
+                ),
+                {"TARGETING_SCORE": 1350},
+            )
+
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
+        if not ignore_specs:
+            q &= ~C.has_spec
+        fill_values_by_query(base, q, {"TARGETING_SCORE": 100})
+
+    base["p_sort"] = -base["p_sat_corrected"]
+    base.sort(["TARGETING_SCORE", "p_sort"])
+    del base["p_sort"]
+
+    for score_to_limit, new_score, n_limit, random_choice in (
+        (300, 400, 0, False),
+        (600, 1000, 100, False),
+        (700, 800, 100, False),
+        (800, 900, 200, True),
+    ):
+        score_this = Query("TARGETING_SCORE == {}".format(score_to_limit))
+        n = score_this.count(base)
+        if n > n_limit:
+            if random_choice:
+                idx = np.random.RandomState(seed).choice(
+                    np.flatnonzero(score_this.mask(base)), n - n_limit, False
+                )  # pylint: disable=no-member
+                base["TARGETING_SCORE"][idx] = new_score
+            else:
+                n_cut = (n_limit - 1) if n_limit else (n // 2)
+                p_cut = score_this.filter(base, "p_sat_corrected")[n_cut]
+                fill_values_by_query(
+                    base,
+                    Query(score_this, (lambda p: p < p_cut, "p_sat_corrected")),
+                    {"TARGETING_SCORE": new_score},
+                )
+
+    p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
+    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
+    base["TARGETING_SCORE"] += np.where(base["TARGETING_SCORE"] >= 200, p, p // 10)
+
+    base.sort("TARGETING_SCORE")
+    return base
+
 
 
 def assign_targeting_score_lowz(base, manual_selected_objids=None, gmm_parameters=None, ignore_specs=False, **kwargs):

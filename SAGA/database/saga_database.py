@@ -430,9 +430,7 @@ class Database(object):
         self._possible_base_versions = tuple(
             k.partition("_")[2] for k in self._file_path_pattern if k.startswith("base_")
         )
-        self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
-        self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
-        self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
+
         self.set_default_base_version()
 
     def _add_derived_data(self):
@@ -565,6 +563,20 @@ class Database(object):
         return int(version[1]), version
 
     def set_default_base_version(self, version=None):
-        _, version_postfix = self.resolve_base_version(version)
+        major_version, version_postfix = self.resolve_base_version(version)
         version_postfix = version_postfix or "v3"
+
+        if major_version == 1:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr12"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
+        elif major_version == 2:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
+        else:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr16"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr9"]
+
         self.base_file_path_pattern = self._file_path_pattern["base_" + version_postfix]

@@ -8,14 +8,14 @@ from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 from astropy.table import Table, vstack
 from astropy.time import Time
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from ..hosts import HostCatalog
 from ..objects import ObjectCatalog, get_unique_objids
 from ..observing.aat import get_gaia_guidestars, write_fld_file
 from ..utils import add_skycoord
 from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
-                                     assign_targeting_score_v2plus)
+                                     assign_targeting_score_v2plus, assign_targeting_score_v3)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -77,9 +77,12 @@ class TargetSelection(object):
         self.target_catalogs = dict()
 
         if assign_targeting_score_func is None:
-            self.assign_targeting_score = (
-                assign_targeting_score_v1 if self._build_version < 2 else assign_targeting_score_v2plus
-            )
+            if self._build_version == 1:
+                self.assign_targeting_score = assign_targeting_score_v1
+            elif self._build_version == 2:
+                self.assign_targeting_score = assign_targeting_score_v2plus
+            else:
+                self.assign_targeting_score = assign_targeting_score_v3
         else:
             self.assign_targeting_score = assign_targeting_score_func
             if not callable(self.assign_targeting_score):
@@ -90,7 +93,10 @@ class TargetSelection(object):
         else:
             self.assign_targeting_score_kwargs = dict(assign_targeting_score_kwargs)
 
-        self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
+        if gmm_parameters is None and self._build_version >= 3:
+            self._gmm_parameters = None
+        else:
+            self._gmm_parameters = self._load_gmm_parameters(gmm_parameters)
 
         try:
             self._manual_selected_objids = get_unique_objids(
@@ -99,14 +105,21 @@ class TargetSelection(object):
         except (TypeError, KeyError):
             self._manual_selected_objids = manual_selected_objids
 
+        if self._build_version >= 3:
+            remove_list_keys = (
+                ("decals_dr9", "OBJID"),
+            )
+        else:
+            remove_list_keys = (
+                ("sdss", "SDSS ID"),
+                ("des", "DES_OBJID"),
+                ("decals", "decals_objid"),
+                ("decals_dr8", "OBJID"),
+                ("decals_dr9", "OBJID"),
+            )
+
         self._remove_lists = {}
-        for list_name, col in (
-            ("sdss", "SDSS ID"),
-            ("des", "DES_OBJID"),
-            ("decals", "decals_objid"),
-            ("decals_dr8", "OBJID"),
-            ("decals_dr9", "OBJID"),
-        ):
+        for list_name, col in remove_list_keys:
             survey = list_name.partition("_")[0]
             try:
                 d = self._database["{}_remove".format(list_name)]
@@ -308,6 +321,9 @@ def prepare_mmt_catalog(
     elif "OBJID_sdss" in target_catalog.colnames:
         is_star = Query("OBJID_sdss != -1", "morphology_info_sdss == 6", "REMOVE_sdss == 0")
         mags = {b: "{}_mag_sdss".format(b) for b in "ugr"}
+    elif "REF_CAT" in target_catalog.colnames:
+        is_star = Query("is_galaxy == 0", "REMOVE == 0", QueryMaker.startswith("REF_CAT", "G"))
+        mags = {b: "{}_mag".format(b) for b in "ugr"}  # TODO: fix flux star for v3
     else:
         is_star = Query(~Query("is_galaxy"), "REMOVE == 0")
         mags = {b: "{}_mag".format(b) for b in "ugr"}

@@ -65,10 +65,15 @@ is_galaxy = Query("PHOTPTYPE == 3")
 is_galaxy2 = Query("is_galaxy")
 fibermag_r_cut = Query("FIBERMAG_R <= 23.0")
 
-faint_end_limit = Query("r_mag < 20.75")
+faint_end_limit2 = Query("r_mag < 20.75")
+faint_end_limit3 = Query("r_mag < 20.65")
+faint_end_limit = faint_end_limit3
+
 sdss_limit = Query("r_mag < 17.77")
 lowz_mag_cut = Query("r_mag > 18", "r_mag < 20")
-r_abs_limit = Query("Mr < -12.295")
+r_abs_limit2 = Query("Mr < -12.295")
+r_abs_limit3 = Query("Mr < -12.395")
+r_abs_limit = r_abs_limit3
 
 faint_end_limit_strict = Query("r_mag - log10(HOST_DIST)*5 - 25 < -12", faint_end_limit)
 
