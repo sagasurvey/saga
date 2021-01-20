@@ -156,20 +156,16 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
     remove_queries = [
         QueryMaker.isin("OBJID", to_remove),  # 0
-        "(MASKBITS >> 1) % 2 > 0",  # 1
-        "(MASKBITS >> 5) % 2 > 0",  # 2
-        "(MASKBITS >> 6) % 2 > 0",  # 3
-        "(MASKBITS >> 7) % 2 > 0",  # 4
-        "(MASKBITS >> 12) % 2 > 0",  # 5
-        "(MASKBITS >> 13) % 2 > 0",  # 6
-        _n_or_more_lt(sigma_grz, 2, 1),  # 7
-        Query(_n_or_more_gt(fracflux_grz, 2, 5)),  # 8
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1.5)),  # 9
+        "(MASKBITS >> 5) % 8 > 0",  # 1
+        "(MASKBITS >> 12) % 2 > 0",  # 2
+        _n_or_more_lt(sigma_grz, 2, 1),  # 3
+        Query(_n_or_more_gt(fracflux_grz, 2, 5)),  # 4
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1.5)),  # 5
         Query(
             _n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracflux_grz, 2, 1), _n_or_more_lt(sigma_wise, 1, 0)
-        ),  # 10
-        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 11
-        Query(_n_or_more_lt(sigma_grz + sigma_wise, 7, 25)),  # 12
+        ),  # 6
+        Query(_n_or_more_lt(sigma_grz, 3, 80), _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 7
+        Query(_n_or_more_lt(sigma_grz + sigma_wise, 7, 25)),  # 8
     ]
 
     catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
@@ -191,25 +187,28 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
 
 
 SPEC_MATCHING_ORDER = (
-    (Query("REMOVE == 0", "r_mag < 21", "is_galaxy == 0", (np.char.isalnum, "REF_CAT"), "sep < 0.5"), "sep"),
+    (Query("REMOVE == 0", "is_galaxy == 0", (np.char.isalnum, "REF_CAT"), "sep < 0.5"), "sep"),
     (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
-    (Query("REMOVE == 0", "r_mag < 21", "is_galaxy == 0", "sep < 0.5"), "sep"),
-    (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy == 0", "sep < 0.5"), "sep"),
     (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 1"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep < 0.5"), "sep"),
+    (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 0.5"), "sep"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep_norm < 2", "sep < 10"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "is_galaxy", "sep < 5"), "r_mag"),
-    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 0.5", "sep < 10"), "r_mag"),
-    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "r_mag"),
-    (Query("REMOVE == 0", "is_galaxy", "sep < 3"), "r_mag"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy", "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy", "sep_norm < 1"), "r_mag"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy", "sep_norm < 2", "sep < 10"), "r_mag"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "is_galaxy", "sep < 5"), "r_mag"),
+    (Query("REMOVE == 0", "sep < 0.5"), "sep"),
+    (Query("REMOVE % 2 == 0", "sep < 0.5"), "sep"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 0.5", "sep < 10"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep_norm < 2", "sep < 5"), "r_mag"),
+    (Query("REMOVE == 0", "is_galaxy", "sep < 3"), "r_mag"),
     (Query("REMOVE % 2 == 0", "is_galaxy", "sep_norm < 0.5", "sep < 10"), "r_mag"),
     (Query("REMOVE % 2 == 0", "is_galaxy", "sep_norm < 1", "sep < 10"), "r_mag"),
+    (Query("REMOVE % 2 == 0", "is_galaxy", "sep_norm < 2", "sep < 5"), "r_mag"),
     (Query("REMOVE % 2 == 0", "is_galaxy", "sep < 3"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep < 10"), "sep"),
     (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 10"), "sep"),
