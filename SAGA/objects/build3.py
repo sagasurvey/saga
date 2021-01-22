@@ -64,7 +64,7 @@ MERGED_CATALOG_COLUMNS = list(
 )
 
 
-def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None):
+def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None, trim=True):
     """
     Refs:
     - https://www.legacysurvey.org/dr9/files/#sweep-catalogs-region-sweep
@@ -177,7 +177,8 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None)
         {"REMOVE": 0},
     )
 
-    catalog = catalog[MERGED_CATALOG_COLUMNS]
+    if trim:
+        catalog = catalog[MERGED_CATALOG_COLUMNS]
     catalog["survey"] = "decals"
     catalog["OBJID_decals"] = catalog["OBJID"]
     catalog["REMOVE_decals"] = catalog["REMOVE"]
