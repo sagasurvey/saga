@@ -2,7 +2,8 @@ import os
 
 import numpy as np
 import requests
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, match_coordinates_sky
+from astropy.table import hstack
 from easyquery import Query
 
 __all__ = [
@@ -29,6 +30,8 @@ __all__ = [
     "decode_flag",
     "join_str_arr",
     "calc_normalized_dist",
+    "get_coord",
+    "nearest_neighbor_join",
 ]
 
 
@@ -280,3 +283,44 @@ def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, c
     cos_t = np.cos(theta)
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.hypot((dx * cos_t + dy * sin_t) / a, (-dx * sin_t + dy * cos_t) / b)
+
+
+def get_coord(table, coord=None):
+    if isinstance(coord, SkyCoord):
+        return coord
+    if coord is None:
+        if "coord" in table and isinstance(table["coord"], SkyCoord):
+            return table["coord"]
+        if "RA" in table and "DEC" in table:
+            return SkyCoord(table["RA"], table["DEC"], unit="deg")
+    else:
+        _cols = list(table.colnames)
+        if isinstance(coord, str) and coord in _cols and isinstance(table[coord], SkyCoord):
+            return table[coord]
+        try:
+            if coord[0] in _cols and coord[1] in _cols:
+                return SkyCoord(table[coord[0]], table[coord[1]], unit="deg")
+        except (TypeError, IndexError, KeyError):
+            pass
+    raise ValueError("Cannot identify coord column")
+
+
+def nearest_neighbor_join(left, right, left_coord=None, right_coord=None, join_type="left", nthneighbor=1,
+                          sep_label="sep", uniq_col_name='{col_name}{table_name}', table_names=("_1", "_2")):
+
+    left_coord = get_coord(left, left_coord)
+    right_coord = get_coord(right, right_coord)
+
+    if join_type == "left":
+        idx, sep, _ = match_coordinates_sky(left_coord, right_coord, nthneighbor=nthneighbor)
+        right = right[idx]
+    elif join_type == "right":
+        idx, sep, _ = match_coordinates_sky(right_coord, left_coord, nthneighbor=nthneighbor)
+        left = left[idx]
+    else:
+        raise ValueError("join_type must be 'left' or 'right'")
+
+    d = hstack([left, right], join_type="exact", uniq_col_name=uniq_col_name, table_names=table_names)
+    d[sep_label] = sep.arcsec
+
+    return d
