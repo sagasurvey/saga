@@ -149,22 +149,18 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     to_remove = [] if to_remove is None else to_remove
     to_recover = [] if to_recover is None else to_recover
 
+    allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
     sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
-    fracmasked_grz = [f"FRACMASKED_{b}" for b in "GRZ"]
     fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
 
     remove_queries = [
         QueryMaker.isin("OBJID", to_remove),  # 0
-        "(MASKBITS >> 5) % 8 > 0",  # 1
-        "(MASKBITS >> 12) % 2 > 0",  # 2
-        _n_or_more_lt(sigma_grz, 2, 1),  # 3
-        _n_or_more_gt(fracflux_grz, 2, 5),  # 4
-        (_n_or_more_lt(sigma_grz, 3, 90) & _n_or_more_gt(fracflux_grz, 2, 1.5)),  # 5
-        (_n_or_more_lt(sigma_grz, 3, 90) & _n_or_more_gt(fracflux_grz, 2, 1) & _n_or_more_lt(sigma_wise, 1, 0)),  # 6
-        (_n_or_more_lt(sigma_grz, 3, 90) & _n_or_more_lt(sigma_grz, 1, 10) & _n_or_more_gt(fracflux_grz, 2, 0.15)),  # 7
-        (_n_or_more_lt(sigma_grz, 3, 90) & _n_or_more_gt(fracmasked_grz, 2, 0.2)),  # 8
-        _n_or_more_lt(sigma_grz + sigma_wise, 7, 25),  # 9
+        _n_or_more_gt(allmask_grz, 2, 0),  # 1
+        Query("FLUX_R <= 0"),  # 2
+        Query("FLUX_G <= 0", "FLUX_Z <= 0"),  # 3
+        (_n_or_more_lt(sigma_grz, 3, 60) & _n_or_more_gt(fracflux_grz, 1, 2)),  # 4
+        _n_or_more_lt(sigma_grz + sigma_wise, 7, 20),  # 5
     ]
 
     catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
@@ -187,13 +183,17 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
 
 SPEC_MATCHING_ORDER = (
-    (Query("REMOVE % 2 == 0", "sep < 0.1"), "sep"),
-    (Query("REMOVE % 2 == 0", "sep < 0.5", Query("is_galaxy == 0") | Query("sep_norm < 1")), "sep"),
+    (Query("REMOVE == 0", "sep < 0.5", (np.char.isalnum, "REF_CAT")), "sep"),
+    (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
+    (Query("REMOVE == 0", "sep < 0.5", "r_mag < 21.5", Query("is_galaxy == 0") | Query("sep_norm < 0.5")), "sep"),
     (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 1"), "r_mag"),
-    (Query("REMOVE == 0", "sep_norm < 1"), "r_mag"),
-    (Query("REMOVE % 2 == 0", "sep_norm < 1"), "r_mag"),
-    (Query("REMOVE % 2 == 0", "sep < 3"), "sep"),
+    (Query("REMOVE == 0", "r_mag < 21", "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", Query("sep_norm < 1.5") | Query("sep < 3", "is_galaxy")), "r_mag"),
+    (Query("REMOVE % 2 == 0", "r_mag < 21", Query("sep_norm < 1") | Query("sep < 3", "is_galaxy")), "r_mag"),
+    (Query("REMOVE % 2 == 0", Query("sep_norm < 1") | Query("sep < 3", "is_galaxy")), "r_mag"),
     (Query("REMOVE == 0", "is_galaxy == 0", "r_mag < 17"), "sep"),
+    (Query("REMOVE == 0", "r_mag < 21", "sep < 10"), "sep"),
+    (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 10"), "sep"),
     (Query("REMOVE % 2 == 0", "sep < 10"), "sep"),
     (Query("sep < 10"), "sep"),
 )
