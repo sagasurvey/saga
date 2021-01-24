@@ -288,13 +288,13 @@ def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, c
 def get_coord(table, coord=None):
     if isinstance(coord, SkyCoord):
         return coord
+    _cols = table.colnames
     if coord is None:
-        if "coord" in table and isinstance(table["coord"], SkyCoord):
+        if "coord" in _cols and isinstance(table["coord"], SkyCoord):
             return table["coord"]
-        if "RA" in table and "DEC" in table:
+        if "RA" in _cols and "DEC" in _cols:
             return SkyCoord(table["RA"], table["DEC"], unit="deg")
     else:
-        _cols = list(table.colnames)
         if isinstance(coord, str) and coord in _cols and isinstance(table[coord], SkyCoord):
             return table[coord]
         try:
@@ -305,8 +305,17 @@ def get_coord(table, coord=None):
     raise ValueError("Cannot identify coord column")
 
 
-def nearest_neighbor_join(left, right, left_coord=None, right_coord=None, join_type="left", nthneighbor=1,
-                          sep_label="sep", uniq_col_name='{col_name}{table_name}', table_names=("_1", "_2")):
+def nearest_neighbor_join(
+    left,
+    right,
+    left_coord=None,
+    right_coord=None,
+    join_type="left",
+    nthneighbor=1,
+    sep_label="sep",
+    uniq_col_name="{col_name}{table_name}",
+    table_names=("_1", "_2"),
+):
 
     left_coord = get_coord(left, left_coord)
     right_coord = get_coord(right, right_coord)

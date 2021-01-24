@@ -229,6 +229,13 @@ class Database(object):
                 FitsTable(os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v0_1_2.fits")),
                 use_local_first=True,
             ),
+            "sga_v3.0": DataObject(
+                FitsTable(
+                    "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/largegalaxies/SGA-parent-v3.0.fits"
+                ),
+                FitsTable(os.path.join(self._local_dir, "external_catalogs", "sga", "SGA-parent-v3.0.fits")),
+                use_local_first=True,
+            ),
             "spectra_gama_dr2": DataObject(
                 FitsTable("http://www.gama-survey.org/dr2/data/cat/SpecCat/v08/SpecObj.fits"),
                 FitsTable(

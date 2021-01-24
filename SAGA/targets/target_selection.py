@@ -15,7 +15,8 @@ from ..objects import ObjectCatalog, get_unique_objids
 from ..observing.aat import get_gaia_guidestars, write_fld_file
 from ..utils import add_skycoord
 from .assign_targeting_score import (COLUMNS_USED, assign_targeting_score_v1,
-                                     assign_targeting_score_v2plus, assign_targeting_score_v3)
+                                     assign_targeting_score_v2plus,
+                                     assign_targeting_score_v3)
 
 __all__ = ["TargetSelection", "prepare_mmt_catalog", "prepare_aat_catalog"]
 
@@ -106,9 +107,7 @@ class TargetSelection(object):
             self._manual_selected_objids = manual_selected_objids
 
         if self._build_version >= 3:
-            remove_list_keys = (
-                ("decals_dr9", "OBJID"),
-            )
+            remove_list_keys = (("decals_dr9", "OBJID"),)
         else:
             remove_list_keys = (
                 ("sdss", "SDSS ID"),
@@ -317,22 +316,40 @@ def prepare_mmt_catalog(
 
     if "PHOTPTYPE" in target_catalog.colnames:
         is_star = Query("PHOTPTYPE == 6", "REMOVE == -1")
-        mags = {b: "PSFMAG_{}".format(b.upper) for b in "ugr"}
+        target_catalog["r_star"] = target_catalog["PSFMAG_R"]
+        target_catalog["gr_star"] = target_catalog["PSFMAG_G"] - target_catalog["PSFMAG_R"]
+        target_catalog["ug_star"] = target_catalog["PSFMAG_U"] - target_catalog["PSFMAG_G"]
     elif "OBJID_sdss" in target_catalog.colnames:
         is_star = Query("OBJID_sdss != -1", "morphology_info_sdss == 6", "REMOVE_sdss == 0")
-        mags = {b: "{}_mag_sdss".format(b) for b in "ugr"}
+        target_catalog["r_star"] = target_catalog["r_mag_sdss"]
+        target_catalog["gr_star"] = target_catalog["g_mag_sdss"] - target_catalog["r_mag_sdss"]
+        target_catalog["ug_star"] = target_catalog["u_mag_sdss"] - target_catalog["g_mag_sdss"]
     elif "REF_CAT" in target_catalog.colnames:
-        is_star = Query("is_galaxy == 0", "REMOVE == 0", QueryMaker.startswith("REF_CAT", "G"))
-        mags = {b: "{}_mag".format(b) for b in "ugr"}  # TODO: fix flux star for v3
+        is_star = Query(
+            "is_galaxy == 0",
+            "REMOVE == 0",
+            "morphology_info == 80",
+            QueryMaker.startswith("REF_CAT", "G"),
+            "g_mag < 19",
+            "r_mag < 19",
+            "z_mag < 19",
+        )
+        A = np.column_stack([np.ones(len(target_catalog)), *target_catalog[["g_mag", "r_mag", "z_mag"]].itercols()])
+        target_catalog["r_star"] = A @ np.array([0.04942244, 0.10494481, 0.87591029, 0.01724201])
+        target_catalog["gr_star"] = A @ np.array([0.09917215, 0.73569233, -0.38515815, -0.35320598])
+        target_catalog["ug_star"] = A @ np.array([1.35222044, 1.18061772, -1.60904784, 0.38804513])
+        del A
     else:
-        is_star = Query(~Query("is_galaxy"), "REMOVE == 0")
-        mags = {b: "{}_mag".format(b) for b in "ugr"}
+        is_star = Query("is_galaxy == 0", "REMOVE == 0")
+        target_catalog["r_star"] = target_catalog["r_mag"]
+        target_catalog["gr_star"] = target_catalog["g_mag"] - target_catalog["r_mag"]
+        target_catalog["ug_star"] = target_catalog["u_mag"] - target_catalog["g_mag"]
 
-    is_guide_star = is_star & Query("{r} >= 14".format(**mags), "{r} < 15".format(**mags))
-    is_flux_star = is_star & Query("{r} >= 17".format(**mags), "{r} < 18".format(**mags))
-    is_flux_star &= Query("{u} - {g} >= 0.6".format(**mags), "{u} - {g} < 1.2".format(**mags))
-    is_flux_star &= Query("{g} - {r} >= 0".format(**mags), "{g} - {r} < 0.6".format(**mags))
-    is_flux_star &= Query("({g} - {r}) > 0.75 * ({u} - {g}) - 0.45".format(**mags))
+    is_guide_star = is_star & Query("r_star >= 14", "r_star < 15")
+    is_flux_star = is_star & Query("r_star >= 17", "r_star < 18")
+    is_flux_star &= Query("ug_star >= 0.6", "ug_star < 1.2")
+    is_flux_star &= Query("gr_star >= 0", "gr_star < 0.6")
+    is_flux_star &= Query("gr_star >= 0.75 * ug_star - 0.45")
 
     target_catalog = (is_target | is_guide_star | is_flux_star).filter(target_catalog)
     target_catalog.sort(["TARGETING_SCORE", "r_mag"])

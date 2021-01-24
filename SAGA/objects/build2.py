@@ -622,6 +622,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
                 possible_match["ba"] if "ba" in possible_match.colnames else None,
                 possible_match["phi"] if "phi" in possible_match.colnames else None,
             )
+            possible_match["SPEC_Z"] = specs["SPEC_Z"][spec_idx_this]
 
             # using following criteria one by one to find matching photo obj, stop when found
             for q, sorter in matching_order:
@@ -820,10 +821,11 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
     has_nsa = Query("OBJ_NSAID > -1")
     has_sga = QueryMaker.equal("REF_CAT", "L3")
     has_spec_z = Query(
-        "SPEC_Z > 0",
+        "SPEC_Z >= 0.002",
         "ZQUALITY >= 3",
         "is_galaxy",
         "radius > abs(radius_err) * 2.0",
+        "radius > 0",
     )
 
     if "REF_CAT" in base.colnames:
@@ -887,7 +889,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         elif obj_this["REMOVE"] == 0:  # any other good, non-NSA objects
 
-            radius = obj_this["radius"]
+            radius = obj_this["radius"] * 0.9
 
             # HOT FIX for NGC7162A (330.148221, -43.140536) in pgc67817 (base v2)
             if obj_this["OBJID"] == 219806824:
@@ -919,33 +921,31 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         nearby_obj["_idx"] = np.flatnonzero(nearby_obj_mask)
         del nearby_obj_mask
 
-        remove_basic_conditions = Query("is_galaxy", "r_mag > 14")
+        is_brighter = Query("r_mag < {}".format(obj_this["r_mag"]))
+        is_fainter = ~is_brighter
+        remove_basic_conditions = Query("is_galaxy", is_fainter, "r_mag > 14")
+
         if "REF_CAT" in base.colnames:
-            remove_basic_conditions &= ~has_sga
             remove_basic_conditions |= has_nsa
+            remove_basic_conditions &= QueryMaker.equal("REF_CAT", "")
         elif "OBJ_NSAID" in base.colnames:
             remove_basic_conditions &= ~has_nsa
 
-        close_spec_z = Query(
-            remove_basic_conditions,
-            "ZQUALITY >= 0",
-            (
-                lambda z: np.fabs(z - obj_this["SPEC_Z"]) < 200.0 / SPEED_OF_LIGHT,
-                "SPEC_Z",
-            ),
-        )
-        good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
-        is_fainter = Query((lambda r: (r >= obj_this["r_mag"]) | (~np.isfinite(r)), "r_mag"))
-        to_remove = close_spec_z | Query(remove_basic_conditions, is_fainter, "ZQUALITY < 2")
-
         if shreds_recover is not None:
-            to_remove = to_remove & QueryMaker.in1d("OBJID", shreds_recover, invert=True)
+            remove_basic_conditions &= QueryMaker.in1d("OBJID", shreds_recover, invert=True)
+
+        z_limit = v2z([300, 250, 200, 150][np.searchsorted([14, 16, 20], obj_this["r_mag"])])
+        close_spec_z = Query("ZQUALITY > -1", (lambda z: np.abs(z - obj_this["SPEC_Z"]) < z_limit, "SPEC_Z"))
+        good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
+        no_spec_z = Query("ZQUALITY < 2")
+
+        to_remove = Query(remove_basic_conditions, close_spec_z | no_spec_z)
 
         if not to_remove.mask(nearby_obj).any():  # Nothing to remove, carry on
             continue
 
         new_remove_count = Query(to_remove, "REMOVE == 0").count(nearby_obj)
-        if new_remove_count > 25 and remove_flag == 29:
+        if new_remove_count > 25 and "NSA" not in obj_this["SPEC_REPEAT"] and "SGA" not in obj_this["SPEC_REPEAT"]:
             logging.warning(
                 '{} photo obj newly removed within ~{:.3f}" of {} spec obj {} ({}, {})'.format(
                     new_remove_count,
@@ -957,7 +957,10 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
                 )
             )
 
-        base["REMOVE"][to_remove.filter(nearby_obj, "_idx")] += 1 << remove_flag
+        base["REMOVE"][to_remove.filter(nearby_obj, "_idx")] |= 1 << remove_flag
+
+        close_spec_z = close_spec_z & remove_basic_conditions
+        good_close_spec_z = good_close_spec_z & remove_basic_conditions
 
         if not close_spec_z.mask(nearby_obj).any():
             continue

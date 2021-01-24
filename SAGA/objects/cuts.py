@@ -111,6 +111,10 @@ relaxed_cut_gr = Query("gr - abs(gr_err)*2 + 0.06 * (r_mag - 14) < 1.1") | (~val
 relaxed_cut_ri = Query("ri - abs(ri_err)*2 + 0.06 * (r_mag - 14) < 0.85") | (~valid_i_mag)
 relaxed_cut_rz = Query("rz - abs(rz_err)*2 + 0.06 * (r_mag - 14) < 1.05") | (~valid_z_mag)
 
+very_relaxed_cut_sb = Query("sb_r + abs(sb_r_err)*2 - 0.6 * (r_mag - 14) > 17.5") | (~valid_sb)
+
+ba_cut = Query("ba > (r_mag - 20.75) * 0.05 + 0.3")
+
 orig_high_priority_cuts = Query(
     high_priority_sb,
     high_priority_gr,
@@ -138,6 +142,7 @@ is_very_low_z = Query("SPEC_Z >= 0.003", "SPEC_Z < 0.013")
 
 obj_is_host = Query("OBJ_NSAID == HOST_NSAID", "OBJ_NSAID != -1")
 obj_is_host2 = Query("OBJ_NSAID == HOST_NSA1ID", "OBJ_NSAID != -1")
+obj_is_host3 = Query("OBJ_PGC == HOST_PGC", "OBJ_PGC != -1")
 
 basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
@@ -165,6 +170,7 @@ _known_telnames = {
     "LCRS",
     "slack",
     "ALFALF",
+    "SGA",
 }
 has_our_specs_only = QueryMaker.vectorize(lambda x: x and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT")
 has_our_specs = QueryMaker.vectorize(lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT")

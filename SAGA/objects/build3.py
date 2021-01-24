@@ -10,7 +10,9 @@ from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
 from ..utils import add_skycoord, fill_values_by_query, get_remove_flag
+from ..utils.distance import v2z
 from . import build, build2
+from . import cuts as C
 
 
 def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
@@ -43,6 +45,9 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA", "DEC", "Z_LEDA", "REF", "DIAM", "PA", "BA"]
+
+
 MERGED_CATALOG_COLUMNS = list(
     chain(
         (
@@ -57,6 +62,7 @@ MERGED_CATALOG_COLUMNS = list(
             "ba",
             "phi",
             "REF_CAT",
+            "SGA_ID",
         ),
         (b + "_mag" for b in "ugriz"),
         (b + "_err" for b in "ugriz"),
@@ -92,9 +98,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     # Remove objects fainter than r = 23 (unless g or z < 22.5)
     # flux = 10 ** ((22.5 - mag) / 2.5)
     catalog = (
-        Query("FLUX_R >= MW_TRANSMISSION_R * 0.63") |  # r <= 23
-        Query("FLUX_G >= MW_TRANSMISSION_G") |         # g <= 22.5
-        Query("FLUX_Z >= MW_TRANSMISSION_Z")           # z <= 22.5
+        Query("FLUX_R >= MW_TRANSMISSION_R * 0.63")  # r <= 23
+        | Query("FLUX_G >= MW_TRANSMISSION_G")  # g <= 22.5
+        | Query("FLUX_Z >= MW_TRANSMISSION_Z")  # z <= 22.5
     ).filter(catalog)
 
     # Assign OBJID
@@ -146,32 +152,22 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog[f"{band}_mag"] = np.float32(99.0)
         catalog[f"{band}_err"] = np.float32(99.0)
 
-    to_remove = [] if to_remove is None else to_remove
-    to_recover = [] if to_recover is None else to_recover
-
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
     sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
     fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
 
-    remove_queries = [
-        QueryMaker.isin("OBJID", to_remove),  # 0
-        _n_or_more_gt(allmask_grz, 2, 0),  # 1
-        Query("FLUX_R <= 0"),  # 2
-        Query("FLUX_G <= 0", "FLUX_Z <= 0"),  # 3
-        (_n_or_more_lt(sigma_grz, 3, 60) & _n_or_more_gt(fracflux_grz, 1, 2)),  # 4
-        _n_or_more_lt(sigma_grz + sigma_wise, 7, 20),  # 5
-    ]
+    remove_queries = {
+        1: _n_or_more_gt(allmask_grz, 2, 0),
+        2: Query("FLUX_R <= 0"),
+        3: Query("FLUX_G <= 0", "FLUX_Z <= 0"),
+        4: (_n_or_more_lt(sigma_grz, 3, 60) & _n_or_more_gt(fracflux_grz, 1, 2)),
+        5: _n_or_more_lt(sigma_grz + sigma_wise, 7, 20),
+    }
 
+    catalog["REMOVE"] = np.where(np.char.isalnum(catalog["REF_CAT"]), 0, get_remove_flag(catalog, remove_queries))
     catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
-    catalog["REMOVE"] = get_remove_flag(catalog, remove_queries)
-    has_ref = Query((np.char.isalnum, "REF_CAT"))
-    manual_recover = QueryMaker.isin("OBJID", to_recover)
-    fill_values_by_query(
-        catalog,
-        Query(has_ref, "REMOVE % 2 == 0") | manual_recover,
-        {"REMOVE": 0},
-    )
+    catalog["SGA_ID"] = np.where(QueryMaker.equal("REF_CAT", "L3").mask(catalog), catalog["REF_ID"], -1)
 
     if trim:
         catalog = catalog[MERGED_CATALOG_COLUMNS]
@@ -179,21 +175,26 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["OBJID_decals"] = catalog["OBJID"]
     catalog["REMOVE_decals"] = catalog["REMOVE"]
 
+    if to_remove is not None:
+        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int)
+
+    if to_recover is not None:
+        idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
+        catalog["REMOVE"][idx] = 0
+
     return catalog
 
 
 SPEC_MATCHING_ORDER = (
-    (Query("REMOVE == 0", "sep < 0.5", (np.char.isalnum, "REF_CAT")), "sep"),
+    (Query("SPEC_Z < 0.002", "REMOVE == 0", "is_galaxy == 0", "sep < 5"), "sep"),
+    (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "sep < 5"), "sep"),
+    (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "r_mag < 17"), "sep"),
+    (Query("REMOVE == 0", "sep < 0.5", "r_mag < 21.5", Query("is_galaxy") | "sep_norm < 1"), "r_mag"),
     (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
-    (Query("REMOVE == 0", "sep < 0.5", "r_mag < 21.5", Query("is_galaxy == 0") | Query("sep_norm < 0.5")), "sep"),
-    (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "r_mag < 21", "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep_norm < 1"), "r_mag"),
-    (Query("REMOVE == 0", "r_mag < 21", Query("sep_norm < 1.5") | Query("sep < 3", "is_galaxy")), "r_mag"),
-    (Query("REMOVE % 2 == 0", "r_mag < 21", Query("sep_norm < 1") | Query("sep < 3", "is_galaxy")), "r_mag"),
-    (Query("REMOVE % 2 == 0", Query("sep_norm < 1") | Query("sep < 3", "is_galaxy")), "r_mag"),
-    (Query("REMOVE == 0", "is_galaxy == 0", "r_mag < 17"), "sep"),
-    (Query("REMOVE == 0", "r_mag < 21", "sep < 10"), "sep"),
-    (Query("REMOVE % 2 == 0", "r_mag < 21", "sep < 10"), "sep"),
+    (Query("REMOVE == 0", "r_mag < 21", Query("sep_norm < 1.5") | "sep < 5"), "r_mag"),
+    (Query("REMOVE % 2 == 0", Query("sep_norm < 1") | "sep < 3"), "r_mag"),
     (Query("REMOVE % 2 == 0", "sep < 10"), "sep"),
     (Query("sep < 10"), "sep"),
 )
@@ -201,18 +202,35 @@ SPEC_MATCHING_ORDER = (
 
 def apply_manual_fixes(base):
 
-    # NGC5792 (224.5945, -1.0910)
     fill_values_by_query(
         base,
-        QueryMaker.equal("OBJID", 903255060000002115),
-        dict(radius=120.0, radius_err=0.006, ba=0.25, phi=84.0),
-    )
-
-    # NGC7162A (330.1482, -43.1405)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 901050380000007338),
-        dict(ba=0.72, phi=50.3),
+        QueryMaker.isin(
+            "OBJID",
+            [
+                915147800000001877,
+                901039870000003755,
+                903341560000000816,
+                903442030000003771,
+                903233250000000577,
+                900906460000008966,
+                900906460000009106,
+                900896600000003831,
+                900809940000005200,
+                900800510000009934,
+                900809940000005279,
+                901029370000006715,
+                901039840000008707,
+                901039860000005713,
+                901018960000005296,
+                901039870000003755,
+                901050380000000229,
+                900896580000007542,
+                902577060000004414,
+                900452390000002003,
+                904733050000000124,
+            ],
+        ),
+        dict(is_galaxy=True),
     )
 
     # NSA (v1.0.1) 343647 (255.5115, 22.9355)
@@ -236,6 +254,94 @@ def apply_manual_fixes(base):
         ),
     )
 
+    # Flipped coordinates for a galaxy/star pair in nsa126115
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 904488130000004194),
+        dict(RA=0.4979568838114891, DEC=20.985493504498578),
+    )
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 904488130000004168),
+        dict(RA=0.4993274319772168, DEC=20.986906437087658),
+    )
+
+    return base
+
+
+def match_sga(base, sga):
+
+    # ensure sga table is sorted by ID
+    if (np.ediff1d(sga["SGA_ID"]) < 0).any():
+        sga.sort("SGA_ID")
+
+    has_sga_idx = np.flatnonzero(base["SGA_ID"] > -1)
+
+    sga_idx = np.searchsorted(sga["SGA_ID"], base["SGA_ID"][has_sga_idx])
+    sga_idx[sga_idx >= len(sga)] = -1
+    matched = base["SGA_ID"][has_sga_idx] == sga["SGA_ID"][sga_idx]
+    if not matched.all():
+        has_sga_idx = has_sga_idx[matched]
+        sga_idx = sga_idx[matched]
+
+    sga = sga[sga_idx]
+
+    return has_sga_idx, sga
+
+
+def add_sga(base, sga):
+
+    matching_idx, sga = match_sga(base, sga)
+
+    base["ba"][matching_idx] = sga["BA"]
+    base["phi"][matching_idx] = sga["PA"]
+    base["radius"][matching_idx] = sga["DIAM"] * 30  # DIAM in amin to radius in asec
+    base["radius_err"][matching_idx] = sga["DIAM"] * 30 * 1e-4
+
+    base["OBJ_PGC"] = np.int64(-1)
+    base["OBJ_PGC"][matching_idx] = sga["PGC"]
+
+    # later we only need entries with specs
+    sga = sga[sga["Z_LEDA"] > -1]
+
+    return base, sga
+
+
+def add_sga_specs(base, sga):
+
+    matching_idx, sga = match_sga(base, sga)
+
+    has_spec = base["ZQUALITY"][matching_idx] >= 3
+    has_no_spec = base["ZQUALITY"][matching_idx] == -1
+    has_poor_spec = ~(has_spec | has_no_spec)
+    has_consistent_z = np.abs(base["SPEC_Z"][matching_idx] - sga["Z_LEDA"]) < v2z(500)
+
+    for i in np.flatnonzero(has_spec & has_consistent_z):
+        base_idx = matching_idx[i]
+        base["SPEC_REPEAT"][base_idx] = build2._join_spec_repeat(base["SPEC_REPEAT"][base_idx], ["SGA"])
+
+    for i in np.flatnonzero(has_poor_spec | has_spec):
+        base_idx = matching_idx[i]
+        base["SPEC_REPEAT_ALL"][base_idx] = build2._join_spec_repeat(base["SPEC_REPEAT_ALL"][base_idx], ["SGA"])
+
+    for i in np.flatnonzero(has_no_spec | has_poor_spec):
+        base_idx = matching_idx[i]
+        base["SPEC_REPEAT"][base_idx] = "SGA"
+        base["RA_spec"][base_idx] = sga["RA"][i]
+        base["DEC_spec"][base_idx] = sga["DEC"][i]
+        base["SPEC_Z"][base_idx] = sga["Z_LEDA"][i]
+        base["SPEC_Z_ERR"][base_idx] = v2z(100)
+        base["ZQUALITY"][base_idx] = 4
+        base["SPECOBJID"][base_idx] = str(sga["SGA_ID"][i])
+        base["MASKNAME"][base_idx] = str(sga["REF"][i])
+        base["TELNAME"][base_idx] = "SGA"
+        base["HELIO_CORR"][base_idx] = True
+
+    return base
+
+
+def identify_host(base):
+    fill_values_by_query(base, C.obj_is_host3, {"SATS": 3, "REMOVE": 0})
     return base
 
 
@@ -262,6 +368,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     decals_recover=None,
     sdss=None,
     nsa=None,
+    sga=None,
     spectra=None,
     halpha=None,
     shreds_recover=None,
@@ -281,15 +388,18 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
     del decals, decals_remove, decals_recover
 
-    base = apply_manual_fixes(base)
     base = build.add_host_info(base, host)
     base = build2.add_columns_for_spectra(base)
 
-    nsa = filter_nearby_object(nsa, host)
+    if sga is not None:
+        base, sga = add_sga(base, sga)
+
+    base = apply_manual_fixes(base)
+
     all_spectra = [
-        extract_sdss_spectra(sdss),
-        extract_nsa_spectra(nsa),
         filter_nearby_object(spectra, host),
+        extract_sdss_spectra(sdss),
+        extract_nsa_spectra(filter_nearby_object(nsa, host)),
     ]
     del sdss, nsa, spectra
 
@@ -301,12 +411,13 @@ def build_full_stack(  # pylint: disable=unused-argument
         base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
     del all_spectra
 
+    base = add_sga_specs(base, sga)
+    del sga
     base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
-        base = build2.remove_too_close_to_host(base)
-        base = build.find_satellites(base, version=2)
-        base = build2.identify_host(base)
+        base = build.find_satellites(base, version=3)
+        base = identify_host(base)
 
     base = build2.add_surface_brightness(base)
     base = build.add_stellar_mass(base)

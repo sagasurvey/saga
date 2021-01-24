@@ -571,9 +571,8 @@ def assign_targeting_score_v2plus(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                idx = np.random.RandomState(seed).choice(
-                    np.flatnonzero(score_this.mask(base)), n - n_limit, False
-                )  # pylint: disable=no-member
+                # pylint: disable=no-member
+                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
                 base["TARGETING_SCORE"][idx] = new_score
             else:
                 n_cut = (n_limit - 1) if n_limit else (n // 2)
@@ -604,7 +603,7 @@ def assign_targeting_score_v3(
     **kwargs,
 ):
     """
-    Last updated: 08/19/2020
+    Last updated: 01/24/2021
      100 Human selection and Special targets
      150 sats without AAT/MMT/PAL specs
      180 low-z (z < 0.05) but ZQUALITY = 2
@@ -623,10 +622,16 @@ def assign_targeting_score_v3(
     1400 Has spec already
     """
 
-    main_targeting_cuts = C.paper2_targeting_cut
+    clean_galaxy = C.is_clean2 & C.is_galaxy2
+    within_host = C.sat_rcut
+    loose_faint_limit = "r_mag < 20.9"
+    padded_faint_limit = C.faint_end_limit2
+    main_targeting_cuts = C.paper2_targeting_cut & C.ba_cut
+    very_relaxed_targeting_cuts = Query(C.very_relaxed_cut_sb, C.gr_cut_tight | C.relaxed_cut_gr)
 
-    basic_loose = Query(C.very_relaxed_targeting_cuts, C.is_clean2, C.is_galaxy2, "r_mag < 21")
-    basic = Query(C.very_relaxed_targeting_cuts, C.basic_cut2)
+    basic_loose = Query(very_relaxed_targeting_cuts, clean_galaxy, loose_faint_limit)
+    basic = Query(very_relaxed_targeting_cuts, C.basic_cut2)
+    basic |= Query(main_targeting_cuts, clean_galaxy, within_host, padded_faint_limit)
 
     if not ignore_specs:
         basic_loose = Query(basic_loose, ~C.has_spec)
@@ -634,7 +639,6 @@ def assign_targeting_score_v3(
 
     base = add_cut_scores(base)
     base["TARGETING_SCORE"] = 1000
-    surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
 
     exclusion_cuts = Query()
 
@@ -642,9 +646,9 @@ def assign_targeting_score_v3(
         exclusion_cuts = Query(exclusion_cuts, QueryMaker.in1d("OBJID", low_priority_objids, invert=True))
 
     very_low_sb_cut = Query(
-        "r_mag < 20.7",
+        padded_faint_limit,
         C.valid_sb,
-        C.paper2_targeting_cut,
+        main_targeting_cuts,
         Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
     )
 
@@ -656,7 +660,7 @@ def assign_targeting_score_v3(
     fill_values_by_query(base, Query(basic, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 700})
     fill_values_by_query(
         base,
-        Query(basic_loose, C.faint_end_limit, main_targeting_cuts),
+        Query(basic_loose, padded_faint_limit, main_targeting_cuts),
         {"TARGETING_SCORE": 600},
     )
     fill_values_by_query(
@@ -692,19 +696,12 @@ def assign_targeting_score_v3(
             {"TARGETING_SCORE": 150},
         )
 
-    if remove_lists is not None:
-        for survey in surveys:
-            if survey not in remove_lists:
-                continue
-            fill_values_by_query(
-                base,
-                Query(
-                    C.is_clean2,
-                    (lambda x: np.in1d(x, remove_lists[survey]), "OBJID"),
-                    (lambda x: x == survey, "survey"),
-                ),
-                {"TARGETING_SCORE": 1350},
-            )
+    if remove_lists is not None and "decals" in remove_lists:
+        fill_values_by_query(
+            base,
+            Query(C.is_clean2, QueryMaker.isin("OBJID", remove_lists["decals"])),
+            {"TARGETING_SCORE": 1350},
+        )
 
     if manual_selected_objids is not None:
         q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
@@ -726,9 +723,8 @@ def assign_targeting_score_v3(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                idx = np.random.RandomState(seed).choice(
-                    np.flatnonzero(score_this.mask(base)), n - n_limit, False
-                )  # pylint: disable=no-member
+                # pylint: disable=no-member
+                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
                 base["TARGETING_SCORE"][idx] = new_score
             else:
                 n_cut = (n_limit - 1) if n_limit else (n // 2)
@@ -745,7 +741,6 @@ def assign_targeting_score_v3(
 
     base.sort("TARGETING_SCORE")
     return base
-
 
 
 def assign_targeting_score_lowz(base, manual_selected_objids=None, gmm_parameters=None, ignore_specs=False, **kwargs):

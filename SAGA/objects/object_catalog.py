@@ -454,7 +454,7 @@ class ObjectCatalog(object):
             If set to an astropy.time.Time object, overwrite catalogs that are older than that time.
 
         base_file_path_pattern : str, optional
-        version : int, optional (default: 2)
+        version : int, optional (default: 3)
         return_catalogs : bool, optional (default: False)
         raise_exception : bool, optional (default: False)
         add_specs_only_before_time : astropy.time.Time, optional (default: None)
@@ -489,7 +489,7 @@ class ObjectCatalog(object):
             return
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
-            "Start to build {} base catalog(s).".format(nhosts),
+            "Start to build {} base catalog(s). Build version = {}".format(nhosts, build_version),
         )
 
         print(
@@ -535,6 +535,14 @@ class ObjectCatalog(object):
             print(time.strftime("[%m/%d %H:%M:%S]"), "NSA catalog loaded.")
         else:
             nsa = None
+
+        try:
+            sga = self._database["sga_v3.0"]
+        except KeyError:
+            sga = None
+        else:
+            sga = sga.read()[build3.SGA_COLUMNS]
+            print(time.strftime("[%m/%d %H:%M:%S]"), "SGA catalog loaded.")
 
         spectra = self._database["spectra_raw_all"].read(
             before_time=add_specs_only_before_time,
@@ -632,6 +640,7 @@ class ObjectCatalog(object):
                 base = build_module.build_full_stack(
                     host=host,
                     nsa=nsa,
+                    sga=sga,
                     spectra=spectra,
                     halpha=halpha,
                     convert_to_sdss_filters=convert_to_sdss_filters,
