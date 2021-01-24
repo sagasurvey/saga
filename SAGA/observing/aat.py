@@ -215,9 +215,7 @@ def subsample_catalog(
             if favor_highpri is False or i < 3:
                 idxs_to_rem.append(np.random.permutation(idxs)[:ntorem])
             else:
-                assert len(favor_highpri) == len(
-                    catalog
-                ), "catalog and favor_highpri do not match in length!"
+                assert len(favor_highpri) == len(catalog), "catalog and favor_highpri do not match in length!"
                 idxs_to_rem.append(idxs[np.argsort(favor_highpri[idxs])][-ntorem:])
     subcat = catalog.copy()
     if idxs_to_rem:
@@ -250,22 +248,20 @@ def infer_radec_cols(table):
     return raname, decname
 
 
-def make_decals_viewer_cutouts(
-    table, survey="sdss", ncols=3, zoom=15, size=120, namecol=None, dhtml=True
-):
+def make_decals_viewer_cutouts(table, survey="ls-dr9", ncols=3, zoom=15, size=120, namecol=None, dhtml=True):
     """
     Zoom of 15 is ~1"/pixel, so ~2' across with defaults
     """
-    template_url = "http://legacysurvey.org/viewer/jpeg-cutout/?ra={ra:.7}&dec={dec:.7}&zoom={zoom}&layer={layer}&size={size}"
+    template_url = (
+        "https://www.legacysurvey.org/viewer/jpeg-cutout/?ra={ra:.7}&dec={dec:.7}&zoom={zoom}&layer={layer}&size={size}"
+    )
 
     raname, decname = infer_radec_cols(table)
 
     entries = []
     for row in table:
-        imgurl = template_url.format(
-            ra=row[raname], dec=row[decname], layer=survey, size=size, zoom=zoom
-        )
-        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
+        imgurl = template_url.format(ra=row[raname], dec=row[decname], layer=survey, size=size, zoom=zoom)
+        viewurl = "https://www.legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
 
         namestr = "" if namecol is None else (str(row[namecol]) + "<br>")
         entries.append('{}<a href="{}"><img src="{}"></a>'.format(namestr, viewurl, imgurl))
@@ -360,19 +356,13 @@ def show_des_cutouts(
         raise ValueError("table and job length do not match!")
     raname, decname = infer_radec_cols(table)
 
-    sizestr = (
-        ""
-        if force_size is None
-        else ('height="{}" width="{}"'.format(force_size[1], force_size[0]))
-    )
+    sizestr = "" if force_size is None else ('height="{}" width="{}"'.format(force_size[1], force_size[0]))
     entries = []
     for row, imgurl in zip(table, img_urls):
-        viewurl = "http://legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
+        viewurl = "https://www.legacysurvey.org/viewer?ra={}&dec={}".format(row[raname], row[decname])
 
         namestr = "" if namecol is None else (str(row[namecol]) + "<br>")
-        entries.append(
-            '{}<a href="{}"><img src="{}"{}></a>'.format(namestr, viewurl, imgurl, sizestr)
-        )
+        entries.append('{}<a href="{}"><img src="{}"{}></a>'.format(namestr, viewurl, imgurl, sizestr))
 
     entryrows = [[]]
     while entries:

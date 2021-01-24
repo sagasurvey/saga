@@ -73,17 +73,13 @@ class QuickStart:
     @property
     def host_catalog(self):
         if self._host_catalog is None:
-            self._host_catalog = self._host_catalog_class(
-                self.database, **self._host_catalog_options
-            )
+            self._host_catalog = self._host_catalog_class(self.database, **self._host_catalog_options)
         return self._host_catalog
 
     @property
     def object_catalog(self):
         if self._object_catalog is None:
-            self._object_catalog = ObjectCatalog(
-                self.database, self._host_catalog_class, self.host_catalog
-            )
+            self._object_catalog = ObjectCatalog(self.database, self._host_catalog_class, self.host_catalog)
         return self._object_catalog
 
     @property

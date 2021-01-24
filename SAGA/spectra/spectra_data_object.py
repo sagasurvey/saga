@@ -26,9 +26,7 @@ class SpectraData(object):
 
         for k, v in self._external_specs_dict.items():
             func_name = "read_" + k.lower()
-            func = getattr(read_external, func_name, None) or getattr(
-                read_observed, func_name, None
-            )
+            func = getattr(read_external, func_name, None) or getattr(read_observed, func_name, None)
             if func is None:
                 print("Cannot find function to read {}".format(k))
                 continue

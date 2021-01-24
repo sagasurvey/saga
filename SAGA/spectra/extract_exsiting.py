@@ -1,5 +1,5 @@
 import numpy as np
-from easyquery import Query
+from easyquery import Query, QueryMaker
 
 from ..utils import fill_values_by_query
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
@@ -9,16 +9,16 @@ __all__ = ["extract_sdss_spectra", "extract_nsa_spectra"]
 
 
 def extract_sdss_spectra(sdss):
-    specs = Query("SPEC_Z > -1.0").filter(
-        sdss["RA", "DEC", "SPEC_Z", "SPEC_Z_ERR", "SPEC_Z_WARN", "OBJID"]
-    )
+    if sdss is None or not len(sdss):
+        return
+    specs = Query("SPEC_Z > -1.0").filter(sdss["RA", "DEC", "SPEC_Z", "SPEC_Z_ERR", "SPEC_Z_WARN", "OBJID"])
     if not len(specs):
         return
     specs["ZQUALITY"] = np.where(specs["SPEC_Z_WARN"] == 0, 4, 1)
     del specs["SPEC_Z_WARN"]
 
     for objid, fixes in fixes_sdss_spec_by_objid.items():
-        fill_values_by_query(specs, "OBJID == {}".format(objid), fixes)
+        fill_values_by_query(specs, QueryMaker.equal("OBJID", objid), fixes)
 
     specs.rename_column("OBJID", "SPECOBJID")
     specs["TELNAME"] = "SDSS"
@@ -28,6 +28,8 @@ def extract_sdss_spectra(sdss):
 
 
 def extract_nsa_spectra(nsa):
+    if nsa is None:
+        return
     specs = nsa["RA", "DEC", "Z", "ZSRC", "NSAID"]
     specs["TELNAME"] = "NSA"
     specs["SPEC_Z_ERR"] = 20 / SPEED_OF_LIGHT

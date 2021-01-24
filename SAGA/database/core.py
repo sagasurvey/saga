@@ -62,9 +62,7 @@ class FileObject(DownloadableBase):
     @staticmethod
     def _gz_fallback(file_path):
         file_path_str = str(file_path)
-        file_path_alt = (
-            file_path_str[:-3] if file_path_str.lower().endswith(".gz") else (file_path_str + ".gz")
-        )
+        file_path_alt = file_path_str[:-3] if file_path_str.lower().endswith(".gz") else (file_path_str + ".gz")
         if (not os.path.isfile(file_path)) and os.path.isfile(file_path_alt):
             return file_path_alt
         return file_path
@@ -122,9 +120,7 @@ class EcsvTable(FileObject):
 
 class GoogleSheets(FastCsvTable):
     def __init__(self, key, gid, **kwargs):
-        path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(
-            key, gid
-        )
+        path = "https://docs.google.com/spreadsheets/d/{0}/export?format=csv&gid={1}".format(key, gid)
         self.url = "https://docs.google.com/spreadsheets/d/{0}/edit#gid={1}".format(key, gid)
         super(GoogleSheets, self).__init__(path, **kwargs)
 

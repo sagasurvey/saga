@@ -2,7 +2,8 @@ import os
 
 import numpy as np
 import requests
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, match_coordinates_sky
+from astropy.table import hstack
 from easyquery import Query
 
 __all__ = [
@@ -28,6 +29,9 @@ __all__ = [
     "group_by",
     "decode_flag",
     "join_str_arr",
+    "calc_normalized_dist",
+    "get_coord",
+    "nearest_neighbor_join",
 ]
 
 
@@ -81,10 +85,8 @@ def add_skycoord(table, ra_label="RA", dec_label="DEC", coord_label="coord", uni
     return table
 
 
-def get_decals_viewer_image(
-    ra, dec, pixscale=0.2, layer="sdssco", size=256, out=None
-):  # pylint: disable=W0613
-    url = "http://legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
+def get_decals_viewer_image(ra, dec, pixscale=0.2, layer="ls-dr9", size=256, out=None):  # pylint: disable=W0613
+    url = "https://www.legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
         **locals()
     )
     content = requests.get(url, timeout=120).content
@@ -162,9 +164,15 @@ def find_near_coord(table, coord, within_arcsec=3.0):
     """
     table = add_skycoord(table)
     sep = table["coord"].separation(coord).arcsec
-    nearby_indices = np.flatnonzero(sep < within_arcsec)
-    nearby_indices = nearby_indices[sep[nearby_indices].argsort()]
-    return table[nearby_indices]
+
+    nearby_mask = sep < within_arcsec
+    sep = sep[nearby_mask]
+    table = table[nearby_mask]
+
+    sorter = sep.argsort()
+    table = table[sorter]
+    table["sep"] = sep[sorter]
+    return table
 
 
 def find_near_ra_dec(table, ra, dec, within_arcsec=3.0):
@@ -215,9 +223,7 @@ def view_table_as_2d_array(table, cols=None, row_mask=None, dtype=np.float64):
             return col_this.filled().data
         return col_this.data
 
-    return np.vstack(
-        [_get_data(table[c][row_mask]).astype(dtype, casting="same_kind", copy=False) for c in cols]
-    ).T
+    return np.vstack([_get_data(table[c][row_mask]).astype(dtype, casting="same_kind", copy=False) for c in cols]).T
 
 
 def makedirs_if_needed(path):
@@ -255,3 +261,75 @@ def join_str_arr(*arrays):
     for b in arrays_iter:
         a = np.char.add(a, b)
     return a
+
+
+def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, cen_phi=None):
+    """
+    obj_ra, obj_dec, cen_ra, cen_dec in degrees
+    cen_r is half-light radius in arcseconds
+    """
+    a = cen_r * 2.0 / 3600.0
+    cos_dec = np.cos(np.deg2rad((obj_dec + cen_dec) * 0.5))
+    dx = np.rad2deg(np.arcsin(np.sin(np.deg2rad(obj_ra - cen_ra)))) * cos_dec
+    dy = obj_dec - cen_dec
+
+    if cen_ba is None:
+        with np.errstate(divide="ignore"):
+            return np.hypot(dx, dy) / a
+
+    b = a * cen_ba
+    theta = np.deg2rad(90 - cen_phi)
+    sin_t = np.sin(theta)
+    cos_t = np.cos(theta)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.hypot((dx * cos_t + dy * sin_t) / a, (-dx * sin_t + dy * cos_t) / b)
+
+
+def get_coord(table, coord=None):
+    if isinstance(coord, SkyCoord):
+        return coord
+    _cols = table.colnames
+    if coord is None:
+        if "coord" in _cols and isinstance(table["coord"], SkyCoord):
+            return table["coord"]
+        if "RA" in _cols and "DEC" in _cols:
+            return SkyCoord(table["RA"], table["DEC"], unit="deg")
+    else:
+        if isinstance(coord, str) and coord in _cols and isinstance(table[coord], SkyCoord):
+            return table[coord]
+        try:
+            if coord[0] in _cols and coord[1] in _cols:
+                return SkyCoord(table[coord[0]], table[coord[1]], unit="deg")
+        except (TypeError, IndexError, KeyError):
+            pass
+    raise ValueError("Cannot identify coord column")
+
+
+def nearest_neighbor_join(
+    left,
+    right,
+    left_coord=None,
+    right_coord=None,
+    join_type="left",
+    nthneighbor=1,
+    sep_label="sep",
+    uniq_col_name="{col_name}{table_name}",
+    table_names=("_1", "_2"),
+):
+
+    left_coord = get_coord(left, left_coord)
+    right_coord = get_coord(right, right_coord)
+
+    if join_type == "left":
+        idx, sep, _ = match_coordinates_sky(left_coord, right_coord, nthneighbor=nthneighbor)
+        right = right[idx]
+    elif join_type == "right":
+        idx, sep, _ = match_coordinates_sky(right_coord, left_coord, nthneighbor=nthneighbor)
+        left = left[idx]
+    else:
+        raise ValueError("join_type must be 'left' or 'right'")
+
+    d = hstack([left, right], join_type="exact", uniq_col_name=uniq_col_name, table_names=table_names)
+    d[sep_label] = sep.arcsec
+
+    return d

@@ -349,9 +349,7 @@ class HostCatalog(object):
         d = self._annotate_table(d, add_coord=add_coord, include_stats=include_stats)
         return d[0]
 
-    def load_single_near_ra_dec(
-        self, ra, dec, sep=3600, use_master=None, add_coord=True, include_stats=False
-    ):
+    def load_single_near_ra_dec(self, ra, dec, sep=3600, use_master=None, add_coord=True, include_stats=False):
         """
         ra, dec in degrees
         """
@@ -361,11 +359,7 @@ class HostCatalog(object):
         if len(cat) == 0:
             raise KeyError("No host near ({:.6f}, {:.6f}) found!".format(ra, dec))
         if len(cat) != 1:
-            raise ValueError(
-                "More than one hosts near ({:.6f}, {:.6f}) found! Use smaller `sep`!".format(
-                    ra, dec
-                )
-            )
+            raise ValueError("More than one hosts near ({:.6f}, {:.6f}) found! Use smaller `sep`!".format(ra, dec))
         cat = self._annotate_table(cat, add_coord=add_coord, include_stats=include_stats)
         return cat[0]
 

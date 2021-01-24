@@ -11,6 +11,7 @@ import numpy as np
 import requests
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.io import ascii
 from astropy.table import Table, vstack
 
 try:
@@ -22,6 +23,7 @@ else:
     Gaia.ROW_LIMIT = 0
 
 from ..utils import makedirs_if_needed
+from ..utils.overlap_checker import is_within
 from .core import DownloadableBase, FitsTable
 
 _HAS_CASJOBS_ = True
@@ -180,6 +182,14 @@ class SdssQuery(DownloadableBase):
         WHERE n.objID = p.objID
     """
 
+    _spec_query_template = """
+        SELECT s.specObjID as OBJID, s.bestObjID, s.ra as RA, s.dec as DEC, s.survey,
+        ISNULL(s.z, -1) as SPEC_Z, ISNULL(s.zErr, -1) as SPEC_Z_ERR, ISNULL(s.zWarning, -1) as SPEC_Z_WARN
+        FROM dbo.fGetNearbySpecObjEq({ra:.10g}, {dec:.10g}, {r_arcmin:.10g}) n, SpecObj s
+        INTO mydb.{db_table_name}
+        WHERE n.specObjID = s.specObjID
+    """
+
     def __init__(
         self,
         ra,
@@ -190,6 +200,8 @@ class SdssQuery(DownloadableBase):
         user=None,
         password=None,
         default_use_sciserver=True,
+        specs_only=False,
+        sciserver_via_csv=False,
     ):
 
         self.sciserver_user = user or os.getenv("SCISERVER_USER")
@@ -198,12 +210,7 @@ class SdssQuery(DownloadableBase):
         self.casjobs_pass = password or os.getenv("CASJOBS_PW")
 
         self.use_sciserver = False
-        if (
-            default_use_sciserver
-            and _HAS_SCISERVER_
-            and self.sciserver_user
-            and self.sciserver_pass
-        ):
+        if default_use_sciserver and _HAS_SCISERVER_ and self.sciserver_user and self.sciserver_pass:
             self.use_sciserver = True
 
         if self.use_sciserver:
@@ -212,8 +219,9 @@ class SdssQuery(DownloadableBase):
             if not db_table_name:
                 db_table_name = "SAGA" + get_random_string(4)
             self.db_table_name = re.sub("[^A-Za-z]", "", db_table_name)
-        self.query = self.construct_query(ra, dec, radius, self.db_table_name)
+        self.query = self.construct_query(ra, dec, radius, self.db_table_name, specs_only)
         self.context = context
+        self.sciserver_via_csv = sciserver_via_csv
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
@@ -227,6 +235,7 @@ class SdssQuery(DownloadableBase):
                 context=self.context,
                 username=self.sciserver_user,
                 password=self.sciserver_pass,
+                via_csv=self.sciserver_via_csv,
             )
         else:
             self.run_casjobs_with_casjobs(
@@ -240,7 +249,7 @@ class SdssQuery(DownloadableBase):
             )
 
     @classmethod
-    def construct_query(cls, ra, dec, radius=1.0, db_table_name=None):
+    def construct_query(cls, ra, dec, radius=1.0, db_table_name=None, specs_only=False):
         """
         Generates the query to send to the SDSS to get the full SDSS catalog around
         a target.
@@ -261,21 +270,16 @@ class SdssQuery(DownloadableBase):
             The SQL query to send to the SDSS skyserver
         """
 
-        select_into_mydb = True
-        if db_table_name is None:
-            db_table_name = "TO_BE_REMOVED"
-            select_into_mydb = False
-
-        # pylint: disable=possibly-unused-variable
-        ra = ensure_deg(ra)
-        dec = ensure_deg(dec)
-        r_arcmin = ensure_deg(radius) * 60.0
-
-        # ``**locals()`` means "use the local variable names to fill the template"
-        q = cls._query_template.format(**locals())
-        q = re.sub(r"[^\S\n]+", " ", q).strip()
-        if not select_into_mydb:
-            q = q.replace("INTO mydb.{}".format(db_table_name), "")
+        params = {
+            "ra": ensure_deg(ra),
+            "dec": ensure_deg(dec),
+            "r_arcmin": ensure_deg(radius) * 60.0,
+            "db_table_name": (db_table_name or "__TO_BE_REMOVED__"),
+        }
+        query_template = cls._spec_query_template if specs_only else cls._query_template
+        q = query_template.format(**params)
+        q = re.sub(r"\s+", " ", q).strip()
+        q = q.replace("INTO mydb.__TO_BE_REMOVED__", "")
         return q
 
     @staticmethod
@@ -324,9 +328,7 @@ class SdssQuery(DownloadableBase):
             "POST",
         )
 
-        job_id = cjob.submit(
-            query, context=context, task_name="casjobs_" + db_table_name, estimate=1
-        )
+        job_id = cjob.submit(query, context=context, task_name="casjobs_" + db_table_name, estimate=1)
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
             "casjob ({}) submitted...".format(db_table_name),
@@ -356,7 +358,13 @@ class SdssQuery(DownloadableBase):
 
     @staticmethod
     def run_casjobs_with_sciserver(
-        query, output_path, compress=True, context="DR14", username=None, password=None
+        query,
+        output_path,
+        compress=True,
+        context="DR14",
+        username=None,
+        password=None,
+        via_csv=False,
     ):
         """
         Run a single casjobs and download casjobs output using SciServer
@@ -388,10 +396,14 @@ class SdssQuery(DownloadableBase):
         if not (_HAS_SCISERVER_ and username and password):
             raise ValueError("You are not setup to run casjobs with SciServer")
         SciServer.Authentication.login(username, password)
-        r = SciServer.CasJobs.executeQuery(query, context=context, format="fits")
+        return_format = "csv" if via_csv else "fits"
+        r = SciServer.CasJobs.executeQuery(query, context=context, format=return_format)
         file_open = gzip.open if compress else open
         with file_open(output_path, "wb") as f_out:
-            shutil.copyfileobj(r, f_out)
+            if via_csv:
+                ascii.read(r, format="csv").write(f_out, format="fits")
+            else:
+                shutil.copyfileobj(r, f_out)
 
 
 class DesQuery(DownloadableBase):
@@ -553,7 +565,7 @@ class DecalsQuery(DownloadableBase):
         ra,
         dec,
         radius=1.0,
-        decals_dr="dr7",
+        decals_dr="dr9",
         decals_base_dir="/global/project/projectdirs/cosmo/data/legacysurvey",
     ):
 
@@ -607,61 +619,25 @@ class DecalsQuery(DownloadableBase):
         ra_max, dec_max = cls.brickname_to_ra_dec(bmax)
         return ra_min, ra_max, dec_min, dec_max
 
-    @staticmethod
-    def is_within(ra, dec, ra_min, ra_max, dec_min, dec_max, margin_ra=0, margin_dec=0):
-        return (
-            (ra_min - margin_ra <= ra)
-            & (ra_max + margin_ra >= ra)
-            & (dec_min - margin_dec <= dec)
-            & (dec_max + margin_dec >= dec)
-        )
-
-    @staticmethod
-    def annotate_catalog(d):
-        for band in "grz":
-            BAND = band.upper()
-            d[band + "_mag"] = 22.5 - 2.5 * np.log10(
-                d["FLUX_" + BAND] / d["MW_TRANSMISSION_" + BAND]
-            )
-            d[band + "_err"] = (
-                2.5
-                / np.log(10)
-                / (d["FLUX_" + BAND] / d["MW_TRANSMISSION_" + BAND])
-                / np.sqrt(d["FLUX_IVAR_" + BAND])
-            )
-        return d
-
     def get_decals_catalog(self):
+        center_coord = SkyCoord(self.ra, self.dec, unit="deg")
         output = []
         for sweep_dir in self.sweep_dirs:
             for filename in sorted(os.listdir(sweep_dir)):
                 if not filename.startswith("sweep-") or not filename.endswith(".fits"):
                     continue
-                if not self.is_within(
-                    self.ra,
-                    self.dec,
-                    *self.get_ra_dec_range(filename),
-                    margin_ra=(self.radius * 1.01 / max(np.cos(np.deg2rad(self.dec)), 1.0e-8)),
-                    margin_dec=(self.radius * 1.01),
-                ):
+                if not is_within(self.ra, self.dec, *self.get_ra_dec_range(filename), margin=self.radius):
                     continue
-
                 d = FitsTable(os.path.join(sweep_dir, filename)).read()
-                sep = (
-                    SkyCoord(d["RA"], d["DEC"], unit="deg")
-                    .separation(SkyCoord(self.ra, self.dec, unit="deg"))
-                    .deg
-                )
-                d = d[sep <= self.radius]
-                if len(d):
-                    output.append(d)
-                del d
+                mask = SkyCoord(d["RA"], d["DEC"], unit="deg").separation(center_coord).deg <= self.radius
+                if mask.any():
+                    output.append(d[mask])
+                del d, mask
 
         if not output:
             return Table()
 
-        output = vstack(output, "exact")
-        return self.annotate_catalog(output)
+        return vstack(output, "exact")
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:

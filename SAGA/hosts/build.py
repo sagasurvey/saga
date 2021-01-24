@@ -179,9 +179,7 @@ def calc_needed_quantities(d):
     d["DIST"] = m2d(d["DISTMOD"])
     d["Z_COSMO"] = d2z(d["DIST"])
 
-    d["kcorrection"] = calc_kcor(
-        "Ks2", d["Z_COSMO"].data, "H2 - Ks2", d["H_tc"].data - d["K_tc"].data
-    )
+    d["kcorrection"] = calc_kcor("Ks2", d["Z_COSMO"].data, "H2 - Ks2", d["H_tc"].data - d["K_tc"].data)
     d["K_RAW"] = np.where(d["K_tc"].mask, d["kt"], d["K_tc"])
     d["K_TC"] = np.where(d["K_tc"].mask, d["kt"] - 0.03, d["K_tc"] - d["kcorrection"])
     d["K_ABS"] = d["K_TC"] - d["DISTMOD"]
@@ -245,9 +243,7 @@ def add_image_coverage(d, coverage_map, name, nest=True):
         if dist <= 0:
             frac.append(np.nan)
             continue
-        idx = hp.query_disc(
-            nside, hp.ang2vec(ra, dec, lonlat=True), np.arcsin(0.3 / dist), nest=nest
-        )
+        idx = hp.query_disc(nside, hp.ang2vec(ra, dec, lonlat=True), np.arcsin(0.3 / dist), nest=nest)
         frac.append(np.count_nonzero(coverage_map[idx]) / len(idx) if len(idx) else np.nan)
     d["COVERAGE_{}".format(name.upper())] = np.array(frac)
     return d
@@ -305,9 +301,7 @@ def clean_up_columns(d):
         (
             col.upper()
             for col in d.colnames
-            if col.startswith("BRIGHTEST_")
-            or col.startswith("COVERAGE_")
-            or col.startswith("STAR_DENSITY_")
+            if col.startswith("BRIGHTEST_") or col.startswith("COVERAGE_") or col.startswith("STAR_DENSITY_")
         )
     )
 
@@ -365,9 +359,7 @@ def add_selection_flags(d):
     image_preferred = Query(
         image_allowed,
         (
-            lambda d6, d7, de, s: (
-                (de >= 0.99) | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)
-            ),
+            lambda d6, d7, de, s: ((de >= 0.99) | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)),
             "COVERAGE_DECALS_DR6",
             "COVERAGE_DECALS_DR7",
             "COVERAGE_DES_DR1",

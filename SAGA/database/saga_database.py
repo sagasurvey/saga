@@ -55,6 +55,18 @@ known_google_sheets = {
         1157130787,
         include_names=["OBJID"],
     ),
+    "decals_dr9_remove": GoogleSheets(
+        "1Oi1cSVIOORCMBFz_gU1_yn9bUSrr-GUjk8axuUS-DO4",
+        0,
+        header_start=1,
+        include_names=["OBJID"],
+    ),
+    "decals_dr9_recover": GoogleSheets(
+        "1Oi1cSVIOORCMBFz_gU1_yn9bUSrr-GUjk8axuUS-DO4",
+        297899824,
+        header_start=1,
+        include_names=["OBJID"],
+    ),
     "shreds_recover": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         763845590,
@@ -62,7 +74,9 @@ known_google_sheets = {
         include_names=["OBJID"],
     ),
     "manual_targets_aat2018a": GoogleSheets(
-        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w", 0, include_names=["OBJID"]
+        "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
+        0,
+        include_names=["OBJID"],
     ),
     "manual_targets_aat2018b": GoogleSheets(
         "1Z8HISgp6ScJ0YZiFK5_TrGDZXY9t2OL3hkCSFJUiC6w",
@@ -171,9 +185,7 @@ class Database(object):
                 FastCsvTable(os.path.join(self._shared_dir, "HostCatalogs", "master_list_v2.csv"))
             ),
             "saga_spectra_May2017": DataObject(
-                FitsTable(
-                    os.path.join(self._shared_dir, "Products", "saga_spectra_May2017.fits.gz")
-                )
+                FitsTable(os.path.join(self._shared_dir, "Products", "saga_spectra_May2017.fits.gz"))
             ),
             "hyperleda_kt12": DataObject(
                 HyperledaQuery(
@@ -204,23 +216,24 @@ class Database(object):
             ),
             "hipparcos2": DataObject(
                 FitsTable("http://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/fits?I/311/hip2.dat.gz"),
-                FitsTable(
-                    os.path.join(self._local_dir, "master_list_v2_sources", "hipparcos2.fits")
-                ),
+                FitsTable(os.path.join(self._local_dir, "master_list_v2_sources", "hipparcos2.fits")),
                 use_local_first=True,
             ),
             "nsa_v1.0.1": DataObject(
                 FitsTable("https://data.sdss.org/sas/dr14/sdss/atlas/v1/nsa_v1_0_1.fits"),
-                FitsTable(
-                    os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v1_0_1.fits")
-                ),
+                FitsTable(os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v1_0_1.fits")),
                 use_local_first=True,
             ),
             "nsa_v0.1.2": DataObject(
                 FitsTable("http://sdss.physics.nyu.edu/mblanton/v0/nsa_v0_1_2.fits"),
+                FitsTable(os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v0_1_2.fits")),
+                use_local_first=True,
+            ),
+            "sga_v3.0": DataObject(
                 FitsTable(
-                    os.path.join(self._local_dir, "external_catalogs", "nsa", "nsa_v0_1_2.fits")
+                    "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/largegalaxies/SGA-parent-v3.0.fits"
                 ),
+                FitsTable(os.path.join(self._local_dir, "external_catalogs", "sga", "SGA-parent-v3.0.fits")),
                 use_local_first=True,
             ),
             "spectra_gama_dr2": DataObject(
@@ -251,15 +264,11 @@ class Database(object):
             ),
             "spectra_ozdes_dr1": DataObject(
                 FitsTable("http://www.mso.anu.edu.au/ozdes/OzDES-DR1.fits"),
-                FitsTable(
-                    os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR1.fits")
-                ),
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR1.fits")),
                 use_local_first=True,
             ),
             "spectra_ozdes_dr2": DataObject(
-                FitsTable(
-                    os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR2.fits")
-                ),
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR2.fits")),
             ),
             "spectra_2df": DataObject(
                 FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "2dF", "2dF_best.fit"))
@@ -268,9 +277,7 @@ class Database(object):
                 FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "6dF", "6dF_DR3.fit"))
             ),
             "spectra_wigglez": DataObject(
-                FitsTable(
-                    os.path.join(self._shared_dir, "Spectra", "Final", "WiggleZ", "WiggleZ.fits")
-                )
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "WiggleZ", "WiggleZ.fits"))
             ),
             "spectra_lcrs": DataObject(
                 FitsTable(
@@ -390,60 +397,47 @@ class Database(object):
         for k, v in known_google_sheets.items():
             self._tables[k] = DataObject(v, CsvTable(), cache_in_memory=True)
 
-        self._tables["hosts_v2"].local = CsvTable(
-            os.path.join(self._shared_dir, "HostCatalogs", "host_list_v2.csv")
-        )
+        self._tables["hosts_v2"].local = CsvTable(os.path.join(self._shared_dir, "HostCatalogs", "host_list_v2.csv"))
 
-        self._tables["hosts_v1"].local = CsvTable(
-            os.path.join(self._shared_dir, "HostCatalogs", "host_list_v1.csv")
-        )
+        self._tables["hosts_v1"].local = CsvTable(os.path.join(self._shared_dir, "HostCatalogs", "host_list_v1.csv"))
 
-        self._tables["lowz_fields"].local = CsvTable(
-            os.path.join(self._shared_dir, "HostCatalogs", "lowz_fields.csv")
-        )
+        self._tables["lowz_fields"].local = CsvTable(os.path.join(self._shared_dir, "HostCatalogs", "lowz_fields.csv"))
 
         self._tables["hosts"] = self._tables["hosts_v2"]
         self._tables["master_list"] = self._tables["master_list_v2"]
 
         self._file_path_pattern = {
-            "base_paper2": os.path.join(
-                self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"
-            ),
+            "base_paper2": os.path.join(self._local_dir, "base_catalogs_paper2", "base_v2_{}.fits.gz"),
             "base_v2p1": os.path.join(self._local_dir, "base_catalogs_v2.1", "base_v2_{}.fits.gz"),
+            "base_v3": os.path.join(self._local_dir, "base_catalogs_v3", "base_v3_{}.fits.gz"),
             "base_v2": os.path.join(self._local_dir, "base_catalogs", "base_v2_{}.fits.gz"),
             "base_v1": os.path.join(self._local_dir, "base_catalogs", "base_v1_{}.fits.gz"),
-            "base_v0p1": os.path.join(
-                self._shared_dir, "Paper1", "base_catalogs", "base_sql_{}.fits.gz"
-            ),
-            "sdss_dr14": os.path.join(
-                self._local_dir, "external_catalogs", "sdss_dr14", "{}.fits.gz"
-            ),
-            "sdss_dr12": os.path.join(
-                self._local_dir, "external_catalogs", "sdss_dr12", "{}.fits.gz"
-            ),
+            "base_v0p1": os.path.join(self._shared_dir, "Paper1", "base_catalogs", "base_sql_{}.fits.gz"),
+            "sdss_dr16": os.path.join(self._local_dir, "external_catalogs", "sdss_dr16", "{}.fits.gz"),
+            "sdss_dr14": os.path.join(self._local_dir, "external_catalogs", "sdss_dr14", "{}.fits.gz"),
+            "sdss_dr12": os.path.join(self._local_dir, "external_catalogs", "sdss_dr12", "{}.fits.gz"),
             "wise": os.path.join(self._local_dir, "external_catalogs", "wise", "{}.fits.gz"),
-            "des_dr1": os.path.join(
-                self._local_dir, "external_catalogs", "des_dr1", "{}_des_dr1.fits.gz"
-            ),
-            "decals": os.path.join(
-                self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"
-            ),
+            "des_dr1": os.path.join(self._local_dir, "external_catalogs", "des_dr1", "{}_des_dr1.fits.gz"),
+            "decals_dr67": os.path.join(self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"),
             "decals_dr8": os.path.join(
                 self._local_dir,
                 "external_catalogs",
                 "decals_dr8",
                 "{}_decals_dr8.fits.gz",
             ),
-            "gaia": os.path.join(
-                self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"
+            "decals_dr9": os.path.join(
+                self._local_dir,
+                "external_catalogs",
+                "decals_dr9",
+                "{}_decals_dr9.fits.gz",
             ),
+            "gaia": os.path.join(self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"),
         }
 
         self._possible_base_versions = tuple(
             k.partition("_")[2] for k in self._file_path_pattern if k.startswith("base_")
         )
-        self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
-        self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+
         self.set_default_base_version()
 
     def _add_derived_data(self):
@@ -475,9 +469,7 @@ class Database(object):
 
     def _set_file_path_pattern(self, key, value):
         self._file_path_pattern[key] = value
-        keys_to_del = [
-            k for k in self._tables if isinstance(k, tuple) and len(k) == 2 and k[0] == key
-        ]
+        keys_to_del = [k for k in self._tables if isinstance(k, tuple) and len(k) == 2 and k[0] == key]
         for k in keys_to_del:
             del self._tables[k]
         if key == "base":
@@ -562,7 +554,7 @@ class Database(object):
         """
 
         if version is None:
-            return 2, ""
+            return 3, ""
         version = str(version).lower().strip()
         if version in ("paper1", "p1"):
             return 0, "v0p1"
@@ -578,6 +570,20 @@ class Database(object):
         return int(version[1]), version
 
     def set_default_base_version(self, version=None):
-        _, version_postfix = self.resolve_base_version(version)
-        version_postfix = version_postfix or "v2p1"
+        major_version, version_postfix = self.resolve_base_version(version)
+        version_postfix = version_postfix or "v3"
+
+        if major_version == 1:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr12"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
+        elif major_version == 2:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr14"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr67"]
+        else:
+            self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr16"]
+            self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
+            self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr9"]
+
         self.base_file_path_pattern = self._file_path_pattern["base_" + version_postfix]

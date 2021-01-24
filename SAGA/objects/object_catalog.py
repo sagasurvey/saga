@@ -1,3 +1,4 @@
+import gc
 import os
 import time
 import traceback
@@ -13,7 +14,7 @@ from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
 from ..hosts import HostCatalog
 from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
 from ..utils.distance import d2m
-from . import build, build2
+from . import build, build2, build3
 from . import cuts as C
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
 
@@ -82,6 +83,74 @@ def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.25, **kwargs
     return p
 
 
+def _get_coverage(host, survey):
+    try:
+        return host["COVERAGE_" + survey.upper()]
+    except KeyError:
+        return 0.0
+
+
+def _determine_raw_catalogs_saga_v1(**kwargs):
+    return ("sdss", "wise")
+
+
+def _determine_raw_catalogs_saga_v2(host, using_dr8_by_default=False, **kwargs):
+    coverage = {
+        s: _get_coverage(host, s)
+        for s in (
+            "sdss",
+            "des_dr1",
+            "decals_dr6",
+            "decals_dr7",
+            "decals_dr8",
+        )
+    }
+
+    if using_dr8_by_default:
+        coverage["decals"] = coverage["decals_dr8"]
+    else:
+        coverage["decals"] = max(coverage["decals_dr6"], coverage["decals_dr7"])
+    coverage["sdss_des"] = max(coverage["sdss"], coverage["des_dr1"])
+    coverage["max"] = max(coverage["decals"], coverage["sdss_des"])
+
+    catalogs = []
+    if coverage["sdss"] >= 0.85:
+        catalogs.append("sdss")
+    if coverage["des_dr1"] >= 0.85:
+        catalogs.append("des")
+    if coverage["decals"] >= 0.95:
+        catalogs.append("decals")
+
+    if not using_dr8_by_default:
+        if (
+            "decals" in catalogs
+            and coverage["decals_dr8"] >= 0.99
+            and (coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99)
+        ):
+            catalogs.remove("decals")
+            catalogs.append("decals_dr8")
+        elif "decals" not in catalogs and coverage["decals_dr8"] >= 0.95 and coverage["des_dr1"] < 0.95:
+            catalogs.append("decals_dr8")
+
+    return tuple(set(catalogs))
+
+
+def _determine_raw_catalogs_saga_v3(host, **kwargs):
+    catalogs = ["decals_dr9"]
+    if _get_coverage(host, "sdss") > 0:
+        catalogs.append("sdss_dr16")
+    return tuple(catalogs)
+
+
+def _determine_raw_catalogs_lowz(host_id, **kwargs):
+    field_name = str(host_id)
+    if any(field_name.startswith(s) for s in ["GD1", "300S", "Jet", "Styx"]):
+        return ("decals_dr67",)
+    if any(field_name.startswith(s) for s in ["p13"]):
+        return ("decals_dr8",)
+    return ("des",)
+
+
 class ObjectCatalog(object):
     """
     This class provides a high-level interface to access object catalogs
@@ -112,9 +181,7 @@ class ObjectCatalog(object):
         self._database = database or Database()
         if host_catalog_instance is not None:
             if not isinstance(host_catalog_instance, host_catalog_class):
-                raise ValueError(
-                    "`host_catalog_instance` must be an instance of `host_catalog_class`."
-                )
+                raise ValueError("`host_catalog_instance` must be an instance of `host_catalog_class`.")
             self._host_catalog = host_catalog_instance
         else:
             self._host_catalog = host_catalog_class(self._database)
@@ -132,10 +199,7 @@ class ObjectCatalog(object):
                 table["{}_mag".format(b)] = table[b] - table["EXTINCTION_{}".format(b.upper())]
 
         for color in get_all_colors():
-            if (
-                "{}_mag".format(color[0]) not in table.colnames
-                or "{}_mag".format(color[1]) not in table.colnames
-            ):
+            if "{}_mag".format(color[0]) not in table.colnames or "{}_mag".format(color[1]) not in table.colnames:
                 continue
             with np.errstate(invalid="ignore"):
                 table[color] = table["{}_mag".format(color[0])] - table["{}_mag".format(color[1])]
@@ -162,9 +226,7 @@ class ObjectCatalog(object):
                 )
                 p_sat_dict["p_sat_corrected"] = 0
 
-        good_obj = (
-            Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        )
+        good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
         fill_values_by_query(table, ~good_obj, p_sat_dict)
 
         if add_skycoord:
@@ -281,10 +343,7 @@ class ObjectCatalog(object):
             if hosts is None:
                 host_ids = np.unique(t["HOST_NSAID"])
             output_iterator = (
-                self._slice_table(
-                    t, Query(cuts, "HOST_NSAID == {}".format(i)), columns, add_skycoord
-                )
-                for i in host_ids
+                self._slice_table(t, Query(cuts, "HOST_NSAID == {}".format(i)), columns, add_skycoord) for i in host_ids
             )
             if return_as[0] == "i":
                 return output_iterator
@@ -351,10 +410,8 @@ class ObjectCatalog(object):
             fixes_dict = fixes_to_nsa_v012
             cols = build.NSA_COLS_USED
         elif version == "1.0.1":
-            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (nsa["DFLAGS"][:, 3:6]).all(
-                axis=1
-            )
-            objs_to_remove = [614276, 632725, 628283, 694072, 667243, 219164]
+            remove_mask |= (nsa["DFLAGS"][:, 3:6] == 24).any(axis=1) & (nsa["DFLAGS"][:, 3:6]).all(axis=1)
+            objs_to_remove = [614276, 632725, 628283, 694072, 667243, 219164, 632150]
             fixes_dict = fixes_to_nsa_v101
             cols = build2.NSA_COLS_USED
         remove_mask |= np.in1d(nsa["NSAID"], objs_to_remove, assume_unique=True)
@@ -397,7 +454,7 @@ class ObjectCatalog(object):
             If set to an astropy.time.Time object, overwrite catalogs that are older than that time.
 
         base_file_path_pattern : str, optional
-        version : int, optional (default: 2)
+        version : int, optional (default: 3)
         return_catalogs : bool, optional (default: False)
         raise_exception : bool, optional (default: False)
         add_specs_only_before_time : astropy.time.Time, optional (default: None)
@@ -417,6 +474,8 @@ class ObjectCatalog(object):
         build_version, version_postfix = self._database.resolve_base_version(version)
         if build_version == 0:
             raise ValueError("Cannot build v0 base catalogs")
+        if version_postfix and not version_postfix.startswith("_"):
+            version_postfix = "_" + version_postfix
 
         if overwrite not in (True, False, None) and not isinstance(overwrite, Time):
             overwrite = Time(overwrite)
@@ -430,24 +489,60 @@ class ObjectCatalog(object):
             return
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
-            "Start to build {} base catalog(s).".format(nhosts),
+            "Start to build {} base catalog(s). Build version = {}".format(nhosts, build_version),
         )
 
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
             "base_file_path_pattern =",
-            self._database.base_file_path_pattern
+            self._database._file_path_pattern["base" + version_postfix]
             if base_file_path_pattern is None
             else base_file_path_pattern,
         )
 
-        build_module = build if build_version < 2 else build2
+        if build_version < 2:
+            build_module = build
+            manual_keys = [("sdss", "SDSS ID")]
+            catalogs_determining_func = _determine_raw_catalogs_saga_v1
+        elif HOSTID_COLNAME == "field_id":
+            build_module = build2
+            manual_keys = [
+                ("des", "DES_OBJID"),
+                ("decals", "decals_objid"),
+                ("decals_dr8", "OBJID"),
+                ("shreds", "OBJID"),
+            ]
+            catalogs_determining_func = _determine_raw_catalogs_lowz
+        elif build_version < 3:
+            build_module = build2
+            manual_keys = [
+                ("sdss", "SDSS ID"),
+                ("des", "DES_OBJID"),
+                ("decals", "decals_objid"),
+                ("decals_dr8", "OBJID"),
+                ("shreds", "OBJID"),
+            ]
+            catalogs_determining_func = _determine_raw_catalogs_saga_v2
+        else:
+            build_module = build3
+            manual_keys = [
+                ("decals_dr9", "OBJID"),
+            ]
+            catalogs_determining_func = _determine_raw_catalogs_saga_v3
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
             print(time.strftime("[%m/%d %H:%M:%S]"), "NSA catalog loaded.")
         else:
             nsa = None
+
+        try:
+            sga = self._database["sga_v3.0"]
+        except KeyError:
+            sga = None
+        else:
+            sga = sga.read()[build3.SGA_COLUMNS]
+            print(time.strftime("[%m/%d %H:%M:%S]"), "SGA catalog loaded.")
 
         spectra = self._database["spectra_raw_all"].read(
             before_time=add_specs_only_before_time,
@@ -458,14 +553,8 @@ class ObjectCatalog(object):
 
         halpha = self._database["spectra_halpha"].read()
 
-        manual_lists = {}
-        for survey, col in (
-            ("sdss", "SDSS ID"),
-            ("des", "DES_OBJID"),
-            ("decals", "decals_objid"),
-            ("decals_dr8", "OBJID"),
-            ("shreds", "OBJID"),
-        ):
+        manual_lists = dict()
+        for survey, col in manual_keys:
             for list_type in ("remove", "recover"):
                 key = "{}_{}".format(survey, list_type)
                 try:
@@ -473,8 +562,13 @@ class ObjectCatalog(object):
                 except KeyError:
                     continue
                 val = get_unique_objids(mlist.read()[col])
-                if len(val):
-                    manual_lists[key] = val
+                if not len(val):
+                    continue
+                if "_" in survey:
+                    new_key = "{}_{}".format(survey.partition("_")[0], list_type)
+                    if new_key not in manual_lists:
+                        key = new_key
+                manual_lists[key] = val
         print(time.strftime("[%m/%d %H:%M:%S]"), "All other manual lists loaded.")
 
         failed_count = 0
@@ -482,8 +576,7 @@ class ObjectCatalog(object):
         for i, host in enumerate(host_table):
             host_id = host[HOSTID_COLNAME]
             if base_file_path_pattern is None:
-                base_key = "base" + version_postfix
-                data_obj = self._database[base_key, host_id].remote
+                data_obj = self._database["base" + version_postfix, host_id].remote
             else:
                 data_obj = FitsTable(base_file_path_pattern.format(host_id))
 
@@ -503,96 +596,34 @@ class ObjectCatalog(object):
                 if file_time > overwrite:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "Base catalog {} ({}) is newer than {}.".format(
-                            host_id, file_time.isot, overwrite.isot
-                        ),
+                        "Base catalog {} ({}) is newer than {}.".format(host_id, file_time.isot, overwrite.isot),
                         "({}/{})".format(i + 1, nhosts),
                     )
                     continue
 
-            if build_version < 2:
-                catalogs = ("sdss", "wise")
-            elif HOSTID_COLNAME == "field_id":
-                host_id = host[HOSTID_COLNAME]
-                if any((host_id).startswith(s) for s in ("GD1", "300S", "Jet", "Styx")):
-                    catalogs = ("decals",)
-                elif any((host_id).startswith(s) for s in ("p13")):
-                    catalogs = ("decals_dr8",)
-                else:
-                    catalogs = ("des",)
-            else:
-
-                def _get(col):
-                    # pylint: disable=cell-var-from-loop
-                    try:
-                        return host["COVERAGE_" + col.upper()]
-                    except KeyError:
-                        return 0.0
-
-                catalogs = []
-                coverage = {
-                    s: _get(s)
-                    for s in (
-                        "sdss",
-                        "des_dr1",
-                        "decals_dr6",
-                        "decals_dr7",
-                        "decals_dr8",
-                    )
-                }
-                using_dr8_by_default = "dr8" in self._database.decals_file_path_pattern
-
-                if using_dr8_by_default:
-                    coverage["decals"] = coverage["decals_dr8"]
-                else:
-                    coverage["decals"] = max(coverage["decals_dr6"], coverage["decals_dr7"])
-                coverage["sdss_des"] = max(coverage["sdss"], coverage["des_dr1"])
-                coverage["max"] = max(coverage["decals"], coverage["sdss_des"])
-
-                if coverage["sdss"] >= 0.85:
-                    catalogs.append("sdss")
-                if coverage["des_dr1"] >= 0.85:
-                    catalogs.append("des")
-                if coverage["decals"] >= 0.95:
-                    catalogs.append("decals")
-
-                if not using_dr8_by_default:
-                    if (
-                        "decals" in catalogs
-                        and coverage["decals_dr8"] >= 0.99
-                        and (coverage["sdss_des"] < 0.85 or coverage["max"] < 0.99)
-                    ):
-                        catalogs.remove("decals")
-                        catalogs.append("decals_dr8")
-                    elif (
-                        "decals" not in catalogs
-                        and coverage["decals_dr8"] >= 0.95
-                        and coverage["des_dr1"] < 0.95
-                    ):
-                        catalogs.append("decals_dr8")
-
-                catalogs = tuple(set(catalogs))
-
-            def get_catalog_or_none(catalog_name):
-                # pylint: disable=cell-var-from-loop
+            catalog_dict = dict()
+            catalogs = catalogs_determining_func(
+                host=host,
+                host_id=host_id,
+                using_dr8_by_default=("dr8" in self._database.decals_file_path_pattern),
+            )
+            for catalog_name in catalogs:
                 try:
                     cat = self._database[catalog_name, host_id].read()
                 except OSError:
                     print(
                         time.strftime("[%m/%d %H:%M:%S]"),
-                        "[WARNING] Not found: {} catalog for {}!!.".format(
-                            catalog_name.upper(), host_id
-                        ),
+                        "[WARNING] Not found: {} catalog for {}!!.".format(catalog_name.upper(), host_id),
                     )
-                    return
-                return cat[build.WISE_COLS_USED] if catalog_name == "wise" else cat
-
-            catalog_dict = {k.partition("_")[0]: get_catalog_or_none(k) for k in catalogs}
+                    continue
+                if catalog_name == "wise":
+                    cat = cat[build.WISE_COLS_USED]
+                catalog_dict[catalog_name.partition("_")[0]] = cat
 
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
                 "Use {} to build base catalog {} for {}".format(
-                    ", ".join((k for k, v in catalog_dict.items() if v is not None)).upper(),
+                    ", ".join(catalog_dict).upper(),
                     version_postfix.lstrip("_"),
                     host_id,
                 ),
@@ -609,6 +640,7 @@ class ObjectCatalog(object):
                 base = build_module.build_full_stack(
                     host=host,
                     nsa=nsa,
+                    sga=sga,
                     spectra=spectra,
                     halpha=halpha,
                     convert_to_sdss_filters=convert_to_sdss_filters,
@@ -649,11 +681,12 @@ class ObjectCatalog(object):
                 failed_count += 1
                 continue
 
+            del base
+            gc.collect()
+
         print(
             time.strftime("[%m/%d %H:%M:%S]"),
-            "All done building base catalogs for {}/{} hosts.".format(
-                nhosts - failed_count, nhosts
-            ),
+            "All done building base catalogs for {}/{} hosts.".format(nhosts - failed_count, nhosts),
         )
 
         if return_catalogs:
@@ -757,18 +790,14 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_approx"].append(
-            Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum()
-        )
+        data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
         data["sats_missed_corrected"].append(
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )
 
         return data
 
-    def generate_object_stats(
-        self, hosts="build_default", save_to=None, overwrite=False, generate_func=None
-    ):
+    def generate_object_stats(self, hosts="build_default", save_to=None, overwrite=False, generate_func=None):
         """
         generate object statistics for *hosts*
         """
