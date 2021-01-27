@@ -113,7 +113,7 @@ relaxed_cut_rz = Query("rz - abs(rz_err)*2 + 0.06 * (r_mag - 14) < 1.05") | (~va
 
 very_relaxed_cut_sb = Query("sb_r + abs(sb_r_err)*2 - 0.6 * (r_mag - 14) > 17.5") | (~valid_sb)
 
-ba_cut = Query("ba > (r_mag - 20.75) * 0.05 + 0.3")
+ba_cut = Query("ba > (r_mag - 20.75) * 0.08 + 0.3")
 
 orig_high_priority_cuts = Query(
     high_priority_sb,

@@ -603,17 +603,17 @@ def assign_targeting_score_v3(
     **kwargs,
 ):
     """
-    Last updated: 01/24/2021
+    Last updated: 01/27/2021
      100 Human selection and Special targets
      150 sats without AAT/MMT/PAL specs
      180 low-z (z < 0.05) but ZQUALITY = 2
-     200 within host & r < 20.75, bright in primary targeting region -OR- very low SB -OR- very high p_sat
-     300 within host & r < 20.75, primary targeting region, the higher p_sat half
-     400 within host & r < 20.75, primary targeting region, the lower p_sat half
-     500 within host & bright (relaxed) -OR- outwith host & bright in primary targeting region
-     600 outwith host & r < 20.75, main targeting cuts, limit to 100
-     700 within host, relaxed targeting cuts (i.e., slightly outside of primary targeting region)
-     800 within host, everything else in griz cuts
+     200 within host & r < 20.65, bright in paper2+ba cuts -OR- very low SB -OR- very high p_sat
+     300 within host & r < 20.65, paper2+ba cuts, the higher p_sat half
+     400 within host & r < 20.65, paper2+ba cuts, the lower p_sat half
+     500 within host & bright (padded paper2 cuts + ba cut) -OR- outwith host & bright in paper2+ba cuts
+     600 within host & r < 20.65 padded paper2 cuts + ba cut, limit to 100
+     700 outwith host & r < 20.65, paper2+ba cuts, limit to 100
+     800 within host, everything else in some very relaxed cuts, limit to 150
      900 within host, everything else
     1000 everything else
     1200 Not galaxy
@@ -624,14 +624,14 @@ def assign_targeting_score_v3(
 
     clean_galaxy = C.is_clean2 & C.is_galaxy2
     within_host = C.sat_rcut
-    loose_faint_limit = "r_mag < 20.9"
+    loose_faint_limit = "r_mag < 20.85"
     padded_faint_limit = C.faint_end_limit2
     main_targeting_cuts = C.paper2_targeting_cut & C.ba_cut
+    padded_targeting_cuts = C.relaxed_targeting_cuts & C.ba_cut
     very_relaxed_targeting_cuts = Query(C.very_relaxed_cut_sb, C.gr_cut_tight | C.relaxed_cut_gr)
 
     basic_loose = Query(very_relaxed_targeting_cuts, clean_galaxy, loose_faint_limit)
-    basic = Query(very_relaxed_targeting_cuts, C.basic_cut2)
-    basic |= Query(main_targeting_cuts, clean_galaxy, within_host, padded_faint_limit)
+    basic = Query(basic_loose, within_host, C.faint_end_limit)
 
     if not ignore_specs:
         basic_loose = Query(basic_loose, ~C.has_spec)
@@ -654,18 +654,19 @@ def assign_targeting_score_v3(
 
     bright = Query(exclusion_cuts, C.sdss_limit)
     bright_main = Query(bright, main_targeting_cuts)
+    bright_padded = Query(bright, padded_targeting_cuts)
 
     fill_values_by_query(base, Query(C.basic_cut2), {"TARGETING_SCORE": 900})
     fill_values_by_query(base, Query(basic), {"TARGETING_SCORE": 800})
-    fill_values_by_query(base, Query(basic, C.relaxed_targeting_cuts), {"TARGETING_SCORE": 700})
+    fill_values_by_query(base, Query(basic_loose, C.faint_end_limit, C.main_targeting_cuts), {"TARGETING_SCORE": 700})
     fill_values_by_query(
         base,
-        Query(basic_loose, padded_faint_limit, main_targeting_cuts),
+        Query(basic, padded_targeting_cuts),
         {"TARGETING_SCORE": 600},
     )
     fill_values_by_query(
         base,
-        Query(basic_loose, bright_main) | Query(basic, bright, C.relaxed_targeting_cuts),
+        Query(basic_loose, bright_main) | Query(basic, bright_padded),
         {"TARGETING_SCORE": 500},
     )
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
@@ -715,9 +716,9 @@ def assign_targeting_score_v3(
 
     for score_to_limit, new_score, n_limit, random_choice in (
         (300, 400, 0, False),
-        (600, 1000, 100, False),
-        (700, 800, 100, False),
-        (800, 900, 200, True),
+        (600, 800, 100, False),
+        (700, 1000, 100, False),
+        (800, 900, 150, True),
     ):
         score_this = Query("TARGETING_SCORE == {}".format(score_to_limit))
         n = score_this.count(base)
