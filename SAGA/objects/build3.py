@@ -70,6 +70,11 @@ MERGED_CATALOG_COLUMNS = list(
 )
 
 
+def prepare_objid(catalog):
+    release_short = (catalog["RELEASE"] // 1000) * 10 + catalog["RELEASE"] % 10
+    return release_short * np.int64(1e16) + catalog["BRICKID"] * np.int64(1e10) + catalog["OBJID"].astype(np.int64)
+
+
 def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None, trim=True):
     """
     Refs:
@@ -104,11 +109,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     ).filter(catalog)
 
     # Assign OBJID
-    release_short = (catalog["RELEASE"] // 1000) * 10 + catalog["RELEASE"] % 10
-    catalog["OBJID"] = (
-        release_short * np.int64(1e16) + catalog["BRICKID"] * np.int64(1e10) + catalog["OBJID"].astype(np.int64)
-    )
-    del release_short
+    catalog["OBJID"] = prepare_objid(catalog)
 
     # Do galaxy/star separation
     catalog["is_galaxy"] = QueryMaker.not_equal("TYPE", "PSF").mask(catalog)
