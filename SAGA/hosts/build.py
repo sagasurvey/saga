@@ -341,32 +341,8 @@ def add_selection_flags(d):
     d["HOST_SCORE"] += (env_allowed & sample_preferred).mask(d).astype(np.int) * 2
     assert ((env_preferred & sample_preferred).filter(d, "HOST_SCORE") == 4).all()
 
-    image_allowed = Query(
-        (
-            lambda *cols: np.amax(np.vstack(cols), axis=0) >= 0.99,
-            "COVERAGE_DECALS_DR6",
-            "COVERAGE_DECALS_DR7",
-            "COVERAGE_DES_DR1",
-            "COVERAGE_SDSS",
-        ),
-        (
-            lambda c1, c2: np.maximum(c1, c2) >= 0.85,
-            "COVERAGE_DES_DR1",
-            "COVERAGE_SDSS",
-        ),
-    )
-
-    image_preferred = Query(
-        image_allowed,
-        (
-            lambda d6, d7, de, s: ((de >= 0.99) | (np.median(np.vstack([np.maximum(d6, d7), de, s]), axis=0) >= 0.95)),
-            "COVERAGE_DECALS_DR6",
-            "COVERAGE_DECALS_DR7",
-            "COVERAGE_DES_DR1",
-            "COVERAGE_SDSS",
-        ),
-    )
-
+    image_allowed = Query("COVERAGE_DECALS_DR9 >= 0.95")
+    image_preferred = Query("COVERAGE_DECALS_DR9 >= 0.99")
     d["HAS_IMAGE"] = image_allowed.mask(d).astype(np.int)
     d["HAS_IMAGE"] += image_preferred.mask(d).astype(np.int)
 

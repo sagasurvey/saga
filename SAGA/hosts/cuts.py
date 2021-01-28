@@ -35,12 +35,12 @@ _list_by_pgc = {
     # fmt: on
 }
 
-has_decals_image = Query("COVERAGE_DECALS_DR6 >= 0.99") | Query("COVERAGE_DECALS_DR7 >= 0.99")
-has_des_image = Query("COVERAGE_DES_DR1 >= 0.99")
-has_sdss_image = Query("COVERAGE_SDSS >= 0.99")
-has_decals_dr8_image = Query("COVERAGE_DECALS_DR8 >= 0.99")
+has_decals_image = Query("COVERAGE_DECALS_DR9 >= 0.95")
+has_des_image = Query("COVERAGE_DES_DR1 >= 0.95")
+has_sdss_image = Query("COVERAGE_SDSS >= 0.95")
+has_decals_dr8_image = Query("COVERAGE_DECALS_DR8 >= 0.95")
 
-has_image = Query("HAS_IMAGE > 0") | has_decals_dr8_image
+has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
 
 potential_hosts = Query("HOST_SCORE > 0")
