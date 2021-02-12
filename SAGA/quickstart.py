@@ -66,8 +66,6 @@ class QuickStart:
     def database(self):
         if self._database is None:
             self._database = Database(self._shared_dir, self._local_dir)
-            if self._lowz:
-                self._database.set_default_base_version("v2")
         return self._database
 
     @property

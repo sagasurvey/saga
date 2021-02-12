@@ -142,13 +142,17 @@ def _determine_raw_catalogs_saga_v3(host, **kwargs):
     return tuple(catalogs)
 
 
-def _determine_raw_catalogs_lowz(host_id, **kwargs):
+def _determine_raw_catalogs_lowz_v2(host_id, **kwargs):
     field_name = str(host_id)
     if any(field_name.startswith(s) for s in ["GD1", "300S", "Jet", "Styx"]):
         return ("decals_dr67",)
     if any(field_name.startswith(s) for s in ["p13"]):
         return ("decals_dr8",)
     return ("des",)
+
+
+def _determine_raw_catalogs_lowz_v3(**kwargs):
+    return ("decals_dr9",)
 
 
 class ObjectCatalog(object):
@@ -504,15 +508,6 @@ class ObjectCatalog(object):
             build_module = build
             manual_keys = [("sdss", "SDSS ID")]
             catalogs_determining_func = _determine_raw_catalogs_saga_v1
-        elif HOSTID_COLNAME == "field_id":
-            build_module = build2
-            manual_keys = [
-                ("des", "DES_OBJID"),
-                ("decals", "decals_objid"),
-                ("decals_dr8", "OBJID"),
-                ("shreds", "OBJID"),
-            ]
-            catalogs_determining_func = _determine_raw_catalogs_lowz
         elif build_version < 3:
             build_module = build2
             manual_keys = [
@@ -522,13 +517,19 @@ class ObjectCatalog(object):
                 ("decals_dr8", "OBJID"),
                 ("shreds", "OBJID"),
             ]
-            catalogs_determining_func = _determine_raw_catalogs_saga_v2
+            if HOSTID_COLNAME == "field_id":
+                catalogs_determining_func = _determine_raw_catalogs_lowz_v2
+            else:
+                catalogs_determining_func = _determine_raw_catalogs_saga_v2
         else:
             build_module = build3
             manual_keys = [
                 ("decals_dr9", "OBJID"),
             ]
-            catalogs_determining_func = _determine_raw_catalogs_saga_v3
+            if HOSTID_COLNAME == "field_id":
+                catalogs_determining_func = _determine_raw_catalogs_lowz_v3
+            else:
+                catalogs_determining_func = _determine_raw_catalogs_saga_v3
 
         if use_nsa:
             nsa = self.load_nsa("0.1.2" if build_version < 2 else "1.0.1")
