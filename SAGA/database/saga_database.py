@@ -67,6 +67,12 @@ known_google_sheets = {
         header_start=1,
         include_names=["OBJID"],
     ),
+    "decals_dr9_lowz_remove": GoogleSheets(
+        "1Oi1cSVIOORCMBFz_gU1_yn9bUSrr-GUjk8axuUS-DO4",
+        96219784,
+        header_start=1,
+        include_names=["OBJID"],
+    ),
     "shreds_recover": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         763845590,

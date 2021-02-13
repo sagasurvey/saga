@@ -523,12 +523,15 @@ class ObjectCatalog(object):
                 catalogs_determining_func = _determine_raw_catalogs_saga_v2
         else:
             build_module = build3
-            manual_keys = [
-                ("decals_dr9", "OBJID"),
-            ]
             if HOSTID_COLNAME == "field_id":
+                manual_keys = [
+                    ("decals_dr9_lowz", "OBJID"),
+                ]
                 catalogs_determining_func = _determine_raw_catalogs_lowz_v3
             else:
+                manual_keys = [
+                    ("decals_dr9", "OBJID"),
+                ]
                 catalogs_determining_func = _determine_raw_catalogs_saga_v3
 
         if use_nsa:
