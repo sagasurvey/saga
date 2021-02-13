@@ -432,14 +432,16 @@ class DesQuery(DownloadableBase):
         d.imaflags_iso_r,
         (CASE WHEN d.wavg_spread_model_r=-99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
         (CASE WHEN d.wavg_spreaderr_model_r=-99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
-        from des_dr1.main d where
+        from {table_name} d where
         q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
 
-    def __init__(self, ra, dec, radius=1.0):
-        self.query = self.construct_query(ra, dec, radius)
+    _default_table_name = "des_dr1.main"
+
+    def __init__(self, ra, dec, radius=1.0, table_name=None):
+        self.query = self.construct_query(ra, dec, radius, table_name)
 
     @classmethod
-    def construct_query(cls, ra, dec, radius=1.0):
+    def construct_query(cls, ra, dec, radius=1.0, table_name=None):
         """
         Generates the query to send to the DES to get the full DES catalog around
         a target.
@@ -462,6 +464,7 @@ class DesQuery(DownloadableBase):
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
         r_deg = ensure_deg(radius)
+        table_name = str(table_name or cls._default_table_name)
 
         # ``**locals()`` means "use the local variable names to fill the template"
         q = cls._query_template.format(**locals())
