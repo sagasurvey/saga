@@ -406,8 +406,102 @@ class SdssQuery(DownloadableBase):
                 shutil.copyfileobj(r, f_out)
 
 
-class DesQuery(DownloadableBase):
+class DatalabQuery(DownloadableBase):
 
+    _query_template = None  # to be implemented by subclass
+
+    def __init__(self, *args, **kwargs):
+        self.query = None
+        if self._query_template:
+            self.set_query(self.construct_query(*args, **kwargs))
+
+    @classmethod
+    def construct_query(cls, ra, dec, radius=1.0, **kwargs):
+        """
+        Generates the query to send to the DES to get the full DES catalog around
+        a target.
+
+        Parameters
+        ----------
+        ra : `Quantity` or float
+            The center/host RA (in degrees if float)
+        dec : `Quantity` or float
+            The center/host Dec (in degrees if float)
+        radius : `Quantity` or float
+            The radius to search out to (in degrees if float)
+
+        Returns
+        -------
+        query : str
+            The SQL query to send to the Datalab skyserver
+        """
+        # pylint: disable=possibly-unused-variable
+        ra = ensure_deg(ra)
+        dec = ensure_deg(dec)
+        r_deg = ensure_deg(radius)
+
+        # ``**locals()`` means "use the local variable names to fill the template"
+        q = cls._query_template.format(**locals())
+        q = re.sub(r"\s+", " ", q).strip()
+        q = re.sub(", ", ",", q)
+        return q
+
+    def set_query(self, query):
+        self.query = str(query)
+
+    def get_colnames_from_query(self, query=None):
+        if query is None:
+            query = self.query
+
+        cols = []
+        for item in query.lower().partition(" from ")[0].split(","):
+            _, has_as, name = item.rpartition(" as ")
+            if not has_as:
+                _, has_dot, name = item.rpartition(".")
+                if not has_dot:
+                    name = item
+            cols.append(name.strip())
+        return cols
+
+    def run_query(self, query=None):
+        if query is None:
+            query = self.query
+
+        if _HAS_DATALAB_:
+            raw = dl.queryClient.query(sql=query)
+            return Table.read(raw, format="ascii.fast_csv")
+
+        cols = self.get_colnames_from_query(query)
+
+        # taken from https://github.com/noaodatalab/datalab/blob/master/dl/queryClient.py#L1791
+        r = requests.get(
+            "https://datalab.noao.edu/query/query",
+            {"sql": query, "ofmt": "ascii", "async": False},
+            headers={
+                "Content-Type": "application/octet-stream",
+                "X-DL-AuthToken": "anonymous.0.0.anon_access",
+            },
+            timeout=(120, 3600),
+        )
+        if not r.ok or not r.text:
+            raise requests.RequestException('DES query failed: "{}"'.format(r.text))
+
+        t = Table.read(r.text, format="ascii.fast_tab", names=cols)
+        r.close()
+
+        return t
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if os.path.isfile(file_path) and not overwrite:
+            return
+        t = self.run_query()
+        file_open = gzip.open if compress else open
+        makedirs_if_needed(file_path)
+        with file_open(file_path, "wb") as f:
+            t.write(f, format="fits")
+
+
+class DesQuery(DatalabQuery):
     _query_template = """select
         d.COADD_OBJECT_ID as OBJID,
         d.ALPHAWIN_J2000 as RA,
@@ -432,91 +526,32 @@ class DesQuery(DownloadableBase):
         d.imaflags_iso_r,
         (CASE WHEN d.wavg_spread_model_r=-99 THEN d.spread_model_r ELSE d.wavg_spread_model_r END) as spread_model_r,
         (CASE WHEN d.wavg_spreaderr_model_r=-99 THEN d.spreaderr_model_r ELSE d.wavg_spreaderr_model_r END) as spreaderr_model_r
-        from {table_name} d where
+        from des_dr1.main d where
         q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})"""
 
-    _default_table_name = "des_dr1.main"
 
-    def __init__(self, ra, dec, radius=1.0, table_name=None):
-        self.query = self.construct_query(ra, dec, radius, table_name)
-
-    @classmethod
-    def construct_query(cls, ra, dec, radius=1.0, table_name=None):
-        """
-        Generates the query to send to the DES to get the full DES catalog around
-        a target.
-
-        Parameters
-        ----------
-        ra : `Quantity` or float
-            The center/host RA (in degrees if float)
-        dec : `Quantity` or float
-            The center/host Dec (in degrees if float)
-        radius : `Quantity` or float
-            The radius to search out to (in degrees if float)
-
-        Returns
-        -------
-        query : str
-            The SQL query to send to the SDSS skyserver
-        """
-        # pylint: disable=possibly-unused-variable
-        ra = ensure_deg(ra)
-        dec = ensure_deg(dec)
-        r_deg = ensure_deg(radius)
-        table_name = str(table_name or cls._default_table_name)
-
-        # ``**locals()`` means "use the local variable names to fill the template"
-        q = cls._query_template.format(**locals())
-        q = re.sub(r"\s+", " ", q).strip()
-        q = re.sub(", ", ",", q)
-        return q
-
-    @staticmethod
-    def get_colnames_from_query(query):
-        cols = []
-        for item in query.lower().partition(" from ")[0].split(","):
-            _, has_as, name = item.rpartition(" as ")
-            if not has_as:
-                _, has_dot, name = item.rpartition(".")
-                if not has_dot:
-                    name = item
-            cols.append(name.strip())
-        return cols
-
-    def run_query(self):
-        if _HAS_DATALAB_:
-            raw = dl.queryClient.query(sql=self.query)
-            return Table.read(raw, format="ascii.fast_csv")
-
-        cols = self.get_colnames_from_query(self.query)
-
-        # taken from https://github.com/noaodatalab/datalab/blob/master/dl/queryClient.py#L1791
-        r = requests.get(
-            "https://datalab.noao.edu/query/query",
-            {"sql": self.query, "ofmt": "ascii", "async": False},
-            headers={
-                "Content-Type": "application/octet-stream",
-                "X-DL-AuthToken": "anonymous.0.0.anon_access",
-            },
-            timeout=(120, 3600),
-        )
-        if not r.ok or not r.text:
-            raise requests.RequestException('DES query failed: "{}"'.format(r.text))
-
-        t = Table.read(r.text, format="ascii.fast_tab", names=cols)
-        r.close()
-
-        return t
-
-    def download_as_file(self, file_path, overwrite=False, compress=True):
-        if os.path.isfile(file_path) and not overwrite:
-            return
-        t = self.run_query()
-        file_open = gzip.open if compress else open
-        makedirs_if_needed(file_path)
-        with file_open(file_path, "wb") as f:
-            t.write(f, format="fits")
+class DelveQuery(DatalabQuery):
+    _query_template = """select
+        d.quick_object_id as OBJID,
+        d.ra as RA,
+        d.dec as DEC,
+        (d.mag_auto_g - d.extinction_g) as g_mag,
+        (d.mag_auto_r - d.extinction_r) as r_mag,
+        (d.mag_auto_i - d.extinction_i) as i_mag,
+        (d.mag_auto_z - d.extinction_z) as z_mag,
+        d.magerr_auto_g as g_err,
+        d.magerr_auto_r as r_err,
+        d.magerr_auto_i as i_err,
+        d.magerr_auto_z as z_err,
+        d.a_image_r as radius,
+        (d.b_image_r / d.a_image_r) as ba,
+        d.theta_image_r as phi,
+        d.extended_class_r as morphology_info,
+        (CASE WHEN d.extended_class_r=3 THEN 1 ELSE 0 END) as is_galaxy,
+        (d.flags_g * 100 + d.flags_r) as REMOVE
+        from delve_dr1.objects d where
+        q3c_radial_query(d.ra, d.dec, {ra:.7g}, {dec:.7g}, {r_deg:.7g})
+        and d.mag_auto_r < 23.5"""
 
 
 class DecalsPrebuilt(DownloadableBase):

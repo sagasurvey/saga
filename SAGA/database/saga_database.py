@@ -424,6 +424,7 @@ class Database(object):
             "sdss_dr12": os.path.join(self._local_dir, "external_catalogs", "sdss_dr12", "{}.fits.gz"),
             "wise": os.path.join(self._local_dir, "external_catalogs", "wise", "{}.fits.gz"),
             "des_dr1": os.path.join(self._local_dir, "external_catalogs", "des_dr1", "{}_des_dr1.fits.gz"),
+            "delve_dr1": os.path.join(self._local_dir, "external_catalogs", "delve_dr1", "{}_delve_dr1.fits.gz"),
             "decals_dr67": os.path.join(self._local_dir, "external_catalogs", "decals", "{}_decals.fits.gz"),
             "decals_dr8": os.path.join(
                 self._local_dir,
@@ -591,5 +592,6 @@ class Database(object):
             self._file_path_pattern["sdss"] = self._file_path_pattern["sdss_dr16"]
             self._file_path_pattern["des"] = self._file_path_pattern["des_dr1"]
             self._file_path_pattern["decals"] = self._file_path_pattern["decals_dr9"]
+            self._file_path_pattern["delve"] = self._file_path_pattern["delve_dr1"]
 
         self.base_file_path_pattern = self._file_path_pattern["base_" + version_postfix]

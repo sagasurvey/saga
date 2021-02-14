@@ -151,7 +151,10 @@ def _determine_raw_catalogs_lowz_v2(host_id, **kwargs):
     return ("des",)
 
 
-def _determine_raw_catalogs_lowz_v3(**kwargs):
+def _determine_raw_catalogs_lowz_v3(host_id, **kwargs):
+    field_name = str(host_id)
+    if any(field_name.startswith(s) for s in ["Pal15"]):
+        return ("delve_dr1",)
     return ("decals_dr9",)
 
 

@@ -186,6 +186,36 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     return catalog
 
 
+def prepare_delve_catalog_for_merging(catalog, to_remove=None, to_recover=None, trim=True):
+    cols = ["objid", "ra", "dec", "remove"]
+    catalog.rename_columns(cols, [c.upper() for c in cols])
+    for b in "griz":
+        catalog[f"{b}_mag"] = catalog[f"{b}_mag"].astype(np.float32)
+        catalog[f"{b}_err"] = catalog[f"{b}_err"].astype(np.float32)
+    catalog["u_mag"] = np.float32(99.0)
+    catalog["u_err"] = np.float32(99.0)
+    catalog["morphology_info"] = catalog["morphology_info"].astype(np.int32)
+    catalog["is_galaxy"] = catalog["is_galaxy"].astype(bool)
+    catalog["radius_err"] = catalog["radius"] * 1.0e-4
+    catalog["REF_CAT"] = '  '
+    catalog["SGA_ID"] = -1
+
+    if trim:
+        catalog = catalog[MERGED_CATALOG_COLUMNS]
+    catalog["survey"] = "delve"
+    catalog["OBJID_delve"] = catalog["OBJID"]
+    catalog["REMOVE_delve"] = catalog["REMOVE"]
+
+    if to_remove is not None:
+        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int)
+
+    if to_recover is not None:
+        idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
+        catalog["REMOVE"][idx] = 0
+
+    return catalog
+
+
 SPEC_MATCHING_ORDER = (
     (Query("SPEC_Z < 0.002", "REMOVE == 0", "is_galaxy == 0", "sep < 5"), "sep"),
     (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "sep < 5"), "sep"),
@@ -374,6 +404,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     halpha=None,
     shreds_recover=None,
     debug=None,
+    delve=None,
+    delve_remove=None,
+    delve_recover=None,
     **kwargs,
 ):
     """
@@ -384,10 +417,14 @@ def build_full_stack(  # pylint: disable=unused-argument
     -------
     base : astropy.table.Table
     """
-    if decals is None:
+    if decals is not None:
+        base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
+        del decals, decals_remove, decals_recover
+    elif delve is not None:
+        base = prepare_delve_catalog_for_merging(delve, delve_remove, delve_recover)
+        del delve, delve_remove, delve_recover
+    else:
         raise ValueError("No photometry catalog to build!")
-    base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
-    del decals, decals_remove, decals_recover
 
     base = build.add_host_info(base, host)
     base = build2.add_columns_for_spectra(base)
