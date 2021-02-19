@@ -31,7 +31,7 @@ _list_by_pgc = {
         35294, 37483, 38802, 40284, 41083, 48815, 49342, 50031, 51340,
         51471, 51620, 52273, 52735, 53499, 54119, 55588, 58470, 59426,
         64725, 66318, 66934, 67782, 67817, 68743, 69349, 70795, 71883,
-    )
+    ),
     # fmt: on
 }
 
@@ -48,6 +48,21 @@ good_exceptions = QueryMaker.in1d("HOSTID", ("nsa163956", "nsa135739", "pgc67817
 good_hosts = Query("HOST_SCORE >= 4") | good_exceptions
 good = good_hosts & has_image
 build_default = potential_hosts & has_image
+cos_saga = QueryMaker.in1d(
+    "HOSTID",
+    (
+        "nsa85746",
+        "nsa85746",
+        "nsa85746",
+        "nsa140594",
+        "nsa13927",
+        "nsa144953",
+        "nsa165082",
+        "nsa165153",
+        "nsa165707",
+        "nsa147606",
+    ),
+)
 
 hostlist_v1 = QueryMaker.in1d("PGC", _list_by_pgc["hostlist_v1"])
 paper1_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper1_complete"])
