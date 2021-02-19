@@ -197,7 +197,7 @@ def prepare_delve_catalog_for_merging(catalog, to_remove=None, to_recover=None, 
     catalog["morphology_info"] = catalog["morphology_info"].astype(np.int32)
     catalog["is_galaxy"] = catalog["is_galaxy"].astype(bool)
     catalog["radius_err"] = catalog["radius"] * 1.0e-4
-    catalog["REF_CAT"] = '  '
+    catalog["REF_CAT"] = "  "
     catalog["SGA_ID"] = -1
 
     if trim:
