@@ -19,6 +19,7 @@ __all__ = [
     "assign_targeting_score_v2",
     "assign_targeting_score_v2plus",
     "assign_targeting_score_v3",
+    "assign_targeting_score_v3_extended",
     "assign_targeting_score_lowz",
     "assign_targeting_score_lowz_v2",
     "calc_simple_satellite_probability",
@@ -719,6 +720,157 @@ def assign_targeting_score_v3(
         (600, 800, 100, False),
         (700, 1000, 100, False),
         (800, 900, 150, True),
+    ):
+        score_this = Query("TARGETING_SCORE == {}".format(score_to_limit))
+        n = score_this.count(base)
+        if n > n_limit:
+            if random_choice:
+                # pylint: disable=no-member
+                idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
+                base["TARGETING_SCORE"][idx] = new_score
+            else:
+                n_cut = (n_limit - 1) if n_limit else (n // 2)
+                p_cut = score_this.filter(base, "p_sat_corrected")[n_cut]
+                fill_values_by_query(
+                    base,
+                    Query(score_this, (lambda p: p < p_cut, "p_sat_corrected")),
+                    {"TARGETING_SCORE": new_score},
+                )
+
+    p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
+    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
+    base["TARGETING_SCORE"] += np.where(base["TARGETING_SCORE"] >= 200, p, p // 10)
+
+    base.sort("TARGETING_SCORE")
+    return base
+
+
+def assign_targeting_score_v3_extended(
+    base,
+    manual_selected_objids=None,
+    ignore_specs=False,
+    debug=False,
+    n_random=50,
+    seed=123,
+    remove_lists=None,
+    low_priority_objids=None,
+    **kwargs,
+):
+    """
+    Last updated: 04/09/2021
+     100 Human selection and Special targets
+     150 sats without AAT/MMT/PAL specs
+     180 low-z (z < 0.05) but ZQUALITY = 2
+     190 within host & r < 20.65, bright in paper2+ba cuts -OR- very low SB -OR- very high p_sat
+     200 within host & r < 20.65, paper2 + ba cuts
+     300 within host & r < 20.65, padded paper2 cuts + ba cut, limit to 150
+     400 within host & r < 20.65, more padded paper2 cuts + ba cut, limit to 150
+     500 outwith host & r < 20.65, paper2 + ba cuts, limit to 100
+     600 within host & r < 20.8, paper2 + ba cuts
+     700 within host & r < 20.8, padded paper2 cuts + ba cut, limit to 150
+     800 within host & r < 20.8, more padded paper2 cuts + ba cut, limit to 150
+     900 within host & r < 20.8 everything else
+    1000 everything else
+    1200 Not galaxy
+    1300 Not clean
+    1350 Removed by hand
+    1400 Has spec already
+    """
+
+    clean_galaxy = C.is_clean2 & C.is_galaxy2
+    within_host = C.sat_rcut
+    padded_faint_limit = "r_mag < 20.8"
+    main_targeting_cuts = C.paper2_targeting_cut & C.ba_cut
+    padded_targeting_cuts = C.relaxed_targeting_cuts & C.ba_cut
+    very_relaxed_targeting_cuts = Query(C.very_relaxed_cut_sb, C.gr_cut_tight | C.relaxed_cut_gr)
+
+    basic_loose = Query(very_relaxed_targeting_cuts, clean_galaxy, padded_faint_limit)
+    basic = Query(basic_loose, within_host, C.faint_end_limit)
+
+    if not ignore_specs:
+        basic_loose = Query(basic_loose, ~C.has_spec)
+        basic = Query(basic, ~C.has_spec)
+
+    base = add_cut_scores(base)
+    base["TARGETING_SCORE"] = 1000
+
+    exclusion_cuts = Query()
+
+    if low_priority_objids is not None:
+        exclusion_cuts = Query(exclusion_cuts, QueryMaker.in1d("OBJID", low_priority_objids, invert=True))
+
+    very_low_sb_cut = Query(
+        padded_faint_limit,
+        C.valid_sb,
+        main_targeting_cuts,
+        Query("score_sb_r >= 21.5") | Query("sb_r >= 25.5"),
+    )
+
+    bright = Query(exclusion_cuts, C.sdss_limit)
+    bright_main = Query(bright, main_targeting_cuts)
+
+    fill_values_by_query(base, Query(C.basic_cut2), {"TARGETING_SCORE": 900})
+    fill_values_by_query(base, Query(basic_loose, within_host, C.ba_cut), {"TARGETING_SCORE": 800})
+    fill_values_by_query(base, Query(basic_loose, within_host, padded_targeting_cuts), {"TARGETING_SCORE": 700})
+    fill_values_by_query(base, Query(basic_loose, within_host, main_targeting_cuts), {"TARGETING_SCORE": 600})
+    fill_values_by_query(
+        base,
+        Query(basic_loose, C.faint_end_limit, main_targeting_cuts),
+        {"TARGETING_SCORE": 500},
+    )
+    fill_values_by_query(base, Query(basic, C.ba_cut), {"TARGETING_SCORE": 400})
+    fill_values_by_query(base, Query(basic, padded_targeting_cuts), {"TARGETING_SCORE": 300})
+    fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 200})
+    fill_values_by_query(
+        base,
+        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        {"TARGETING_SCORE": 190},
+    )
+
+    fill_values_by_query(base, ~C.is_galaxy2, {"TARGETING_SCORE": 1200})
+    fill_values_by_query(base, ~C.is_clean2, {"TARGETING_SCORE": 1300})
+
+    if not ignore_specs:
+        fill_values_by_query(base, C.has_spec, {"TARGETING_SCORE": 1400})
+
+        fill_values_by_query(
+            base,
+            Query(basic_loose, "ZQUALITY == 2", "SPEC_Z < 0.05"),
+            {"TARGETING_SCORE": 180},
+        )
+
+        fill_values_by_query(
+            base,
+            Query(
+                C.is_sat,
+                (lambda x: (x != "AAT") & (x != "MMT") & (x != "PAL"), "TELNAME"),
+            ),
+            {"TARGETING_SCORE": 150},
+        )
+
+    if remove_lists is not None and "decals" in remove_lists:
+        fill_values_by_query(
+            base,
+            Query(C.is_clean2, QueryMaker.isin("OBJID", remove_lists["decals"])),
+            {"TARGETING_SCORE": 1350},
+        )
+
+    if manual_selected_objids is not None:
+        q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
+        if not ignore_specs:
+            q &= ~C.has_spec
+        fill_values_by_query(base, q, {"TARGETING_SCORE": 100})
+
+    base["p_sort"] = -base["p_sat_corrected"]
+    base.sort(["TARGETING_SCORE", "p_sort"])
+    del base["p_sort"]
+
+    for score_to_limit, new_score, n_limit, random_choice in (
+        (300, 400, 150, False),
+        (400, 700, 150, False),
+        (700, 800, 150, False),
+        (800, 900, 150, False),
+        (500, 1000, 100, False),
     ):
         score_this = Query("TARGETING_SCORE == {}".format(score_to_limit))
         n = score_this.count(base)
