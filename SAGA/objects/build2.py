@@ -777,6 +777,8 @@ def add_spectra(base, specs, debug=None, matching_order=None):
             10.0 ** (-0.2 * (base["r_mag"] - 20)),
             base["radius"],
         )
+    if "ba" in base_this.colnames:
+        base_this["radius_for_match"] /= np.sqrt(base_this["ba"])
     fill_values_by_query(
         base_this,
         ~Query((np.isfinite, "radius_for_match"), "radius_for_match > 0"),
@@ -889,11 +891,15 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         elif obj_this["REMOVE"] == 0:  # any other good, non-NSA objects
 
-            radius = obj_this["radius"] * 0.9
+            multiplier = 1.8
+            try:
+                radius = obj_this["sma_sb26"]
+            except KeyError:
+                radius = obj_this["radius"] * 1.1
 
             # HOT FIX for NGC7162A (330.148221, -43.140536) in pgc67817 (base v2)
             if obj_this["OBJID"] == 219806824:
-                radius = 45.0
+                radius = 50.0
 
             dist = calc_normalized_dist(
                 base["RA"],
@@ -903,12 +909,13 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
                 radius,
                 obj_this["ba"] if "ba" in obj_this.colnames else None,
                 obj_this["phi"] if "phi" in obj_this.colnames else None,
+                multiplier=multiplier,
             )
             nearby_obj_mask = dist < 1
             del dist
 
             remove_flag = 29
-            remove_radius = radius * 2.0
+            remove_radius = radius * multiplier
 
         else:
             continue  # skip anything else

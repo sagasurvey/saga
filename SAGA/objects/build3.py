@@ -61,6 +61,7 @@ MERGED_CATALOG_COLUMNS = list(
             "radius_err",
             "ba",
             "phi",
+            "sma_sb26",
             "REF_CAT",
             "SGA_ID",
         ),
@@ -128,12 +129,17 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
     # Rename/add columns
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-    catalog["radius"] = catalog["SHAPE_R"]
-    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]), 9999.0)
+
     e_abs = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
     catalog["ba"] = (1 - e_abs) / (1 + e_abs)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
+
+    # SHAPE_R is in fact semi-major axis
+    sqrt_ba = np.sqrt(catalog["ba"])
+    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba
+    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
+    del sqrt_ba
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
         catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
@@ -158,6 +164,13 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         Query(is_bass_mzls, C.valid_g_mag).mask(catalog),
         -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
         catalog["r_mag"],
+    )
+
+    # semi-major axis (sma) at iso sb=26
+    catalog["sma_sb26"] = np.where(
+        Query("r_mag > 10", "r_mag < 25").mask(catalog),
+        np.exp(2.541029 + 0.83814 * np.log(catalog["SHAPE_R"]) - 0.1077223 * catalog["r_mag"]),
+        catalog["SHAPE_R"] ** 1.02328842 * 1.395337,
     )
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
@@ -333,9 +346,7 @@ def add_sga(base, sga):
 
     base["ba"][matching_idx] = sga["BA"]
     base["phi"][matching_idx] = sga["PA"]
-    base["radius"][matching_idx] = sga["DIAM"] * 30  # DIAM in amin to radius in asec
-    base["radius_err"][matching_idx] = sga["DIAM"] * 30 * 1e-4
-
+    base["sma_sb26"][matching_idx] = sga["DIAM"] * 30
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
 
