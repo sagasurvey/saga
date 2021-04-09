@@ -153,6 +153,13 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog[f"{band}_mag"] = np.float32(99.0)
         catalog[f"{band}_err"] = np.float32(99.0)
 
+    # BASS-DECaLS r mag correction
+    catalog["r_mag"] = np.where(
+        Query(is_bass_mzls, C.valid_g_mag).mask(catalog),
+        -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
+        catalog["r_mag"],
+    )
+
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
     sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
