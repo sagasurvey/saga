@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA", "DEC", "Z_LEDA", "REF", "DIAM", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "REF", "DIAM", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -358,8 +358,8 @@ def add_sga_specs(base, sga):
     for i in np.flatnonzero(has_no_spec | has_poor_spec):
         base_idx = matching_idx[i]
         base["SPEC_REPEAT"][base_idx] = "SGA"
-        base["RA_spec"][base_idx] = sga["RA"][i]
-        base["DEC_spec"][base_idx] = sga["DEC"][i]
+        base["RA_spec"][base_idx] = sga["RA_LEDA"][i]
+        base["DEC_spec"][base_idx] = sga["DEC_LEDA"][i]
         base["SPEC_Z"][base_idx] = sga["Z_LEDA"][i]
         base["SPEC_Z_ERR"][base_idx] = v2z(100)
         base["ZQUALITY"][base_idx] = 4
