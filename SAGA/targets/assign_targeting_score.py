@@ -780,7 +780,7 @@ def assign_targeting_score_v3_extended(
     clean_galaxy = C.is_clean2 & C.is_galaxy2
     within_host = C.sat_rcut
     padded_faint_limit = "r_mag < 20.8"
-    main_targeting_cuts = C.paper2_targeting_cut & C.ba_cut
+    main_targeting_cuts = C.paper2_targeting_cut
     padded_targeting_cuts = C.relaxed_targeting_cuts & C.ba_cut
     very_relaxed_targeting_cuts = Query(C.very_relaxed_cut_sb, C.gr_cut_tight | C.relaxed_cut_gr)
 
