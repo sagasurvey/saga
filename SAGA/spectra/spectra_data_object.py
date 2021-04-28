@@ -66,8 +66,6 @@ class SpectraData(object):
                 ]
             )
 
-        all_specs.append(read_observed.read_deimos())
-
         if additional_specs:
             all_specs.extend(ensure_specs_dtype(spec) for spec in additional_specs)
 

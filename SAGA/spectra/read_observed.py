@@ -21,7 +21,6 @@ __all__ = [
     "read_aat_mz",
     "read_imacs",
     "read_wiyn",
-    "read_deimos",
     "read_palomar",
 ]
 
@@ -287,20 +286,6 @@ def read_wiyn(dir_path):
     del sc
 
     return ensure_specs_dtype(output)
-
-
-def read_deimos():
-    data = {
-        "RA": [247.825839103498, 221.86742, 150.12470],
-        "DEC": [20.210825313885, -0.28144459, 32.561687],
-        "MASKNAME": ["deimos2014", "deimos2016-DN1", "deimos2016-MD1"],
-        "SPECOBJID": [1, 1, 1],
-        "SPEC_Z": [2375 / SPEED_OF_LIGHT, 0.056, 1.08],
-        "SPEC_Z_ERR": [0.001, 0.001, 0.001],
-        "ZQUALITY": [4, 4, 4],
-        "TELNAME": ["DEIMOS", "DEIMOS", "DEIMOS"],
-    }
-    return ensure_specs_dtype(Table(data))
 
 
 def read_palomar(file_path):
