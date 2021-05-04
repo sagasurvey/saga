@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "REF", "DIAM", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "PA_LEDA", "BA_LEDA", "D25_LEDA", "REF", "DIAM", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -61,7 +61,8 @@ MERGED_CATALOG_COLUMNS = list(
             "radius_err",
             "ba",
             "phi",
-            "sma_sb26",
+            "sma",
+            "sma_err",
             "REF_CAT",
             "SGA_ID",
         ),
@@ -137,8 +138,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
     # SHAPE_R is in fact semi-major axis
     sqrt_ba = np.sqrt(catalog["ba"])
-    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba
-    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
+    catalog["sma"] = catalog["SHAPE_R"]
+    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
+    catalog["radius"] = catalog["sma"] * sqrt_ba
+    catalog["radius_err"] = catalog["sma_err"] * sqrt_ba
     del sqrt_ba
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
@@ -164,13 +167,6 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         Query(is_bass_mzls, C.valid_g_mag).mask(catalog),
         -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
         catalog["r_mag"],
-    )
-
-    # semi-major axis (sma) at iso sb=26
-    catalog["sma_sb26"] = np.where(
-        Query("r_mag > 10", "r_mag < 25").mask(catalog),
-        np.exp(2.541029 + 0.83814 * np.log(catalog["SHAPE_R"]) - 0.1077223 * catalog["r_mag"]),
-        catalog["SHAPE_R"] ** 1.02328842 * 1.395337,
     )
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
@@ -344,9 +340,12 @@ def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
 
-    base["ba"][matching_idx] = sga["BA"]
-    base["phi"][matching_idx] = sga["PA"]
-    base["sma_sb26"][matching_idx] = sga["DIAM"] * 30
+    # TODO: Switch to SGA fit when SGA bug is fixed. Using LEDA values for now.
+    base["ba"][matching_idx] = sga["BA_LEDA"]
+    base["phi"][matching_idx] = sga["PA_LEDA"]
+    base["sma"][matching_idx] = sga["D25_LEDA"] * 30
+    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-3
+
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
 

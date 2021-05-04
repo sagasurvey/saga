@@ -893,7 +893,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
             multiplier = 1.8
             try:
-                radius = obj_this["sma_sb26"]
+                radius = obj_this["sma"]
             except KeyError:
                 radius = obj_this["radius"] * 1.1
 
