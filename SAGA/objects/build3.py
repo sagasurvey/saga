@@ -343,8 +343,8 @@ def add_sga(base, sga):
     # TODO: Switch to SGA fit when SGA bug is fixed. Using LEDA values for now.
     base["ba"][matching_idx] = sga["BA_LEDA"]
     base["phi"][matching_idx] = sga["PA_LEDA"]
-    base["sma"][matching_idx] = sga["D25_LEDA"] * 30
-    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-3
+    base["sma"][matching_idx] = sga["D25_LEDA"] * 30  # DIAM in arcmin
+    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-4
 
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
