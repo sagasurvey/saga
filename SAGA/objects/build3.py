@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA", "DEC", "Z_LEDA", "REF", "DIAM", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "PA_LEDA", "BA_LEDA", "D25_LEDA", "REF", "DIAM", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -61,6 +61,8 @@ MERGED_CATALOG_COLUMNS = list(
             "radius_err",
             "ba",
             "phi",
+            "sma",
+            "sma_err",
             "REF_CAT",
             "SGA_ID",
         ),
@@ -128,12 +130,19 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
     # Rename/add columns
     catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-    catalog["radius"] = catalog["SHAPE_R"]
-    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]), 9999.0)
+
     e_abs = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
     catalog["ba"] = (1 - e_abs) / (1 + e_abs)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
+
+    # SHAPE_R is in fact semi-major axis
+    sqrt_ba = np.sqrt(catalog["ba"])
+    catalog["sma"] = catalog["SHAPE_R"]
+    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
+    catalog["radius"] = catalog["sma"] * sqrt_ba
+    catalog["radius_err"] = catalog["sma_err"] * sqrt_ba
+    del sqrt_ba
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
         catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
@@ -152,6 +161,13 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     for band in "ui":
         catalog[f"{band}_mag"] = np.float32(99.0)
         catalog[f"{band}_err"] = np.float32(99.0)
+
+    # BASS-DECaLS r mag correction
+    catalog["r_mag"] = np.where(
+        Query(is_bass_mzls, C.valid_g_mag).mask(catalog),
+        -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
+        catalog["r_mag"],
+    )
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
@@ -324,10 +340,11 @@ def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
 
-    base["ba"][matching_idx] = sga["BA"]
-    base["phi"][matching_idx] = sga["PA"]
-    base["radius"][matching_idx] = sga["DIAM"] * 30  # DIAM in amin to radius in asec
-    base["radius_err"][matching_idx] = sga["DIAM"] * 30 * 1e-4
+    # TODO: Switch to SGA fit when SGA bug is fixed. Using LEDA values for now.
+    base["ba"][matching_idx] = sga["BA_LEDA"]
+    base["phi"][matching_idx] = sga["PA_LEDA"]
+    base["sma"][matching_idx] = sga["D25_LEDA"] * 30  # DIAM in arcmin
+    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-4
 
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
@@ -358,8 +375,8 @@ def add_sga_specs(base, sga):
     for i in np.flatnonzero(has_no_spec | has_poor_spec):
         base_idx = matching_idx[i]
         base["SPEC_REPEAT"][base_idx] = "SGA"
-        base["RA_spec"][base_idx] = sga["RA"][i]
-        base["DEC_spec"][base_idx] = sga["DEC"][i]
+        base["RA_spec"][base_idx] = sga["RA_LEDA"][i]
+        base["DEC_spec"][base_idx] = sga["DEC_LEDA"][i]
         base["SPEC_Z"][base_idx] = sga["Z_LEDA"][i]
         base["SPEC_Z_ERR"][base_idx] = v2z(100)
         base["ZQUALITY"][base_idx] = 4

@@ -771,11 +771,12 @@ def add_spectra(base, specs, debug=None, matching_order=None):
         cols.append("REF_CAT")
     base_this = base[cols]
     base_this["index"] = np.arange(len(base))
+    radius_key = "sma" if "sma" in base.colnames else "radius"  # use sma if available
     with np.errstate(over="ignore"):
         base_this["radius_for_match"] = np.where(
-            Query("is_galaxy", "radius <= abs(radius_err) * 2.0").mask(base),
+            Query("is_galaxy", f"{radius_key} <= abs({radius_key}_err) * 2.0").mask(base),
             10.0 ** (-0.2 * (base["r_mag"] - 20)),
-            base["radius"],
+            base[radius_key],
         )
     fill_values_by_query(
         base_this,
@@ -889,11 +890,20 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
         elif obj_this["REMOVE"] == 0:  # any other good, non-NSA objects
 
-            radius = obj_this["radius"] * 0.9
+            multiplier = 2  # remove up to 2 times of effective radius
+
+            # if semi-major axis (sma) is available, use sma instead.
+            try:
+                radius = obj_this["sma"]
+            except KeyError:
+                radius = obj_this["radius"]
+            else:
+                # when using same, set the multiplier a bit smaller
+                multiplier = 1.8
 
             # HOT FIX for NGC7162A (330.148221, -43.140536) in pgc67817 (base v2)
             if obj_this["OBJID"] == 219806824:
-                radius = 45.0
+                radius = 50.0
 
             dist = calc_normalized_dist(
                 base["RA"],
@@ -903,12 +913,13 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
                 radius,
                 obj_this["ba"] if "ba" in obj_this.colnames else None,
                 obj_this["phi"] if "phi" in obj_this.colnames else None,
+                multiplier=multiplier,
             )
             nearby_obj_mask = dist < 1
             del dist
 
             remove_flag = 29
-            remove_radius = radius * 2.0
+            remove_radius = radius * multiplier
 
         else:
             continue  # skip anything else

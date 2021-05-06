@@ -766,6 +766,8 @@ class ObjectCatalog(object):
         d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)
         d["paper2_need_spec"] = Query(basic_targeting_cuts, C.paper2_targeting_cut, ~C.has_spec)
         d["paper2_total"] = Query(basic_targeting_cuts, C.paper2_targeting_cut)
+        d["paper3_need_spec"] = Query(basic_targeting_cuts, C.paper3_targeting_cut, ~C.has_spec)
+        d["paper3_total"] = Query(basic_targeting_cuts, C.paper3_targeting_cut)
 
         d["specs_total"] = C.has_spec
         d["specs_r_limit"] = Query(C.has_spec, C.faint_end_limit)

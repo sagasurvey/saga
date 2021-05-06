@@ -237,9 +237,9 @@ class Database(object):
             ),
             "sga_v3.0": DataObject(
                 FitsTable(
-                    "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/largegalaxies/SGA-parent-v3.0.fits"
+                    "https://portal.nersc.gov/project/cosmo/data/sga/2020/SGA-2020.fits"
                 ),
-                FitsTable(os.path.join(self._local_dir, "external_catalogs", "sga", "SGA-parent-v3.0.fits")),
+                FitsTable(os.path.join(self._local_dir, "external_catalogs", "sga", "SGA-2020.fits")),
                 use_local_first=True,
             ),
             "spectra_gama_dr2": DataObject(

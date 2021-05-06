@@ -263,12 +263,12 @@ def join_str_arr(*arrays):
     return a
 
 
-def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, cen_phi=None):
+def calc_normalized_dist(obj_ra, obj_dec, cen_ra, cen_dec, cen_r, cen_ba=None, cen_phi=None, multiplier=2.0):
     """
     obj_ra, obj_dec, cen_ra, cen_dec in degrees
-    cen_r is half-light radius in arcseconds
+    cen_r is the semi-major axis in arcseconds, set multiplier as needed
     """
-    a = cen_r * 2.0 / 3600.0
+    a = cen_r / 3600.0 * multiplier
     cos_dec = np.cos(np.deg2rad((obj_dec + cen_dec) * 0.5))
     dx = np.rad2deg(np.arcsin(np.sin(np.deg2rad(obj_ra - cen_ra)))) * cos_dec
     dy = obj_dec - cen_dec
