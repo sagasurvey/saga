@@ -87,11 +87,18 @@ paper2 = paper2_complete = QueryMaker.in1d("PGC", _list_by_pgc["paper2_complete"
 paper3 = QueryMaker.in1d("PGC", _list_by_pgc["paper3"])
 
 observed_definition = Query("specs_ours_rvir >= 100", "specs_ours_rvir < 999999")
-complete_definition = Query(
+
+complete_definition2 = Query(
     "paper2_need_spec / paper2_total < 0.2",
     "paper2_total > 0",
     "paper2_need_spec < 999999",
 )
+complete_definition3 = Query(
+    "paper3_need_spec / paper3_total < 0.2",
+    "paper3_total > 0",
+    "paper3_need_spec < 999999",
+)
+complete_definition = complete_definition3
 
 observed = good_hosts & observed_definition
 unobserved = good & (~observed_definition)
