@@ -236,7 +236,7 @@ SPEC_MATCHING_ORDER = (
     (Query("SPEC_Z < 0.002", "REMOVE == 0", "is_galaxy == 0", "sep < 5"), "sep"),
     (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "sep < 5"), "sep"),
     (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "r_mag < 17"), "sep"),
-    (Query("REMOVE == 0", "sep < 0.5", "r_mag < 21.5", Query("is_galaxy") | "sep_norm < 1"), "r_mag"),
+    (Query("REMOVE == 0", "sep < 0.5", "r_mag < 21.5", Query("is_galaxy == 0") | "sep_norm < 1"), "r_mag"),
     (Query("REMOVE == 0", QueryMaker.equal("REF_CAT", "L3"), "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep_norm < 0.5"), "r_mag"),
     (Query("REMOVE == 0", "r_mag < 21", "sep_norm < 1"), "r_mag"),
