@@ -199,8 +199,11 @@ class ObjectCatalog(object):
         add_skycoord=False,
         ensure_all_objid_cols=False,
     ):
+        # determine catalog version
         version = 2
-        if "EXTINCTION_R" in table.colnames:
+        if "REF_CAT" in table.colnames:
+            version = 3
+        elif "EXTINCTION_R" in table.colnames:
             version = 1
             for b in get_sdss_bands():
                 table["{}_mag".format(b)] = table[b] - table["EXTINCTION_{}".format(b.upper())]
@@ -224,12 +227,17 @@ class ObjectCatalog(object):
                     table[col] = -1
 
         p_sat_dict = {"p_sat_approx": 0}
+        if version == 3:
+            p_sat_params = (-1.843, 1.413, -9.746, 3.245, 0.403)
+        else:
+            p_sat_params = (-1.96, 1.507, -5.498, 0.303, 0.487)
         with np.errstate(over="ignore", invalid="ignore"):
-            table["p_sat_approx"] = calc_fiducial_p_sat(table)
+            table["p_sat_approx"] = calc_fiducial_p_sat(table, p_sat_params)
             if "HOST_DIST" in table.colnames:
                 table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(
                     table,
                     human_selected=self._database["human_selected"].read()["OBJID"],
+                    params=p_sat_params,
                 )
                 p_sat_dict["p_sat_corrected"] = 0
 
