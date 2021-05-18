@@ -157,6 +157,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
                 22.5 - const * np.log(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
             )
             catalog[f"{band}_err"] = _fill_not_finite(const / np.abs(catalog[f"SIGMA_{BAND}"]))
+            catalog[f"{band}_fibermag"] = _fill_not_finite(
+                22.5 - const * np.log(catalog[f"FIBERFLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
+            )
 
     for band in "ui":
         catalog[f"{band}_mag"] = np.float32(99.0)
