@@ -68,6 +68,9 @@ MERGED_CATALOG_COLUMNS = list(
         ),
         (b + "_mag" for b in "ugriz"),
         (b + "_err" for b in "ugriz"),
+        (
+            "r_fibermag",
+        ),
     )
 )
 
