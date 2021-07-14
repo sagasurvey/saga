@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "PA_LEDA", "BA_LEDA", "D25_LEDA", "REF", "DIAM", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -139,12 +139,12 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
 
-    # SHAPE_R is in fact semi-major axis
+    # SHAPE_R is half-light semi-major axis
+    catalog["sma"] = catalog["SHAPE_R"] * 2.0  # multiply by 2 to account for half-light
+    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * 2, 9999.0)
     sqrt_ba = np.sqrt(catalog["ba"])
-    catalog["sma"] = catalog["SHAPE_R"]
-    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
-    catalog["radius"] = catalog["sma"] * sqrt_ba
-    catalog["radius_err"] = catalog["sma_err"] * sqrt_ba
+    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba  # multiply by sqrt(ba) to get effective radius
+    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
     del sqrt_ba
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
@@ -293,8 +293,10 @@ def apply_manual_fixes(base):
         dict(
             is_galaxy=True,
             REMOVE=0,
-            radius=40.0,
-            radius_err=0.002,
+            sma=28.0,
+            sma_err=1.0,
+            radius=11.7,
+            radius_err=0.5,
             ba=0.7,
             phi=97.0,
             g_mag=13.86,
@@ -305,6 +307,27 @@ def apply_manual_fixes(base):
             z_err=0.005,
             REF_CAT="N1",
         ),
+    )
+
+    # (330.14926, -43.140017)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 901050380000007338),
+        dict(sma=100),
+    )
+
+    # (224.594532 -1.090942)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 903255060000002115),
+        dict(sma=270, ba=0.15, phi=81.0),
+    )
+
+    # (330.1370, -43.3897)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 901039870000000760),
+        dict(sma=36.0),
     )
 
     # Flipped coordinates for a galaxy/star pair in nsa126115
@@ -346,14 +369,29 @@ def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
 
-    # TODO: Switch to SGA fit when SGA bug is fixed. Using LEDA values for now.
-    base["ba"][matching_idx] = sga["BA_LEDA"]
-    base["phi"][matching_idx] = sga["PA_LEDA"]
-    base["sma"][matching_idx] = sga["D25_LEDA"] * 30  # DIAM in arcmin
-    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-4
+    use_sga = Query("SMA_MOMENT > 0")
+    use_sga &= QueryMaker.isin(
+        "PGC",
+        [
+            10060, 12342, 16065, 16152, 25217, 25999, 26068, 26932, 27734, 29009,
+            34325, 36124, 36238, 38115, 44025, 49378, 50191, 50369, 51484, 51913, 53499,
+            54120, 66619, 67818, 68590, 71834, 71926, 101219, 139206, 1016399,
+            2045076, 3087653,
+        ],
+        assume_unique=True,
+        invert=True,
+    )
+    use_sga = use_sga.mask(sga)
+
+    base["ba"][matching_idx] = np.where(use_sga, sga["BA"], sga["BA_LEDA"])
+    base["phi"][matching_idx] = np.where(use_sga, sga["PA"], sga["PA_LEDA"])
+    base["sma"][matching_idx] = np.where(use_sga, sga["SMA_MOMENT"], sga["D25_LEDA"] * 30.0 * 1.1)
+    base["sma_err"][matching_idx] = base["sma"][matching_idx] * 1e-4
 
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
+
+    base["REMOVE"][matching_idx] = 0
 
     # later we only need entries with specs
     sga = sga[sga["Z_LEDA"] > -1]
