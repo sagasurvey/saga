@@ -1,4 +1,4 @@
 """
 SAGA package version
 """
-__version__ = "0.41.4"
+__version__ = "0.42.0"
