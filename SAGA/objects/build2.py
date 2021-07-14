@@ -947,7 +947,6 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         is_brighter = Query("r_mag < {}".format(obj_this["r_mag"]))
         is_fainter = ~is_brighter
         remove_basic_conditions = Query("is_galaxy", is_fainter, "r_mag > 14")
-        remove_basic_conditions &= (Query("dist < 0.8") | Query("r_err >= 0.01"))
 
         if has_ref_cat:
             remove_basic_conditions |= has_nsa
@@ -961,7 +960,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         z_limit = v2z([300, 250, 200, 150][np.searchsorted([14, 16, 20], obj_this["r_mag"])])
         close_spec_z = Query("ZQUALITY > -1", (lambda z: np.abs(z - obj_this["SPEC_Z"]) < z_limit, "SPEC_Z"))
         good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
-        no_spec_z = Query("ZQUALITY < 2")
+        no_spec_z = Query("ZQUALITY < 2", Query("dist < 0.8") | Query("r_err >= 0.01"))
 
         to_remove = Query(remove_basic_conditions, close_spec_z | no_spec_z)
 
