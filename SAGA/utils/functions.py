@@ -85,11 +85,10 @@ def add_skycoord(table, ra_label="RA", dec_label="DEC", coord_label="coord", uni
     return table
 
 
-def get_decals_viewer_image(ra, dec, pixscale=0.2, layer="ls-dr9", size=256, out=None):  # pylint: disable=W0613
-    url = "https://www.legacysurvey.org/viewer-dev/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
-        **locals()
-    )
-    content = requests.get(url, timeout=120).content
+def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256, out=None, use_dev=False, timeout=120):  # pylint: disable=W0613
+    dev = "-dev" if use_dev else ""
+    url = f"https://www.legacysurvey.org/viewer{dev}/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}"
+    content = requests.get(url, timeout=timeout).content
     if out is not None:
         if not out.lower().endswith(".jpg"):
             out += ".jpg"
