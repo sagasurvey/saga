@@ -323,6 +323,13 @@ def apply_manual_fixes(base):
         dict(sma=270, ba=0.15, phi=81.0),
     )
 
+    # (198.1743458, 22.829911)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 904589200000000836),
+        dict(sma=60, ba=0.55, phi=50.0),
+    )
+
     # (330.1370, -43.3897)
     fill_values_by_query(
         base,
