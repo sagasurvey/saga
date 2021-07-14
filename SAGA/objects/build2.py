@@ -940,7 +940,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
             continue
 
         nearby_obj = base[nearby_obj_mask]
-        nearby_obj["dist"] = np.delete(dist, obj_this_idx)
+        nearby_obj["dist"] = dist[nearby_obj_mask]
         nearby_obj["_idx"] = np.flatnonzero(nearby_obj_mask)
         del nearby_obj_mask, dist
 
