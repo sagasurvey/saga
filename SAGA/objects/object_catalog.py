@@ -436,6 +436,16 @@ class ObjectCatalog(object):
         nsa = utils.add_skycoord(nsa)
         return nsa
 
+    def load_sga(self):
+        try:
+            sga = self._database["sga_v3.0"]
+        except KeyError:
+            return None
+        sga = sga.read()[build3.SGA_COLUMNS]
+        objs_to_remove = [435028]
+        sga = QueryMaker.isin("SGA_ID", objs_to_remove, True, True).filter(sga)
+        return sga
+
     def build_and_write_to_database(
         self,
         hosts="build_default",
@@ -551,12 +561,8 @@ class ObjectCatalog(object):
         else:
             nsa = None
 
-        try:
-            sga = self._database["sga_v3.0"]
-        except KeyError:
-            sga = None
-        else:
-            sga = sga.read()[build3.SGA_COLUMNS]
+        sga = self.load_sga()
+        if sga is not None:
             print(time.strftime("[%m/%d %H:%M:%S]"), "SGA catalog loaded.")
 
         spectra = self._database["spectra_raw_all"].read(
