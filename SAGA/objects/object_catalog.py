@@ -442,7 +442,7 @@ class ObjectCatalog(object):
         except KeyError:
             return None
         sga = sga.read()[build3.SGA_COLUMNS]
-        objs_to_remove = [435028]
+        objs_to_remove = [435028, 529980]
         sga = QueryMaker.isin("SGA_ID", objs_to_remove, True, True).filter(sga)
         return sga
 
