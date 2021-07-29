@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "D26", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -404,7 +404,7 @@ def add_sga(base, sga):
     base["phi"][matching_idx] = np.where(use_leda, sga["PA_LEDA"], sga["PA"])
 
     # calculate and cap sma value
-    sma = np.where(use_leda, sga["D25_LEDA"] * 1.5, sga["D26"]) * 30.0
+    sma = np.where(use_leda, sga["D25_LEDA"] * 1.5 * 30.0, sga["SMA_MOMENT"] * 1.3333)
     sqrt_ba = np.sqrt(base["ba"][matching_idx])
     r_mag = base["r_mag"][matching_idx]
     sma = np.where(
