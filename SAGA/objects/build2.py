@@ -903,7 +903,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
             if has_sma:
                 remove_radius = obj_this["sma"]
             else:
-                remove_radius = obj_this["radius"] * 3.0
+                remove_radius = obj_this["radius"] * 2.0
                 if has_ba:
                     remove_radius /= np.sqrt(obj_this["ba"])
 
@@ -949,7 +949,11 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         z_limit = v2z([300, 250, 200, 150][np.searchsorted([14, 16, 20], obj_this["r_mag"])])
         close_spec_z = Query("ZQUALITY > -1", (lambda z: np.abs(z - obj_this["SPEC_Z"]) < z_limit, "SPEC_Z"))
         good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
-        no_spec_z = Query("ZQUALITY < 2", Query("dist < 0.75") | Query("r_err >= 0.005"))
+        no_spec_z = Query("ZQUALITY < 2")
+        if has_ref_cat and obj_this["REF_CAT"] == "L3":  # removed by SGA objects
+            no_spec_z &= (Query("dist < 0.75") | Query("r_err >= 0.005"))
+        elif nsa is None:  # removed by all other objects
+            no_spec_z &= (Query("dist < 0.6") | Query("r_err >= 0.02"))
 
         to_remove = Query(remove_basic_conditions, close_spec_z | no_spec_z)
 

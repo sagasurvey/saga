@@ -540,7 +540,7 @@ def build_full_stack(  # pylint: disable=unused-argument
 
     base = add_sga_specs(base, sga)
     del sga
-    base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)
+    base = build2.remove_shreds_near_spec_obj(base)
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
