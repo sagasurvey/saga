@@ -821,33 +821,29 @@ def _join_spec_repeat(current, new):
 
 def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
 
-    has_nsa = Query("OBJ_NSAID > -1")
-    has_sga = QueryMaker.equal("REF_CAT", "L3")
-    has_spec_z = Query(
-        "SPEC_Z >= 0.002",
-        "ZQUALITY >= 3",
-        "is_galaxy",
-        "radius > abs(radius_err) * 2.0",
-        "radius > 0",
-    )
-
-    if "REF_CAT" in base.colnames:
-        base["spec_rank"] = 1 - has_sga.mask(base).astype(np.int)
-    elif "OBJ_NSAID" in base.colnames:
-        base["spec_rank"] = 1 - has_nsa.mask(base).astype(np.int)
-    else:
-        base["spec_rank"] = 0
-
-    cols = ["spec_rank", "r_mag"]
-    has_spec_z_indices = np.flatnonzero(has_spec_z.mask(base))
-    has_spec_z_indices = has_spec_z_indices[base[cols][has_spec_z_indices].argsort(cols)]
-    del base["spec_rank"]
-
     has_sma = "sma" in base.colnames
     has_ba = "ba" in base.colnames
     has_phi = "phi" in base.colnames
     has_ref_cat = "REF_CAT" in base.colnames
     has_obj_nsaid = "OBJ_NSAID" in base.colnames
+
+    is_nsa = Query("OBJ_NSAID > -1")
+    is_sga = QueryMaker.equal("REF_CAT", "L3")
+    is_clean_galaxy = Query(C.is_clean2, C.is_galaxy2, "radius > 0")
+
+    if has_ref_cat:
+        base["spec_rank"] = 1 - is_sga.mask(base).astype(np.int)
+        is_clean_galaxy |= is_sga
+    elif has_obj_nsaid:
+        base["spec_rank"] = 1 - is_nsa.mask(base).astype(np.int)
+        is_clean_galaxy |= is_nsa
+    else:
+        base["spec_rank"] = 0
+
+    cols = ["spec_rank", "r_mag"]
+    has_spec_z_indices = np.flatnonzero(Query(is_clean_galaxy, C.has_spec).mask(base))
+    has_spec_z_indices = has_spec_z_indices[base[cols][has_spec_z_indices].argsort(cols)]
+    del base["spec_rank"]
 
     for obj_this_idx in has_spec_z_indices:
         obj_this = base[obj_this_idx]
@@ -938,13 +934,13 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         remove_basic_conditions = Query("is_galaxy", is_fainter, "r_mag > 14")
 
         if has_ref_cat:
-            remove_basic_conditions |= has_nsa
+            remove_basic_conditions |= is_nsa
             remove_basic_conditions &= QueryMaker.equal("REF_CAT", "")
         elif has_obj_nsaid:
-            remove_basic_conditions &= ~has_nsa
+            remove_basic_conditions &= ~is_nsa
 
         if shreds_recover is not None:
-            remove_basic_conditions &= QueryMaker.in1d("OBJID", shreds_recover, invert=True)
+            remove_basic_conditions &= QueryMaker.isin("OBJID", shreds_recover, invert=True)
 
         z_limit = v2z([300, 250, 200, 150][np.searchsorted([14, 16, 20], obj_this["r_mag"])])
         close_spec_z = Query("ZQUALITY > -1", (lambda z: np.abs(z - obj_this["SPEC_Z"]) < z_limit, "SPEC_Z"))
