@@ -143,8 +143,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     d26_to_eff = 3.0  # multiply by 3 to account for the ratio b/w sma and effective radius
     catalog["sma"] = catalog["SHAPE_R"] * d26_to_eff
     catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * d26_to_eff, 9999.0)
+
+    # multiply by sqrt(ba) to get effective radius
     sqrt_ba = np.sqrt(catalog["ba"])
-    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba  # multiply by sqrt(ba) to get effective radius
+    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba
     catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
     del sqrt_ba
 
@@ -176,9 +178,14 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog["r_mag"],
     )
 
-    # sma correction
-    mask = Query("is_galaxy", "r_mag < 25", ~Query("sma < exp(-0.385 * r_mag + 9.85)", "RCHISQ_R < 50", "sma >= sma_err * 2")).mask(catalog)
-    catalog["sma"] = np.where(mask, np.exp(-0.385 * catalog["r_mag"] + 8.85), catalog["sma"])
+    # cap sma value
+    mask = Query(
+        "is_galaxy",
+        "r_mag >= 16",
+        "r_mag < 30",
+        "sma * sqrt(ba) >= exp(-0.3 * r_mag + 7.9)",
+    ).mask(catalog)
+    catalog["sma"] = np.where(mask, np.exp(-0.3 * catalog["r_mag"] + 7.9) / np.sqrt(catalog["ba"]), catalog["sma"])
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
@@ -396,9 +403,15 @@ def add_sga(base, sga):
     base["ba"][matching_idx] = np.where(use_leda, sga["BA_LEDA"], sga["BA"])
     base["phi"][matching_idx] = np.where(use_leda, sga["PA_LEDA"], sga["PA"])
 
+    # calculate and cap sma value
     sma = np.where(use_leda, sga["D25_LEDA"] * 1.5, sga["D26"]) * 30.0
+    sqrt_ba = np.sqrt(base["ba"][matching_idx])
     r_mag = base["r_mag"][matching_idx]
-    sma = np.where((sma >= np.exp(-0.4 * r_mag + 10.3)) & (r_mag < 25), np.exp(-0.4 * r_mag + 9.3), sma)
+    sma = np.where(
+        (sma * sqrt_ba >= np.exp(-0.3 * r_mag + 7.9)) & (r_mag >= 16) & (r_mag < 30),
+        np.exp(-0.3 * r_mag + 7.9) / sqrt_ba,
+        sma,
+    )
 
     base["sma"][matching_idx] = sma
     base["sma_err"][matching_idx] = sma * 1e-4
