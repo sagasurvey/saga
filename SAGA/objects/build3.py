@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "D26", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -140,8 +140,9 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     del e_abs
 
     # SHAPE_R is half-light semi-major axis
-    catalog["sma"] = catalog["SHAPE_R"] * 2.0  # multiply by 2 to account for half-light
-    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * 2, 9999.0)
+    d26_to_eff = 3.0  # multiply by 3 to account for the ratio b/w sma and effective radius
+    catalog["sma"] = catalog["SHAPE_R"] * d26_to_eff
+    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * d26_to_eff, 9999.0)
     sqrt_ba = np.sqrt(catalog["ba"])
     catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba  # multiply by sqrt(ba) to get effective radius
     catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
@@ -174,6 +175,10 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
         catalog["r_mag"],
     )
+
+    # sma correction
+    mask = Query("is_galaxy", "r_mag < 25", ~Query("sma < exp(-0.385 * r_mag + 9.85)", "RCHISQ_R < 50", "sma >= sma_err * 2")).mask(catalog)
+    catalog["sma"] = np.where(mask, np.exp(-0.385 * catalog["r_mag"] + 8.85), catalog["sma"])
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
@@ -376,8 +381,7 @@ def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
 
-    use_sga = Query("SMA_MOMENT > 0")
-    use_sga &= QueryMaker.isin(
+    use_leda = QueryMaker.isin(
         "PGC",
         [
             10060, 12342, 16065, 16152, 25217, 25999, 26068, 26932, 27734, 29009,
@@ -386,14 +390,18 @@ def add_sga(base, sga):
             2045076, 3087653,
         ],
         assume_unique=True,
-        invert=True,
     )
-    use_sga = use_sga.mask(sga)
+    use_leda = use_leda.mask(sga)
 
-    base["ba"][matching_idx] = np.where(use_sga, sga["BA"], sga["BA_LEDA"])
-    base["phi"][matching_idx] = np.where(use_sga, sga["PA"], sga["PA_LEDA"])
-    base["sma"][matching_idx] = np.where(use_sga, sga["SMA_MOMENT"], sga["D25_LEDA"] * 30.0 * 1.1)
-    base["sma_err"][matching_idx] = base["sma"][matching_idx] * 1e-4
+    base["ba"][matching_idx] = np.where(use_leda, sga["BA_LEDA"], sga["BA"])
+    base["phi"][matching_idx] = np.where(use_leda, sga["PA_LEDA"], sga["PA"])
+
+    sma = np.where(use_leda, sga["D25_LEDA"] * 1.5, sga["D26"]) * 30.0
+    r_mag = base["r_mag"][matching_idx]
+    sma = np.where((sma >= np.exp(-0.4 * r_mag + 10.3)) & (r_mag < 25), np.exp(-0.4 * r_mag + 9.3), sma)
+
+    base["sma"][matching_idx] = sma
+    base["sma_err"][matching_idx] = sma * 1e-4
 
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]

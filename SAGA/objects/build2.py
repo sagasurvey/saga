@@ -779,23 +779,12 @@ def add_spectra(base, specs, debug=None, matching_order=None):
     base_this["index"] = np.arange(len(base))
 
     if has_sma:
-        base_this["radius_for_match"] = base["sma"]
-        base_this["radius_err"] = base["sma_err"]
+        base_this["radius_for_match"] = base["sma"] * 0.75
     else:
         base_this["radius_for_match"] = base["radius"] * 2.0  # half-light correction
-        base_this["radius_err"] = base["radius_err"] * 2.0
         if has_ba:
             base_this["radius_for_match"] /= np.sqrt(base["ba"])
-            base_this["radius_err"] /= np.sqrt(base["ba"])
-
-    with np.errstate(over="ignore"):
-        base_this["radius_for_match"] = np.where(
-            Query("is_galaxy", ~Query("radius_for_match > abs(radius_err) * 2.0")).mask(base_this),
-            np.exp(-0.36 * (base_this["r_mag"] - 11)) * 100.0,
-            base_this["radius_for_match"],
-        )
     fill_values_by_query(base_this, ~Query("radius_for_match > 0"), {"radius_for_match": 0.1})
-    del base_this["radius_err"]
 
     needs_rematch_count = 0
     for _ in range(5):
@@ -914,7 +903,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
             if has_sma:
                 remove_radius = obj_this["sma"]
             else:
-                remove_radius = obj_this["radius"] * 2.0
+                remove_radius = obj_this["radius"] * 3.0
                 if has_ba:
                     remove_radius /= np.sqrt(obj_this["ba"])
 
@@ -960,7 +949,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
         z_limit = v2z([300, 250, 200, 150][np.searchsorted([14, 16, 20], obj_this["r_mag"])])
         close_spec_z = Query("ZQUALITY > -1", (lambda z: np.abs(z - obj_this["SPEC_Z"]) < z_limit, "SPEC_Z"))
         good_close_spec_z = Query(close_spec_z, "ZQUALITY >= 3")
-        no_spec_z = Query("ZQUALITY < 2", Query("dist < 0.8") | Query("r_err >= 0.01"))
+        no_spec_z = Query("ZQUALITY < 2", Query("dist < 0.75") | Query("r_err >= 0.005"))
 
         to_remove = Query(remove_basic_conditions, close_spec_z | no_spec_z)
 
