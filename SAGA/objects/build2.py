@@ -838,7 +838,7 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
     elif has_obj_nsaid and nsa is not None:
         base["spec_rank"] += is_nsa.mask(base).astype(np.int16)
         is_good_galaxy |= is_nsa
-    base["spec_rank"] = -base["spec_rank"]
+    base["spec_rank"] *= -1
 
     cols = ["spec_rank", "r_mag"]
     has_spec_z_indices = np.flatnonzero(is_good_galaxy.mask(base))

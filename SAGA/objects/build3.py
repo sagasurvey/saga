@@ -62,7 +62,6 @@ MERGED_CATALOG_COLUMNS = list(
             "ba",
             "phi",
             "sma",
-            "sma_err",
             "REF_CAT",
             "SGA_ID",
         ),
@@ -142,7 +141,6 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     # SHAPE_R is half-light semi-major axis
     d26_to_eff = 3.0  # multiply by 3 to account for the ratio b/w sma and effective radius
     catalog["sma"] = catalog["SHAPE_R"] * d26_to_eff
-    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * d26_to_eff, 9999.0)
 
     # multiply by sqrt(ba) to get effective radius
     sqrt_ba = np.sqrt(catalog["ba"])
@@ -177,15 +175,6 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         -0.0382 * (catalog["g_mag"] - catalog["r_mag"]) + 0.0108 + catalog["r_mag"],
         catalog["r_mag"],
     )
-
-    # cap sma value
-    mask = Query(
-        "is_galaxy",
-        "r_mag >= 16",
-        "r_mag < 30",
-        "sma * sqrt(ba) >= exp(-0.3 * r_mag + 7.9)",
-    ).mask(catalog)
-    catalog["sma"] = np.where(mask, np.exp(-0.3 * catalog["r_mag"] + 7.9) / np.sqrt(catalog["ba"]), catalog["sma"])
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
@@ -306,7 +295,6 @@ def apply_manual_fixes(base):
             is_galaxy=True,
             REMOVE=0,
             sma=28.0,
-            sma_err=1.0,
             radius=11.7,
             radius_err=0.5,
             ba=0.7,
@@ -349,6 +337,13 @@ def apply_manual_fixes(base):
         dict(sma=36.0),
     )
 
+    # (35.4017, -5.5212)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 902988610000000241),
+        dict(sma=138.0),
+    )
+
     # Flipped coordinates for a galaxy/star pair in nsa126115
     fill_values_by_query(
         base,
@@ -387,43 +382,59 @@ def match_sga(base, sga):
 def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
+    base["OBJ_PGC"] = np.int64(-1)
+    base["OBJ_PGC"][matching_idx] = sga["PGC"]
+    sga["base_idx"] = matching_idx
+    del matching_idx
 
-    use_leda = QueryMaker.isin(
+    REF_FLAG = "LG"
+
+    sga_this = Query(
+        "SMA_MOMENT > 0",
+        "D26 > 0",
+        QueryMaker.isin(
+            "PGC",
+            [4074752, 1681736, 4541156],
+            assume_unique=True,
+            invert=True,
+        ),
+    ).filter(sga)
+
+    if len(sga_this):
+        idx = sga_this["base_idx"]
+        base["ba"][idx] = sga_this["BA"]
+        base["phi"][idx] = sga_this["PA"]
+        base["sma"][idx] = np.minimum(sga_this["SMA_MOMENT"] * 1.3333, sga_this["D26"] * 30.0)
+        base["REMOVE"][idx] = 0
+        base["is_galaxy"][idx] = True
+        base["REF_CAT"][idx] = REF_FLAG
+
+    sga_this = QueryMaker.isin(
         "PGC",
         [
             10060, 12342, 16065, 16152, 25217, 25999, 26068, 26932, 27734, 29009,
-            34325, 36124, 36238, 38115, 44025, 49378, 50191, 50369, 51484, 51913, 53499,
-            54120, 66619, 67818, 68590, 71834, 71926, 101219, 139206, 1016399,
-            2045076, 3087653,
+            34325, 36124, 36238, 38115, 44025, 49378, 50191, 50369, 51484, 51913,
+            53499, 54120, 58470, 66619, 67818, 68590, 71834, 71926, 101219, 139206,
+            1016399, 2045076, 3087653,
         ],
         assume_unique=True,
-    )
-    use_leda = use_leda.mask(sga)
+    ).filter(sga)
 
-    base["ba"][matching_idx] = np.where(use_leda, sga["BA_LEDA"], sga["BA"])
-    base["phi"][matching_idx] = np.where(use_leda, sga["PA_LEDA"], sga["PA"])
+    if len(sga_this):
+        idx = sga_this["base_idx"]
+        base["ba"][idx] = sga_this["BA_LEDA"]
+        base["phi"][idx] = sga_this["PA_LEDA"]
+        base["sma"][idx] = sga_this["D25_LEDA"] * 1.5 * 30.0
+        base["REMOVE"][idx] = 0
+        base["is_galaxy"][idx] = True
+        base["REF_CAT"][idx] = REF_FLAG
 
-    # calculate and cap sma value
-    sma = np.minimum(sga["SMA_MOMENT"] * 1.3333, sga["D26"] * 30.0)
-    sma = np.where(use_leda, sga["D25_LEDA"] * 1.5 * 30.0, sma)
-    sqrt_ba = np.sqrt(base["ba"][matching_idx])
-    r_mag = base["r_mag"][matching_idx]
-    sma = np.where(
-        (sma * sqrt_ba >= np.exp(-0.3 * r_mag + 7.9)) & (r_mag >= 16) & (r_mag < 30),
-        np.exp(-0.3 * r_mag + 7.9) / sqrt_ba,
-        sma,
-    )
-
-    base["sma"][matching_idx] = sma
-    base["sma_err"][matching_idx] = sma * 1e-4
-
-    base["OBJ_PGC"] = np.int64(-1)
-    base["OBJ_PGC"][matching_idx] = sga["PGC"]
-
-    base["REMOVE"][matching_idx] = 0
+    fill_values_by_query(base, QueryMaker.equal("REF_CAT", "L3"), {"REF_CAT": ""})
+    fill_values_by_query(base, QueryMaker.equal("REF_CAT", REF_FLAG), {"REF_CAT": "L3"})
 
     # later we only need entries with specs
-    sga = sga[sga["Z_LEDA"] > -1]
+    del sga["base_idx"]
+    sga = Query("Z_LEDA > -1").filter(sga)
 
     return base, sga
 
@@ -458,6 +469,17 @@ def add_sga_specs(base, sga):
         base["TELNAME"][base_idx] = "SGA"
         base["HELIO_CORR"][base_idx] = True
 
+    return base
+
+
+def cap_sma_value(base):
+    mask = Query(
+        "is_galaxy",
+        "r_mag >= 16",
+        "r_mag < 30",
+        "sma * sqrt(ba) >= exp(-0.3 * r_mag + 7.9)",
+    ).mask(base)
+    base["sma"] = np.where(mask, np.exp(-0.3 * base["r_mag"] + 7.9) / np.sqrt(base["ba"]), base["sma"])
     return base
 
 
@@ -522,6 +544,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     if sga is not None:
         base, sga = add_sga(base, sga)
 
+    base = cap_sma_value(base)
     base = apply_manual_fixes(base)
 
     all_spectra = [

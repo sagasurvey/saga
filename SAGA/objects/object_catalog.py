@@ -442,8 +442,6 @@ class ObjectCatalog(object):
         except KeyError:
             return None
         sga = sga.read()[build3.SGA_COLUMNS]
-        objs_to_remove = [435028, 529980, 943220]
-        sga = QueryMaker.isin("SGA_ID", objs_to_remove, True, True).filter(sga)
         return sga
 
     def build_and_write_to_database(
