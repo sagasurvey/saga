@@ -45,7 +45,7 @@ def _n_or_more_lt(cols, n, cut):
     return Query((_n_or_more_lt_this,) + tuple(cols))
 
 
-SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "PA_LEDA", "BA_LEDA", "D25_LEDA", "REF", "DIAM", "PA", "BA"]
+SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "D26", "PA", "BA"]
 
 
 MERGED_CATALOG_COLUMNS = list(
@@ -62,7 +62,6 @@ MERGED_CATALOG_COLUMNS = list(
             "ba",
             "phi",
             "sma",
-            "sma_err",
             "REF_CAT",
             "SGA_ID",
         ),
@@ -139,12 +138,14 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
     del e_abs
 
-    # SHAPE_R is in fact semi-major axis
+    # SHAPE_R is half-light semi-major axis
+    d26_to_eff = 3.0  # multiply by 3 to account for the ratio b/w sma and effective radius
+    catalog["sma"] = catalog["SHAPE_R"] * d26_to_eff
+
+    # multiply by sqrt(ba) to get effective radius
     sqrt_ba = np.sqrt(catalog["ba"])
-    catalog["sma"] = catalog["SHAPE_R"]
-    catalog["sma_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
-    catalog["radius"] = catalog["sma"] * sqrt_ba
-    catalog["radius_err"] = catalog["sma_err"] * sqrt_ba
+    catalog["radius"] = catalog["SHAPE_R"] * sqrt_ba
+    catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
     del sqrt_ba
 
     for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
@@ -293,8 +294,9 @@ def apply_manual_fixes(base):
         dict(
             is_galaxy=True,
             REMOVE=0,
-            radius=40.0,
-            radius_err=0.002,
+            sma=28.0,
+            radius=11.7,
+            radius_err=0.5,
             ba=0.7,
             phi=97.0,
             g_mag=13.86,
@@ -305,6 +307,41 @@ def apply_manual_fixes(base):
             z_err=0.005,
             REF_CAT="N1",
         ),
+    )
+
+    # (330.14926, -43.140017)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 901050380000007338),
+        dict(sma=100),
+    )
+
+    # (224.594532 -1.090942)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 903255060000002115),
+        dict(sma=270, ba=0.15, phi=81.0),
+    )
+
+    # (198.1743458, 22.829911)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 904589200000000836),
+        dict(sma=60, ba=0.55, phi=50.0),
+    )
+
+    # (330.1370, -43.3897)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 901039870000000760),
+        dict(sma=36.0),
+    )
+
+    # (35.4017, -5.5212)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 902988610000000241),
+        dict(sma=138.0),
     )
 
     # Flipped coordinates for a galaxy/star pair in nsa126115
@@ -345,18 +382,59 @@ def match_sga(base, sga):
 def add_sga(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
-
-    # TODO: Switch to SGA fit when SGA bug is fixed. Using LEDA values for now.
-    base["ba"][matching_idx] = sga["BA_LEDA"]
-    base["phi"][matching_idx] = sga["PA_LEDA"]
-    base["sma"][matching_idx] = sga["D25_LEDA"] * 30  # DIAM in arcmin
-    base["sma_err"][matching_idx] = sga["D25_LEDA"] * 30 * 1e-4
-
     base["OBJ_PGC"] = np.int64(-1)
     base["OBJ_PGC"][matching_idx] = sga["PGC"]
+    sga["base_idx"] = matching_idx
+    del matching_idx
+
+    REF_FLAG = "LG"
+
+    sga_this = Query(
+        "SMA_MOMENT > 0",
+        "D26 > 0",
+        QueryMaker.isin(
+            "PGC",
+            [4074752, 1681736, 4541156],
+            assume_unique=True,
+            invert=True,
+        ),
+    ).filter(sga)
+
+    if len(sga_this):
+        idx = sga_this["base_idx"]
+        base["ba"][idx] = sga_this["BA"]
+        base["phi"][idx] = sga_this["PA"]
+        base["sma"][idx] = np.minimum(sga_this["SMA_MOMENT"] * 1.3333, sga_this["D26"] * 30.0)
+        base["REMOVE"][idx] = 0
+        base["is_galaxy"][idx] = True
+        base["REF_CAT"][idx] = REF_FLAG
+
+    sga_this = QueryMaker.isin(
+        "PGC",
+        [
+            10060, 12342, 16065, 16152, 25217, 25999, 26068, 26932, 27734, 29009,
+            34325, 36124, 36238, 38115, 44025, 49378, 50191, 50369, 51484, 51913,
+            53499, 54120, 58470, 66619, 67818, 68590, 71834, 71926, 101219, 139206,
+            1016399, 2045076, 3087653,
+        ],
+        assume_unique=True,
+    ).filter(sga)
+
+    if len(sga_this):
+        idx = sga_this["base_idx"]
+        base["ba"][idx] = sga_this["BA_LEDA"]
+        base["phi"][idx] = sga_this["PA_LEDA"]
+        base["sma"][idx] = sga_this["D25_LEDA"] * 1.5 * 30.0
+        base["REMOVE"][idx] = 0
+        base["is_galaxy"][idx] = True
+        base["REF_CAT"][idx] = REF_FLAG
+
+    fill_values_by_query(base, QueryMaker.equal("REF_CAT", "L3"), {"REF_CAT": ""})
+    fill_values_by_query(base, QueryMaker.equal("REF_CAT", REF_FLAG), {"REF_CAT": "L3"})
 
     # later we only need entries with specs
-    sga = sga[sga["Z_LEDA"] > -1]
+    del sga["base_idx"]
+    sga = Query("Z_LEDA > -1").filter(sga)
 
     return base, sga
 
@@ -391,6 +469,17 @@ def add_sga_specs(base, sga):
         base["TELNAME"][base_idx] = "SGA"
         base["HELIO_CORR"][base_idx] = True
 
+    return base
+
+
+def cap_sma_value(base):
+    mask = Query(
+        "is_galaxy",
+        "r_mag >= 16",
+        "r_mag < 30",
+        "sma * sqrt(ba) >= exp(-0.3 * r_mag + 7.9)",
+    ).mask(base)
+    base["sma"] = np.where(mask, np.exp(-0.3 * base["r_mag"] + 7.9) / np.sqrt(base["ba"]), base["sma"])
     return base
 
 
@@ -455,6 +544,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     if sga is not None:
         base, sga = add_sga(base, sga)
 
+    base = cap_sma_value(base)
     base = apply_manual_fixes(base)
 
     all_spectra = [
@@ -474,7 +564,7 @@ def build_full_stack(  # pylint: disable=unused-argument
 
     base = add_sga_specs(base, sga)
     del sga
-    base = build2.remove_shreds_near_spec_obj(base, shreds_recover=shreds_recover)
+    base = build2.remove_shreds_near_spec_obj(base)
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
