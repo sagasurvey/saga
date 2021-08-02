@@ -784,7 +784,7 @@ def find_satellites(base, version=1):
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {"SATS": 1})
 
     # removed objects
-    removed_obj = C.has_spec & ~(is_clean & is_galaxy)
+    removed_obj = C.has_spec & ~(is_clean & is_galaxy)  # pylint: disable=invalid-unary-operand-type
     fill_values_by_query(base, removed_obj & C.is_high_z, {"SATS": 90})
     fill_values_by_query(base, removed_obj & C.is_low_z, {"SATS": 92})
     fill_values_by_query(base, removed_obj & C.is_very_low_z, {"SATS": 94})

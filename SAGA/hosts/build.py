@@ -114,7 +114,7 @@ def add_nsa(d, nsa):
         nsa[col] = d[col][idx]
     nsa["sep"] = sep.arcsec
 
-    fill_values_by_query(nsa, ~q_match, {"pgc": -1})
+    fill_values_by_query(nsa, ~q_match, {"pgc": -1})  # pylint: disable=invalid-unary-operand-type
     del nsa["coord"]
     nsa.sort(["pgc", "sep"])
     mask = np.insert(np.ediff1d(nsa["pgc"]), 0, 1) == 0

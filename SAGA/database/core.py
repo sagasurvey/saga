@@ -156,7 +156,7 @@ class FitsTable(FileObject):
             t = Table(hdu_list[1].data, masked=False)
         finally:
             try:
-                del hdu_list[1].data
+                del hdu_list[1].data  # pylint: disable=no-member
                 hdu_list.close()
                 del hdu_list
             except:  # pylint: disable=bare-except  # noqa: E722
