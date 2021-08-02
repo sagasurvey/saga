@@ -344,6 +344,13 @@ def apply_manual_fixes(base):
         dict(sma=138.0),
     )
 
+    # (138.5198, 40.1133)
+    fill_values_by_query(
+        base,
+        QueryMaker.equal("OBJID", 915434150000002223),
+        dict(sma=150.0),
+    )
+
     # Flipped coordinates for a galaxy/star pair in nsa126115
     fill_values_by_query(
         base,
