@@ -13,7 +13,6 @@ from .. import utils
 from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
 from ..hosts import HostCatalog
 from ..utils import fill_values_by_query, get_all_colors, get_sdss_bands
-from ..utils.distance import d2m
 from . import build, build2, build3
 from . import cuts as C
 from .manual_fixes import fixes_to_nsa_v012, fixes_to_nsa_v101
@@ -29,35 +28,71 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487), use_abs_r_mag=False):
+def calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
+    r = base["r_mag"]
+
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
         np.where(
             C.valid_i_mag.mask(base),
             base["ri"] + 0.1,
-            np.where(C.valid_z_mag.mask(base), base["rz"] + 0.2, 0.92 - 0.03 * base["r_mag"]),
+            np.where(C.valid_z_mag.mask(base), base["rz"] + 0.2, 0.92 - 0.03 * r),
         ),
     )
 
     sb = np.where(
         C.valid_sb.mask(base),
         base["sb_r"],
-        20.75 + 0.6 * (base["r_mag"] - 14),
+        20.75 + 0.6 * (r - 14),
     )
-
-    r = (base["r_mag"] - d2m(base["HOST_DIST"])) if use_abs_r_mag else base["r_mag"]
 
     mu = params[0] * r + params[1] * sb + params[2] * gr + params[3]
     mu = np.where(np.isnan(mu), np.inf, mu)
-    p = params[4] / (1 + np.exp(-mu))
+    p = params[-1] / (1 + np.exp(-mu))
 
     return p
 
 
-def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.25, **kwargs):
+def calc_fiducial_p_sat_v3(base, params=(-2.759, -6.1327, -0.3378, 3.1311, -8.423, 0.5)):
+    r = base["r_mag"]
 
-    p = calc_fiducial_p_sat(base, **kwargs)
+    gr = np.where(
+        C.valid_g_mag.mask(base),
+        base["gr"],
+        np.where(
+            C.valid_z_mag.mask(base),
+            base["rz"] + 0.2,
+            1.1 - 0.04 * r,
+        ),
+    )
+
+    sb = np.where(
+        C.valid_sb.mask(base),
+        base["sb_r"],
+        np.where(
+            C.valid_r_fibermag.mask(base),
+            19.9 + 0.88 * (base["r_fibermag"] - 18),
+            21.5 + 0.35 * (r - 14),
+        ),
+    )
+
+    rf = np.where(
+        C.valid_r_fibermag.mask(base),
+        base["r_fibermag"],
+        21.5 + 0.55 * (r - 18),
+    )
+
+    mu = params[0] * r + params[1] * gr + params[2] * sb + params[3] * rf + params[4]
+    mu = np.where(np.isnan(mu), np.inf, mu)
+    p = params[-1] / (1 + np.exp(-mu))
+
+    return p
+
+
+def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.15, p_func=calc_fiducial_p_sat_v3, **kwargs):
+
+    p = p_func(base, **kwargs)
 
     if human_selected is not None:
         mask = Query(~C.has_spec, QueryMaker.in1d("OBJID", human_selected)).mask(base)
@@ -228,16 +263,19 @@ class ObjectCatalog(object):
 
         p_sat_dict = {"p_sat_approx": 0}
         if version == 3:
-            p_sat_params = (-1.843, 1.413, -9.746, 3.245, 0.403)
+            p_func = calc_fiducial_p_sat_v3
+            p_bias = 0.15
         else:
-            p_sat_params = (-1.96, 1.507, -5.498, 0.303, 0.487)
+            p_func = calc_fiducial_p_sat_v2
+            p_bias = 0.25
         with np.errstate(over="ignore", invalid="ignore"):
-            table["p_sat_approx"] = calc_fiducial_p_sat(table, p_sat_params)
+            table["p_sat_approx"] = p_func(table)
             if "HOST_DIST" in table.colnames:
                 table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(
                     table,
                     human_selected=self._database["human_selected"].read()["OBJID"],
-                    params=p_sat_params,
+                    bias=p_bias,
+                    p_func=p_func,
                 )
                 p_sat_dict["p_sat_corrected"] = 0
 
