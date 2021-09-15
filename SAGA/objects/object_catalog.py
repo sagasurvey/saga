@@ -909,7 +909,10 @@ class ObjectCatalog(object):
         """
         defaults = dict(
             hosts="good",
-            cuts=Query(C.is_clean2, C.is_galaxy2, C.sat_rcut, C.has_spec | "r_mag < 21"),
+            cuts=Query(C.is_clean2, (
+                Query(C.is_galaxy2, C.sat_rcut, C.has_spec | "r_mag < 21")
+                | Query(C.has_spec, C.is_very_low_z)
+            )),
             return_as="stack",
             add_skycoord=False,
         )
@@ -930,6 +933,7 @@ class ObjectCatalog(object):
 
         t = self.load(**defaults)
 
+        t.meta = {"mtime": time.time()}
         if save_to is not False:
             save_to.write(t, overwrite=overwrite)
 
