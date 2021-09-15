@@ -386,14 +386,13 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
 
 def add_halpha_to_spectra(spectra, halpha):
-    halpha = halpha["EW_Halpha", "EW_Halpha_err", "SPECOBJID1", "MASKNAME"]
+    halpha = halpha["EW_Halpha", "EW_Halpha_err", "TELNAME", "MASKNAME", "SPECOBJID1"]
     halpha.rename_column("SPECOBJID1", "SPECOBJID")
     halpha = ensure_specs_dtype(halpha, cols_definition=EXTENDED_SPECS_COLUMNS, skip_missing_cols=True)
-    spectra = join(spectra, halpha, ["SPECOBJID", "MASKNAME"], "left")
+    spectra = join(spectra, halpha, ["TELNAME", "MASKNAME", "SPECOBJID"], "left")
     spectra["EW_Halpha"].fill_value = np.nan
     spectra["EW_Halpha_err"].fill_value = np.nan
-    spectra.filled()
-    return spectra
+    return spectra.filled()
 
 
 def assign_photometry_choice(stacked_catalog, indices, is_last):
@@ -816,7 +815,7 @@ def add_spectra(base, specs, debug=None, matching_order=None):
 
 
 def _join_spec_repeat(current, new):
-    return "+".join(set(sum((s.split("+") for s in new), current.split("+"))))
+    return "+".join(set(sum((s.split("+") for s in new), current.split("+")))).strip("+")
 
 
 def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):

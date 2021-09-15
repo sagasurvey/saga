@@ -5,7 +5,7 @@ from itertools import chain
 
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.table import vstack
+from astropy.table import vstack, join
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
@@ -460,7 +460,23 @@ def add_sga(base, sga):
     return base, sga
 
 
-def add_sga_specs(base, sga):
+def add_sga_specs(base, sga, halpha=None):
+
+    if halpha is not None:
+        halpha = QueryMaker.equal("TELNAME", "SGA").filter(halpha, ["EW_Halpha", "EW_Halpha_err", "SPECOBJID1"])
+        halpha["SGA_ID"] = halpha["SPECOBJID1"].astype(np.int64)
+        del halpha["SPECOBJID1"]
+        halpha = QueryMaker.isin("SGA_ID", sga["SGA_ID"]).filter(halpha)
+
+        if len(halpha):
+            sga = join(sga, halpha, "SGA_ID", "left")
+            sga["EW_Halpha"].fill_value = np.nan
+            sga["EW_Halpha_err"].fill_value = np.nan
+            sga = sga.filled()
+
+    if "EW_Halpha" not in sga.colnames:
+        sga["EW_Halpha"] = np.nan
+        sga["EW_Halpha_err"] = np.nan
 
     matching_idx, sga = match_sga(base, sga)
 
@@ -473,22 +489,25 @@ def add_sga_specs(base, sga):
         base_idx = matching_idx[i]
         base["SPEC_REPEAT"][base_idx] = build2._join_spec_repeat(base["SPEC_REPEAT"][base_idx], ["SGA"])
 
-    for i in np.flatnonzero(has_poor_spec | has_spec):
+    for i in np.flatnonzero(has_poor_spec | has_spec | has_no_spec):
         base_idx = matching_idx[i]
         base["SPEC_REPEAT_ALL"][base_idx] = build2._join_spec_repeat(base["SPEC_REPEAT_ALL"][base_idx], ["SGA"])
 
     for i in np.flatnonzero(has_no_spec | has_poor_spec):
         base_idx = matching_idx[i]
+        sga_this = sga[i]
         base["SPEC_REPEAT"][base_idx] = "SGA"
-        base["RA_spec"][base_idx] = sga["RA_LEDA"][i]
-        base["DEC_spec"][base_idx] = sga["DEC_LEDA"][i]
-        base["SPEC_Z"][base_idx] = sga["Z_LEDA"][i]
+        base["RA_spec"][base_idx] = sga_this["RA_LEDA"]
+        base["DEC_spec"][base_idx] = sga_this["DEC_LEDA"]
+        base["SPEC_Z"][base_idx] = sga_this["Z_LEDA"]
         base["SPEC_Z_ERR"][base_idx] = v2z(100)
         base["ZQUALITY"][base_idx] = 4
-        base["SPECOBJID"][base_idx] = str(sga["SGA_ID"][i])
-        base["MASKNAME"][base_idx] = str(sga["REF"][i])
+        base["SPECOBJID"][base_idx] = str(sga_this["SGA_ID"])
+        base["MASKNAME"][base_idx] = str(sga_this["REF"])
         base["TELNAME"][base_idx] = "SGA"
         base["HELIO_CORR"][base_idx] = True
+        base["EW_Halpha"][base_idx] = sga_this["EW_Halpha"]
+        base["EW_Halpha_err"][base_idx] = sga_this["EW_Halpha_err"]
 
     return base
 
@@ -583,8 +602,8 @@ def build_full_stack(  # pylint: disable=unused-argument
         base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
     del all_spectra
 
-    base = add_sga_specs(base, sga)
-    del sga
+    base = add_sga_specs(base, sga, halpha)
+    del sga, halpha
     base = build2.remove_shreds_near_spec_obj(base)
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
