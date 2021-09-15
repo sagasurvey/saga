@@ -447,32 +447,45 @@ class Database(object):
 
         self.set_default_base_version()
 
-    def _add_derived_data(self):
-        t = FitsTable(self.base_file_path_pattern.format("saga_clean_specs"))
-        if "saga_clean_specs" in self._tables:
-            self._tables["saga_clean_specs"].remote = t
+    def _set_or_update_local_entry(self, key, local, remote=None, **kwargs):
+        if key in self._tables:
+            self._tables[key].local = local
+            self._tables[key].use_local_first = True
         else:
-            self._tables["saga_clean_specs"] = DataObject(t)
+            if remote is None and isinstance(local, FileObject):
+                remote = type(local)()
+            self._tables[key] = DataObject(remote, local, use_local_first=True, **kwargs)
 
+    def _add_derived_data(self):
+        # saga_clean_specs
+        self._set_or_update_local_entry(
+            "saga_clean_specs",
+            FitsTable(self.base_file_path_pattern.format("saga_clean_specs")),
+        )
+
+        # combined_base
+        fname = "saga_" + os.path.basename(self.base_file_path_pattern.format("all"))
+        if fname.endswith(".gz"):
+            fname = fname[:-3]
+        self._set_or_update_local_entry(
+            "combined_base",
+            FitsTable(os.path.join(os.path.dirname(self.base_file_path_pattern), fname)),
+        )
+
+        # host stats
         stats_path = self.base_file_path_pattern.format("host_stats")
         for ext in (".fits.gz", ".fits"):
             if stats_path.endswith(ext):
                 stats_path = stats_path[: -len(ext)]
                 break
         stats_path += ".csv"
-        t = FastCsvTable(stats_path)
-
-        if "host_stats" in self._tables:
-            self._tables["host_stats"].local = t
-            self._tables["host_stats"].use_local_first = True
-            self._tables["host_stats"].clear_cache()
-        else:
-            self._tables["host_stats"] = DataObject(
-                known_google_sheets["host_stats"],
-                t,
-                use_local_first=True,
-                cache_in_memory=True,
-            )
+        self._set_or_update_local_entry(
+            "host_stats",
+            FastCsvTable(stats_path),
+            known_google_sheets["host_stats"],
+            cache_in_memory=True,
+        )
+        self._tables["host_stats"].clear_cache()
 
     def _set_file_path_pattern(self, key, value):
         self._file_path_pattern[key] = value

@@ -220,8 +220,8 @@ class DataObject(object):
         self._local = None
         self.remote = remote
         self.local = local
-        self.use_local_first = use_local_first
-        self.cache_in_memory = cache_in_memory
+        self.use_local_first = bool(use_local_first)
+        self.cache_in_memory = bool(cache_in_memory)
         self._cached_table = None
 
         if use_local_first and local is None:

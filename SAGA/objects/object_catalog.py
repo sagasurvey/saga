@@ -754,12 +754,10 @@ class ObjectCatalog(object):
         generate clean spectra from all good base catalogs and save to disk
         """
         defaults = dict(
-            hosts="build_default",
-            has_spec=True,
-            cuts=C.is_clean2,
+            hosts="good",
+            cuts=Query(C.is_clean2, C.has_spec),
             return_as="stack",
             add_skycoord=False,
-            ensure_all_objid_cols=True,
         )
 
         defaults.update(kwargs)
@@ -784,7 +782,7 @@ class ObjectCatalog(object):
 
         return t
 
-    def load_clean_specs(self, generate_if_not_exist=True, **kwargs):
+    def load_clean_specs(self, generate_if_not_exist=False, **kwargs):
         """
         load clean spectra from all good base catalogs
         """
@@ -892,7 +890,7 @@ class ObjectCatalog(object):
 
         return data
 
-    def load_object_stats(self, generate_if_not_exist=True, **kwargs):
+    def load_object_stats(self, generate_if_not_exist=False, **kwargs):
         """
         load object stats from all good base catalogs
         """
@@ -901,6 +899,51 @@ class ObjectCatalog(object):
         except IOError:
             if generate_if_not_exist:
                 t = self.generate_object_stats(**kwargs)
+            else:
+                raise
+        return t
+
+    def generate_combined_base_catalog(self, save_to=None, overwrite=False, **kwargs):
+        """
+        generate combined base catalog from all good base catalogs and save to disk
+        """
+        defaults = dict(
+            hosts="good",
+            cuts=Query(C.is_clean2, C.is_galaxy2, C.sat_rcut, C.has_spec | "r_mag < 21"),
+            return_as="stack",
+            add_skycoord=False,
+        )
+        defaults.update(kwargs)
+
+        nhosts = len(self._host_catalog.resolve_id(defaults["hosts"]))
+        print(
+            time.strftime("[%m/%d %H:%M:%S]"),
+            "Generate combined base for {} hosts".format(nhosts),
+        )
+
+        if save_to is not False:
+            if save_to is None:
+                save_to = self._database["combined_base"]
+            elif not isinstance(save_to, (FileObject, DataObject)):
+                save_to = FitsTable(save_to)
+            print(time.strftime("[%m/%d %H:%M:%S]"), "save to path", save_to.path)
+
+        t = self.load(**defaults)
+
+        if save_to is not False:
+            save_to.write(t, overwrite=overwrite)
+
+        return t
+
+    def load_combined_base_catalog(self, generate_if_not_exist=False, **kwargs):
+        """
+        load combined base catalog from all good base catalogs
+        """
+        try:
+            t = self._database["combined_base"].read()
+        except IOError:
+            if generate_if_not_exist:
+                t = self.generate_combined_base_catalog(**kwargs)
             else:
                 raise
         return t
