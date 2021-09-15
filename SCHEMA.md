@@ -1,20 +1,26 @@
-# Schema for SAGA Data Release 2 (DR2) Base Catalogs
+# Schema for SAGA Data Release 3 (DR3) Base Catalogs
 
-## Object catalog (v2.1) schema
+## Object catalog (v3) schema
 
 Label | Unit | Definition
 --- | --- | ---
-`OBJID` | - | Unique photometric object identifier *
-`RA` | degree | Right ascension J2000 *
-`DEC` | degree | Declination J2000 *
-`REMOVE` | - |  0 if good object  *
-`is_galaxy` | - | True if classified as galaxy *
-`morphology_info` | - | Additional morphology info; users should use `is_galaxy` instead *
-`radius` | arcsec | Effective radius of object *
-`radius_err` | arcsec | Estimated error on effective radius of object *
-`<band>_mag` | - | ugrizy magnitude from primary survey, e.g., `r_mag`, [99 or NaN if no measurement] *
-`<band>_err` | - | ugrizy magnitude error from primary survey, e.g., `r_err`, [99 or NaN if no measurement] *
-`survey` | - | Primary survey source for photometry (see the note below)
+`OBJID` | - | Unique photometric object identifier
+`RA` | degree | Right ascension J2000
+`DEC` | degree | Declination J2000
+`REMOVE` | - |  0 if good object
+`is_galaxy` | - | True if classified as galaxy
+`morphology_info` | - | Additional morphology info; users should use `is_galaxy` instead
+`radius` | arcsec | Effective (half-light) circularized radius of object
+`radius_err` | arcsec | Estimated error on effective radius of object
+`ba` | - | galaxy aspect ratio (minor-to-major axis ratio; b/a)
+`phi` | - | position angle of the galaxy
+`sma` | - | semi-major axis at about ~ mag/arcsec^2 surface brightness isophote
+`REF_CAT` | - | whether this object is in the SGA (`L3`) or the Gaia (`G2`) catalogs
+`SGA_ID` | - | SGA ID for objects in the SGA catalog 
+`<band>_mag` | mag | ugrizy magnitude from primary survey, e.g., `r_mag`. [99 or NaN if no measurement]
+`<band>_err` | mag | ugrizy magnitude error from primary survey, e.g., `r_err`. [99 or NaN if no measurement]
+`r_fibermag` | mag | r-band fiber magnitude (fiber diameter = 1.5 arcsec)
+`survey` | - | Primary survey source for photometry
 `TELNAME` | - | Primary source for spectroscopy
 `SPEC_Z` | - |  Redshift of object (-1 if not measured)
 `SPEC_Z_ERR` | - | Estimated error on redshift
@@ -25,7 +31,8 @@ Label | Unit | Definition
 `MASKNAME` | - | spectroscopic mask name
 `RA_spec` | deg | Right ascension J2000 of the spectroscopic object
 `DEC_spec`  | deg |  Declination J2000 of the spectroscopic object
-`EM_ABS` | - | emission line or absorption line
+`spec_phot_sep` | arcsec | separation between the photometric and the spectroscopic coordinates 
+`EM_ABS` | - | emission line or absorption line (obsolete; do not use)
 `HELIO_CORR` | - | True of heliocentric correction has be applied
 `EW_Halpha` | angstrom | Halpha equivalent width
 `EW_Halpha_err` | angstrom | Error on Halpha equivalent width
@@ -33,6 +40,7 @@ Label | Unit | Definition
 `sb_r` | - | Effective apparent surface brightness in r-band
 `log_sm` | - | log (stellar mass / Msun)
 `HOST_NSAID` | - |  NSAID of host (v0)
+`HOST_NSA1ID` | - |  NSAID of host (v1)
 `HOST_PGC` | - |  PGC name of host
 `HOST_RA` | deg |  Right ascension J2000 of host
 `HOST_DEC` | deg |  Declination J2000 of host
@@ -40,9 +48,10 @@ Label | Unit | Definition
 `HOST_VHOST` | km/s |  Recession (Heliocentric) velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
-`p_sat_approx` | - | Approximated probability of this object being a satellite. Use with care.
+`p_sat_approx` | - | Raw pproximated probability of this object being a satellite. Do NOT use.
+`p_sat_corrected` | - | Corrected approximated probability of this object being a satellite. Use with care.
 
-_*data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`)._
+_*For SAGA DR2, data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`). For SAGA DR3, these are taken from LS DR9._
 
 
 ## Host list (v2) schema
@@ -80,6 +89,7 @@ Label | Unit | Definition
 `COVERAGE_DECALS_DR6` | - | Fraction of LS DR6 coverage within 1 Rvir
 `COVERAGE_DECALS_DR7` | - | Fraction of LS DR7 coverage within 1 Rvir
 `COVERAGE_DECALS_DR8` | - | Fraction of LS DR8 coverage within 1 Rvir
+`COVERAGE_DECALS_DR9` | - | Fraction of LS DR9 coverage within 1 Rvir
 `COVERAGE_DES_DR1` | - | Fraction of DES Dr1 coverage within 1 Rvir
 `COVERAGE_SDSS` | - | Fraction of SDSS coverage within 1 Rvir
 `HOST_SCORE` | - | Usable hosts if >=4
