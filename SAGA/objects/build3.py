@@ -5,7 +5,7 @@ from itertools import chain
 
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.table import vstack, join
+from astropy.table import vstack
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
@@ -460,23 +460,7 @@ def add_sga(base, sga):
     return base, sga
 
 
-def add_sga_specs(base, sga, halpha=None):
-
-    if halpha is not None:
-        halpha = QueryMaker.equal("TELNAME", "SGA").filter(halpha, ["EW_Halpha", "EW_Halpha_err", "SPECOBJID1"])
-        halpha["SGA_ID"] = halpha["SPECOBJID1"].astype(np.int64)
-        del halpha["SPECOBJID1"]
-        halpha = QueryMaker.isin("SGA_ID", sga["SGA_ID"]).filter(halpha)
-
-        if len(halpha):
-            sga = join(sga, halpha, "SGA_ID", "left")
-            sga["EW_Halpha"].fill_value = np.nan
-            sga["EW_Halpha_err"].fill_value = np.nan
-            sga = sga.filled()
-
-    if "EW_Halpha" not in sga.colnames:
-        sga["EW_Halpha"] = np.nan
-        sga["EW_Halpha_err"] = np.nan
+def add_sga_specs(base, sga):
 
     matching_idx, sga = match_sga(base, sga)
 
@@ -506,8 +490,6 @@ def add_sga_specs(base, sga, halpha=None):
         base["MASKNAME"][base_idx] = str(sga_this["REF"])
         base["TELNAME"][base_idx] = "SGA"
         base["HELIO_CORR"][base_idx] = True
-        base["EW_Halpha"][base_idx] = sga_this["EW_Halpha"]
-        base["EW_Halpha_err"][base_idx] = sga_this["EW_Halpha_err"]
 
     return base
 
@@ -597,14 +579,18 @@ def build_full_stack(  # pylint: disable=unused-argument
     all_spectra = [s for s in all_spectra if s is not None]
     if all_spectra:
         all_spectra = vstack(all_spectra, "exact")
-        if halpha is not None:
-            all_spectra = build2.add_halpha_to_spectra(all_spectra, halpha)
         base = build2.add_spectra(base, all_spectra, debug=debug, matching_order=SPEC_MATCHING_ORDER)
     del all_spectra
 
-    base = add_sga_specs(base, sga, halpha)
-    del sga, halpha
+    if sga is not None:
+        base = add_sga_specs(base, sga)
+        del sga
+
     base = build2.remove_shreds_near_spec_obj(base)
+
+    if halpha is not None:
+        base = build2.add_halpha(base, halpha, match_by_objid=True)
+        del halpha
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)

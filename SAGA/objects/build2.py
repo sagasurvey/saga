@@ -73,8 +73,6 @@ NSA_COLS_USED = list(_NSA_COLS_USED)
 
 EXTENDED_SPECS_COLUMNS = dict(
     SPECS_COLUMNS,
-    EW_Halpha="<f4",
-    EW_Halpha_err="<f4",
     OBJ_NSAID="<i4",
     SPEC_REPEAT="<U48",
     SPEC_REPEAT_ALL="<U48",
@@ -385,14 +383,33 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     return catalog[MERGED_CATALOG_COLUMNS]
 
 
-def add_halpha_to_spectra(spectra, halpha):
-    halpha = halpha["EW_Halpha", "EW_Halpha_err", "TELNAME", "MASKNAME", "SPECOBJID1"]
-    halpha.rename_column("SPECOBJID1", "SPECOBJID")
-    halpha = ensure_specs_dtype(halpha, cols_definition=EXTENDED_SPECS_COLUMNS, skip_missing_cols=True)
-    spectra = join(spectra, halpha, ["TELNAME", "MASKNAME", "SPECOBJID"], "left")
-    spectra["EW_Halpha"].fill_value = np.nan
-    spectra["EW_Halpha_err"].fill_value = np.nan
-    return spectra.filled()
+def add_halpha(base, halpha, match_by_objid=False):
+
+    if not match_by_objid and "SPECOBJID1" in halpha.colnames:
+        halpha.rename_column("SPECOBJID1", "SPECOBJID")
+
+    cols = ["EW_Halpha", "EW_Halpha_err"]
+    if match_by_objid:
+        cols.append("OBJID")
+    else:
+        cols.extend(["TELNAME", "MASKNAME", "SPECOBJID"])
+    halpha = halpha[cols]
+
+    halpha = ensure_specs_dtype(
+        halpha,
+        cols_definition=dict(EXTENDED_SPECS_COLUMNS, EW_Halpha="<f4", EW_Halpha_err="<f4"),
+        skip_missing_cols=True,
+    )
+
+    base["_INDEX"] = np.arange(len(base))
+    base = join(base, halpha, cols[2:], "left")
+    for col in cols[:2]:
+        base[col].fill_value = np.nan
+        base.replace_column(col, base[col].filled())
+    base.sort("_INDEX")
+    del base["_INDEX"]
+
+    return base
 
 
 def assign_photometry_choice(stacked_catalog, indices, is_last):
@@ -1135,12 +1152,13 @@ def build_full_stack(  # pylint: disable=unused-argument
         all_spectra = vstack(all_spectra, "exact")
 
     if len(all_spectra):
-        if halpha is not None:
-            all_spectra = add_halpha_to_spectra(all_spectra, halpha)
         base = add_spectra(base, all_spectra, debug=debug)
         del all_spectra
         base = remove_shreds_near_spec_obj(base, nsa, shreds_recover=shreds_recover)
         del nsa
+
+    if halpha is not None:
+        base = add_halpha(base, halpha)
 
     if "RHOST_KPC" in base.colnames:  # has host info
         base = remove_too_close_to_host(base)
