@@ -10,7 +10,7 @@ import astropy.units
 import numexpr as ne
 import numpy as np
 from astropy.coordinates import SkyCoord, search_around_sky
-from astropy.table import join, vstack
+from astropy.table import join, vstack, unique
 from easyquery import Query, QueryMaker
 from fast3tree import find_friends_of_friends
 
@@ -393,7 +393,7 @@ def add_halpha(base, halpha, match_by_objid=False):
         cols.append("OBJID")
     else:
         cols.extend(["TELNAME", "MASKNAME", "SPECOBJID"])
-    halpha = halpha[cols]
+    halpha = unique(halpha[cols], cols[2:])
 
     halpha = ensure_specs_dtype(
         halpha,

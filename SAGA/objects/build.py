@@ -800,6 +800,13 @@ def find_satellites(base, version=1):
             {"SATS": 5},
         )
 
+    if base["HOSTID"][0] == "pgc72009":  # overlapping with pgc72060
+        fill_values_by_query(
+            base,
+            Query("OBJID == 902602820000003112", "SATS == 1"),
+            {"SATS": 5},
+        )
+
     return base
 
 
