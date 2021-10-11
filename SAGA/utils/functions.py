@@ -293,6 +293,8 @@ def get_coord(table, coord=None):
             return table["coord"]
         if "RA" in _cols and "DEC" in _cols:
             return SkyCoord(table["RA"], table["DEC"], unit="deg")
+        if "ra" in _cols and "dec" in _cols:
+            return SkyCoord(table["ra"], table["dec"], unit="deg")
     else:
         if isinstance(coord, str) and coord in _cols and isinstance(table[coord], SkyCoord):
             return table[coord]

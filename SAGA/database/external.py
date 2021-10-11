@@ -14,6 +14,10 @@ from astropy.coordinates import SkyCoord
 from astropy.io import ascii
 from astropy.table import Table, vstack
 
+from ..utils import makedirs_if_needed
+from ..utils.overlap_checker import is_within
+from .core import DownloadableBase, FitsTable
+
 try:
     from astroquery.gaia import Gaia
 except ImportError:
@@ -22,9 +26,12 @@ else:
     _HAS_GAIA_ = True
     Gaia.ROW_LIMIT = 0
 
-from ..utils import makedirs_if_needed
-from ..utils.overlap_checker import is_within
-from .core import DownloadableBase, FitsTable
+try:
+    from astroquery.mast import Catalogs as MastCatalogs
+except ImportError:
+    _HAS_MAST_ = False
+else:
+    _HAS_MAST_ = True
 
 _HAS_CASJOBS_ = True
 try:
@@ -63,6 +70,7 @@ __all__ = [
     "DecalsPrebuilt",
     "DecalsQuery",
     "GaiaQuery",
+    "GalexQuery",
     "download_catalogs_for_hosts",
 ]
 
@@ -680,6 +688,7 @@ class DecalsQuery(DownloadableBase):
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
             return
+        makedirs_if_needed(file_path)
         f = FitsTable(file_path)
         f.compress_after_write = bool(compress)
         f.write(self.get_decals_catalog())
@@ -690,13 +699,34 @@ class GaiaQuery(DownloadableBase):
         self.coord = SkyCoord(ra, dec, unit="deg")
         self.radius = radius * u.deg  # pylint: disable=no-member
 
-    def get_gaia_catalog(self):
+    def get_catalog(self):
         if not _HAS_GAIA_:
             raise RuntimeError("Needs astroquery to access Gaia!")
         return Gaia.cone_search_async(self.coord, self.radius).get_data()
 
     def download_as_file(self, file_path, overwrite=False, **kwargs):
-        self.get_gaia_catalog().write(file_path, format="ascii.ecsv", overwrite=overwrite)
+        makedirs_if_needed(file_path)
+        self.get_catalog().write(file_path, format="ascii.ecsv", overwrite=overwrite)
+
+
+class GalexQuery(DownloadableBase):
+    def __init__(self, ra, dec, radius=1.0):
+        self.coord = SkyCoord(ra, dec, unit="deg")
+        self.radius = radius * u.deg  # pylint: disable=no-member
+
+    def get_catalog(self):
+        if not _HAS_MAST_:
+            raise RuntimeError("Needs astroquery to access Galex!")
+        n_max = 500000
+        return MastCatalogs.query_region(self.coord, self.radius, catalog="Galex", pagesize=n_max, maxrecords=n_max).filled()
+
+    def download_as_file(self, file_path, overwrite=False, compress=True):
+        if os.path.isfile(file_path) and not overwrite:
+            return
+        makedirs_if_needed(file_path)
+        f = FitsTable(file_path)
+        f.compress_after_write = bool(compress)
+        f.write(self.get_catalog())
 
 
 def download_catalogs_for_hosts(

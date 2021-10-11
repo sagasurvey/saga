@@ -676,6 +676,7 @@ class ObjectCatalog(object):
                 if catalog_name == "wise":
                     cat = cat[build.WISE_COLS_USED]
                 catalog_dict[catalog_name.partition("_")[0]] = cat
+                del cat
 
             print(
                 time.strftime("[%m/%d %H:%M:%S]"),
@@ -686,6 +687,15 @@ class ObjectCatalog(object):
                 ),
                 "({}/{})".format(i + 1, nhosts),
             )
+
+            # add galex
+            try:
+                cat = self._database["galex", host_id].read()
+            except OSError:
+                pass
+            else:
+                catalog_dict["galex"] = cat[build3.GALEX_COLUMNS]
+                del cat
 
             if debug is None:
                 debug_this = None

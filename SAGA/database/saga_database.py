@@ -439,6 +439,7 @@ class Database(object):
                 "{}_decals_dr9.fits.gz",
             ),
             "gaia": os.path.join(self._local_dir, "external_catalogs", "astrometric", "{}_gaia.ecsv"),
+            "galex": os.path.join(self._local_dir, "external_catalogs", "galex", "{}_galex.fits.gz"),
         }
 
         self._possible_base_versions = tuple(

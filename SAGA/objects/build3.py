@@ -9,7 +9,7 @@ from astropy.table import vstack
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
-from ..utils import add_skycoord, fill_values_by_query, get_remove_flag
+from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, nearest_neighbor_join, calc_normalized_dist
 from ..utils.distance import v2z
 from . import build, build2
 from . import cuts as C
@@ -46,7 +46,7 @@ def _n_or_more_lt(cols, n, cut):
 
 
 SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "D26", "PA", "BA"]
-
+GALEX_COLUMNS = ["ra", "dec", "nuv_exptime", "nuv_mag", "nuv_magerr", "nuv_artifact", "fuv_exptime", "fuv_mag", "fuv_magerr", "fuv_artifact"]
 
 MERGED_CATALOG_COLUMNS = list(
     chain(
@@ -526,6 +526,51 @@ def add_spec_phot_sep(base):
     return base
 
 
+def add_galex(base, galex):
+
+    if galex is None:
+        base["RA_galex"] = np.nan
+        base["DEC_galex"] = np.nan
+        for band in ["nuv", "fuv"]:
+            base[f"{band}_mag"] = np.nan
+            base[f"{band}_magerr"] = np.nan
+        return base
+
+    for band in ["nuv", "fuv"]:
+        observed = (galex[f"{band}_exptime"] > 0) & (galex[f"{band}_exptime"] != 1e20)
+        not_observed = ~observed
+        galex[f"{band}_mag"][not_observed] = np.nan
+        galex[f"{band}_magerr"][not_observed] = np.nan
+
+    galex = galex["ra", "dec", "nuv_mag", "nuv_magerr", "fuv_mag", "fuv_magerr"]
+    base = nearest_neighbor_join(base, galex, sep_label="sep_galex", table_names=("", "_galex"))
+    del galex
+    base.rename_column("ra", "RA_galex")
+    base.rename_column("dec", "DEC_galex")
+
+    sep = base["sep_galex"]
+    sep_norm = calc_normalized_dist(
+        base["RA_galex"],
+        base["DEC_galex"],
+        base["RA"],
+        base["DEC"],
+        base["sma"],
+        base["ba"],
+        base["phi"],
+        multiplier=1,
+    )
+    del base["sep_galex"]
+
+    good_match = (sep < 3) | ((sep_norm < 2) & (sep < 40))
+    not_good_match = ~good_match
+
+    for band in ["nuv", "fuv"]:
+        base[f"{band}_mag"][not_good_match] = np.nan
+        base[f"{band}_magerr"][not_good_match] = np.nan
+
+    return base
+
+
 def build_full_stack(  # pylint: disable=unused-argument
     host,
     decals=None,
@@ -536,11 +581,11 @@ def build_full_stack(  # pylint: disable=unused-argument
     sga=None,
     spectra=None,
     halpha=None,
-    shreds_recover=None,
     debug=None,
     delve=None,
     delve_remove=None,
     delve_recover=None,
+    galex=None,
     **kwargs,
 ):
     """
@@ -591,6 +636,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     if halpha is not None:
         base = build2.add_halpha(base, halpha, match_by_objid=True)
         del halpha
+
+    base = add_galex(base, galex)
+    del galex
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
