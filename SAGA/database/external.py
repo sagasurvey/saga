@@ -705,6 +705,8 @@ class GaiaQuery(DownloadableBase):
         return Gaia.cone_search_async(self.coord, self.radius).get_data()
 
     def download_as_file(self, file_path, overwrite=False, **kwargs):
+        if os.path.isfile(file_path) and not overwrite:
+            return
         makedirs_if_needed(file_path)
         self.get_catalog().write(file_path, format="ascii.ecsv", overwrite=overwrite)
 

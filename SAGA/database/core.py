@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import requests
 from astropy.io import fits
+from astropy.io.ascii import ecsv
 from astropy.table import Table
 from astropy.utils.data import clear_download_cache
 
@@ -16,6 +17,11 @@ try:
     FileExistsError
 except NameError:
     FileExistsError = OSError  # pylint: disable=redefined-builtin
+
+
+# Fix for newer astropy versions
+if "object" not in ecsv.ECSV_DATATYPES:
+    ecsv.ECSV_DATATYPES = ecsv.ECSV_DATATYPES + ("object",)
 
 
 __all__ = [
