@@ -561,7 +561,7 @@ def add_galex(base, galex):
     )
     del base["sep_galex"]
 
-    good_match = (sep < 3) | ((sep_norm < 2) & (sep < 40))
+    good_match = (sep < 3) | ((sep_norm < 1.5) & (sep < 30))
     not_good_match = ~good_match
 
     for band in ["nuv", "fuv"]:
