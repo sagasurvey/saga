@@ -148,26 +148,28 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["radius_err"] = _fill_not_finite(_ivar2err(catalog["SHAPE_R_IVAR"]) * sqrt_ba, 9999.0)
     del sqrt_ba
 
-    for BAND in ("G", "R", "Z", "W1", "W2", "W3", "W4"):
+    # Recalculate mag and err to fix old bugs in the raw catalogs
+    const = 2.5 / np.log(10)
+    for BAND in ("U", "G", "R", "I", "Z", "W1", "W2", "W3", "W4"):
+        band = BAND.lower()
+
+        if f"FLUX_{BAND}" not in catalog.colnames:
+            catalog[f"{band}_mag"] = np.float32(99.0)
+            catalog[f"{band}_err"] = np.float32(99.0)
+            continue
+
         catalog[f"SIGMA_{BAND}"] = catalog[f"FLUX_{BAND}"] * np.sqrt(catalog[f"FLUX_IVAR_{BAND}"])
         catalog[f"SIGMA_GOOD_{BAND}"] = np.where(catalog[f"RCHISQ_{BAND}"] < 100, catalog[f"SIGMA_{BAND}"], 0.0)
 
-    # Recalculate mag and err to fix old bugs in the raw catalogs
-    const = 2.5 / np.log(10)
-    for band in "grz":
-        BAND = band.upper()
         with np.errstate(divide="ignore", invalid="ignore"):
             catalog[f"{band}_mag"] = _fill_not_finite(
                 22.5 - const * np.log(catalog[f"FLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
             )
             catalog[f"{band}_err"] = _fill_not_finite(const / np.abs(catalog[f"SIGMA_{BAND}"]))
-            catalog[f"{band}_fibermag"] = _fill_not_finite(
-                22.5 - const * np.log(catalog[f"FIBERFLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
-            )
-
-    for band in "ui":
-        catalog[f"{band}_mag"] = np.float32(99.0)
-        catalog[f"{band}_err"] = np.float32(99.0)
+            if f"FIBERFLUX_{BAND}" in catalog.colnames:
+                catalog[f"{band}_fibermag"] = _fill_not_finite(
+                    22.5 - const * np.log(catalog[f"FIBERFLUX_{BAND}"] / catalog[f"MW_TRANSMISSION_{BAND}"])
+                )
 
     # BASS-DECaLS r mag correction
     catalog["r_mag"] = np.where(
