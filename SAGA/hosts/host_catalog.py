@@ -1,5 +1,5 @@
 """
-SAGA.host.host_catalog
+SAGA.hosts.host_catalog
 
 This file defines the HostCatalog class
 """
