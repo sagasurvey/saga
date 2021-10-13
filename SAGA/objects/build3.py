@@ -65,11 +65,11 @@ MERGED_CATALOG_COLUMNS = list(
             "REF_CAT",
             "SGA_ID",
         ),
-        (b + "_mag" for b in "ugriz"),
-        (b + "_err" for b in "ugriz"),
-        (
-            "r_fibermag",
-        ),
+        (f"{b}_mag" for b in "ugriz"),
+        (f"{b}_err" for b in "ugriz"),
+        (f"w{b}_mag" for b in "1234"),
+        (f"w{b}_err" for b in "1234"),
+        (f"{b}_fibermag" for b in "grz"),
     )
 )
 
