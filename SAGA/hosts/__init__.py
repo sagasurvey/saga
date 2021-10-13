@@ -1,5 +1,5 @@
 """
-SAGA.host
+SAGA.hosts
 
 This subpackage contains host-related routines, including HostCatalog
 """

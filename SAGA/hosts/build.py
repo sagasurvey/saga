@@ -1,7 +1,7 @@
 """
-SAGA.host.build
+SAGA.hosts.build
 
-This file contains the functinos to build the master list and host list
+This file contains the functions to build the master list and host list
 """
 
 import astropy.units as u
