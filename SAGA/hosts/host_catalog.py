@@ -14,7 +14,7 @@ from easyquery import Query, QueryMaker
 from ..database import Database
 from ..utils import add_skycoord, find_near_ra_dec
 from . import cuts
-from .build import build_master_list
+from .build import build_master_list  # pylint: disable=no-name-in-module
 
 __all__ = ["HostCatalog", "FieldCatalog"]
 
