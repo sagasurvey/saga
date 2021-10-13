@@ -19,8 +19,8 @@ except NameError:
     FileExistsError = OSError  # pylint: disable=redefined-builtin
 
 
-# Fix for newer astropy versions
-if "object" not in ecsv.ECSV_DATATYPES:
+# Hot fix on ECSV_DATATYPES for newer astropy versions
+if hasattr(ecsv, "ECSV_DATATYPES") and "object" not in ecsv.ECSV_DATATYPES:
     ecsv.ECSV_DATATYPES = ecsv.ECSV_DATATYPES + ("object",)
 
 
