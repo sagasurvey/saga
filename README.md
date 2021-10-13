@@ -2,7 +2,7 @@ SAGA
 ====
 [![arXiv:2008.12783](https://img.shields.io/badge/astro--ph.GA-arXiv%3A2008.12783-B31B1B.svg)](https://arxiv.org/abs/2008.12783)
 
-The [SAGA Survey](http://sagasurvey.org/) is a spectroscopic survey that aims
+The [SAGA Survey](https://sagasurvey.org/) is a spectroscopic survey that aims
 to determine dwarf galaxy satellite systems around 100 Milky Way analogs down
 to the brightness of the Leo I galaxy (Mr < −12.3).
 
@@ -10,7 +10,7 @@ This `SAGA` package contains code to generate and access SAGA data catalogs.
 This package is intended for SAGA internal use, but it is licensed under the 
 MIT license. 
 If you use this package or part of it in your research, please considering citing
-SAGA Stage II paper (Mao et al. 2020).
+[SAGA II paper (Mao et al., 2021)](https://ui.adsabs.harvard.edu/abs/2021ApJ...907...85M/abstract).
 
 - Visit [yymao/FoFCatalogMatching](https://github.com/yymao/FoFCatalogMatching) 
   if you are looking for the friends-of-friends sky catalog matching code.
@@ -31,8 +31,8 @@ To force an update, run
 pip install --upgrade --no-deps --force-reinstall https://github.com/sagasurvey/saga/archive/master.zip
 ```
 
-The code should be compatible with Python 3.5+,
-but has mainly been tested with Python 3.6.
+The code should be compatible with Python 3.6+, 
+but Python 3.6 support may be dropping in 2022. 
 
 ### Dependencies
 
@@ -51,7 +51,7 @@ There are two optional dependencies that require manual installation:
 
    * To install sciserver (recommended):
      ```sh
-     pip install "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.0.13#egg=sciserver&subdirectory=py3"
+     pip install "git+https://github.com/sciserver/SciScript-Python.git@sciserver-v2.1.0#egg=sciserver&subdirectory=py3"
      ```
    In both cases you need to set environmental variables to store your credentials. (`CASJOBS_WSID` and `CASJOBS_PW` for casjobs; `SCISERVER_USER` and `SCISERVER_PASS` for sciserver).
 
@@ -80,7 +80,7 @@ You can then load various datasets:
 hosts = saga.host_catalog.load()
 
 # load base catalogs of Paper I hosts
-base_paper1 = saga.object_catalog.load(hosts='paper1', return_as='list')
+base_paper1 = saga.object_catalog.load(hosts='paper2', return_as='list')
 
 # count number of satellites
 for base in base_paper1:
