@@ -4,12 +4,13 @@ base catalog building pipeline 3.0
 from itertools import chain
 
 import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy.table import vstack
+import astropy.units as u
+from astropy.coordinates import SkyCoord, search_around_sky
+from astropy.table import Table, vstack, unique
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
-from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, nearest_neighbor_join, calc_normalized_dist
+from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, calc_normalized_dist, get_coord
 from ..utils.distance import v2z
 from . import build, build2
 from . import cuts as C
@@ -530,45 +531,57 @@ def add_spec_phot_sep(base):
 
 def add_galex(base, galex):
 
+    galex_bands = ("nuv", "fuv")
+
+    for band in galex_bands:
+        base[f"RA_{band}"] = np.float64(np.nan)
+        base[f"DEC_{band}"] = np.float64(np.nan)
+        base[f"{band}_mag"] = np.float32(np.nan)
+        base[f"{band}_magerr"] = np.float32(np.nan)
+
     if galex is None:
-        base["RA_galex"] = np.nan
-        base["DEC_galex"] = np.nan
-        for band in ["nuv", "fuv"]:
-            base[f"{band}_mag"] = np.nan
-            base[f"{band}_magerr"] = np.nan
         return base
 
-    for band in ["nuv", "fuv"]:
-        observed = (galex[f"{band}_exptime"] > 0) & (galex[f"{band}_exptime"] != 1e20)
-        not_observed = ~observed
-        galex[f"{band}_mag"][not_observed] = np.nan
-        galex[f"{band}_magerr"][not_observed] = np.nan
+    galex_stack = []
+    for band in galex_bands:
+        cols = ["ra", "dec", f"{band}_mag", f"{band}_magerr"]
+        galex_this = Query(f"{band}_exptime > 0", f"{band}_exptime < 1e20").filter(galex, cols)
+        galex_this.rename_column(f"{band}_mag", "mag")
+        galex_this.rename_column(f"{band}_magerr", "magerr")
+        galex_this["band"] = band
+        galex_stack.append(galex_this)
+    galex = vstack(galex_stack)
+    del galex_stack, galex_this
 
-    galex = galex["ra", "dec", "nuv_mag", "nuv_magerr", "fuv_mag", "fuv_magerr"]
-    base = nearest_neighbor_join(base, galex, sep_label="sep_galex", table_names=("", "_galex"))
-    del galex
-    base.rename_column("ra", "RA_galex")
-    base.rename_column("dec", "DEC_galex")
+    base = add_skycoord(base)
+    galex_coord = get_coord(galex)
 
-    sep = base["sep_galex"]
-    sep_norm = calc_normalized_dist(
-        base["RA_galex"],
-        base["DEC_galex"],
-        base["RA"],
-        base["DEC"],
-        base["sma"],
-        base["ba"],
-        base["phi"],
+    matches = Table(search_around_sky(base["coord"], galex_coord, 40 * u.arcsec), names=["idx_base", "idx_galex", "sep", "sep_3d"])
+    del matches["sep_3d"]
+    matches["sep"] = matches["sep"].to("arcsec")
+    matches["sep_norm"] = calc_normalized_dist(
+        galex["ra"][matches["idx_galex"]],
+        galex["dec"][matches["idx_galex"]],
+        base["RA"][matches["idx_base"]],
+        base["DEC"][matches["idx_base"]],
+        base["sma"][matches["idx_base"]],
+        base["ba"][matches["idx_base"]],
+        base["phi"][matches["idx_base"]],
         multiplier=1,
     )
-    del base["sep_galex"]
 
-    good_match = (sep < 3) | ((sep_norm < 1.5) & (sep < 30))
-    not_good_match = ~good_match
+    matches = (Query("sep <= 3") | Query("sep_norm <= 1")).filter(matches)
+    matches["invalid_mag"] = 1 - (galex["mag"][matches["idx_galex"]] < 99).astype(np.int32)
+    matches["band"] = galex["band"][matches["idx_galex"]]
+    matches.sort(["invalid_mag", "sep"])
+    matches = unique(matches, keys=["idx_base", "band"])
 
-    for band in ["nuv", "fuv"]:
-        base[f"{band}_mag"][not_good_match] = np.nan
-        base[f"{band}_magerr"][not_good_match] = np.nan
+    for band in galex_bands:
+        idx_base, idx_galex = QueryMaker.equal("band", band).filter(matches, ["idx_base", "idx_galex"]).itercols()
+        base[f"RA_{band}"][idx_base] = galex["ra"][idx_galex]
+        base[f"DEC_{band}"][idx_base] = galex["dec"][idx_galex]
+        base[f"{band}_mag"][idx_base] = galex["mag"][idx_galex]
+        base[f"{band}_magerr"][idx_base] = galex["magerr"][idx_galex]
 
     return base
 
