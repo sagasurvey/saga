@@ -556,7 +556,10 @@ def add_galex(base, galex):
     base = add_skycoord(base)
     galex_coord = get_coord(galex)
 
-    matches = Table(search_around_sky(base["coord"], galex_coord, 40 * u.arcsec), names=["idx_base", "idx_galex", "sep", "sep_3d"])
+    matches = Table(
+        data=search_around_sky(base["coord"], galex_coord, 40 * u.arcsec),  # pylint: disable=no-member
+        names=["idx_base", "idx_galex", "sep", "sep_3d"],
+    )
     del matches["sep_3d"]
     matches["sep"] = matches["sep"].to("arcsec")
     matches["sep_norm"] = calc_normalized_dist(
