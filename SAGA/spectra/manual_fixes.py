@@ -9,3 +9,8 @@ fixes_sdss_spec_by_objid = {
 fixes_2df_spec_by_objid = {
     "TGS905Z093": {"ZQUALITY": 3},
 }
+
+fixes_nsa_v1_spec_by_nsaid = {
+    681293: {"ZQUALITY": 1},
+    622813: {"ZQUALITY": 1},
+}
