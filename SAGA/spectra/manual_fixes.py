@@ -19,3 +19,7 @@ fixes_2df_spec_by_objid = {
 fixes_ozdes_spec_by_objid = {
     "SVA1_COADD-2940383035": {"ZQUALITY": 1},
 }
+
+fixes_6df_spec_by_objid = {
+    "g2117041-090029": {"ZQUALITY": 1},
+}
