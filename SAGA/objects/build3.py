@@ -285,6 +285,8 @@ def apply_manual_fixes(base):
                 902577060000004414,
                 900452390000002003,
                 904733050000000124,
+                904501610000001442,
+                901215290000002014,
             ],
         ),
         dict(is_galaxy=True),
@@ -379,6 +381,20 @@ def apply_manual_fixes(base):
         QueryMaker.equal("OBJID", 904488130000004168),
         dict(RA=0.4993274319772168, DEC=20.986906437087658),
     )
+
+    return base
+
+
+def fix_zero_radius_for_galaxies(base):
+    is_galaxy = Query("is_galaxy")
+    valid_sma = Query("sma > 0", "sma < 1e20")
+    valid_radius = Query("radius > 0", "radius < 1e20")
+
+    idx = np.flatnonzero(Query(is_galaxy, ~valid_sma).mask(base))
+    base["sma"][idx] = np.exp((22.5 - base["r_mag"][idx]) * 0.4)
+
+    idx = np.flatnonzero(Query(is_galaxy, ~valid_radius).mask(base))
+    base["radius"][idx] = base["sma"][idx] / 3.0 * np.sqrt(base["ba"][idx])
 
     return base
 
@@ -631,6 +647,7 @@ def build_full_stack(  # pylint: disable=unused-argument
 
     base = cap_sma_value(base)
     base = apply_manual_fixes(base)
+    base = fix_zero_radius_for_galaxies(base)
 
     all_spectra = [
         filter_nearby_object(spectra, host),
