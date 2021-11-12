@@ -65,6 +65,7 @@ MERGED_CATALOG_COLUMNS = list(
             "sma",
             "REF_CAT",
             "SGA_ID",
+            "FITBITS",
         ),
         (f"{b}_mag" for b in "ugriz"),
         (f"{b}_err" for b in "ugriz"),
@@ -287,6 +288,8 @@ def apply_manual_fixes(base):
                 904733050000000124,
                 904501610000001442,
                 901215290000002014,
+                904461200000003516,
+                904488130000004194,
             ],
         ),
         dict(is_galaxy=True),
@@ -368,18 +371,6 @@ def apply_manual_fixes(base):
         base,
         QueryMaker.equal("OBJID", 915434150000002223),
         dict(sma=150.0),
-    )
-
-    # Flipped coordinates for a galaxy/star pair in nsa126115
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 904488130000004194),
-        dict(RA=0.4979568838114891, DEC=20.985493504498578),
-    )
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 904488130000004168),
-        dict(RA=0.4993274319772168, DEC=20.986906437087658),
     )
 
     return base
