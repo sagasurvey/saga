@@ -114,17 +114,28 @@ def fill_values_by_query(table, query, values_to_fill):
     return n_matched
 
 
-def get_remove_flag(catalog, remove_queries):
+def get_remove_flag(catalog, remove_queries, dtype=None):
     """
     get remove flag by remove queries. remove_queries can be a list or dict.
     """
+
+    if dtype is None:
+        n = len(remove_queries)
+        if n < 16:
+            dtype = np.int32
+        elif n < 32:
+            dtype = np.int64
+        elif n < 64:
+            dtype = np.uint64
+        else:
+            raise ValueError("too many remove queries")
 
     try:
         iter_queries = iter(remove_queries.items())
     except AttributeError:
         iter_queries = enumerate(remove_queries)
 
-    remove_flag = np.zeros(len(catalog), dtype=np.int)
+    remove_flag = np.zeros(len(catalog), dtype=dtype)
     for i, remove_query in iter_queries:
         remove_flag[Query(remove_query).mask(catalog)] += 1 << i
     return remove_flag
