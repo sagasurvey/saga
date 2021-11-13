@@ -186,12 +186,17 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         4: QueryMaker.equal("TYPE", "DEV"),
         5: QueryMaker.equal("TYPE", "SER"),
         6: QueryMaker.equal("REF_CAT", "L3"),
-        7: Query(possible_galaxy, likely_galaxy_1),
-        8: Query(possible_galaxy, likely_galaxy_2),
+        7: Query(likely_galaxy_1),
+        8: Query(likely_galaxy_2),
+        9: Query(possible_galaxy),
     }
 
     catalog["morphology_info"] = get_remove_flag(catalog, type_queries)
-    catalog["is_galaxy"] = (catalog["morphology_info"] % 4 > 0) & (catalog["morphology_info"] >> 6 == 0)
+    catalog["is_galaxy"] = (
+        (catalog["morphology_info"] % 4 == 0)
+        | ((catalog["morphology_info"] >> 6) % 2 > 0)
+        | ((catalog["morphology_info"] >> 7) % 8 > 4)
+    )
 
     remove_queries = {
         1: _n_or_more_gt(allmask_grz, 2, 0),
@@ -295,7 +300,7 @@ def apply_manual_fixes(base):
         904461200000003516,
         904488130000004194,
     ]
-    mask = Query.isin("OBJID", galaxies_not_stars).mask(base)
+    mask = QueryMaker.isin("OBJID", galaxies_not_stars).mask(base)
     base["is_galaxy"][mask] = True
     base["morphology_info"][mask] += (1 << 10)
 
