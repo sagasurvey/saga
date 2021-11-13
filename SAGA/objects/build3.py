@@ -65,7 +65,6 @@ MERGED_CATALOG_COLUMNS = list(
             "sma",
             "REF_CAT",
             "SGA_ID",
-            "FITBITS",
         ),
         (f"{b}_mag" for b in "ugriz"),
         (f"{b}_err" for b in "ugriz"),
