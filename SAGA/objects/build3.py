@@ -116,24 +116,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     # Assign OBJID
     catalog["OBJID"] = prepare_objid(catalog)
 
-    # Do galaxy/star separation
-    catalog["is_galaxy"] = QueryMaker.not_equal("TYPE", "PSF").mask(catalog)
-
-    # Bright (r < 17) stars that are misclassified as galaxies
-    flux_limit = 10 ** ((22.5 - 17) / 2.5)
-    bright_stars = Query(
-        "SHAPE_R < 1",
-        "FLUX_R >= MW_TRANSMISSION_R * {}".format(flux_limit),
-        (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
-    ).mask(catalog)
-
-    # Fix galaxy/star separation with bright_stars and SGA masks
-    catalog["is_galaxy"] &= ~bright_stars
-    catalog["is_galaxy"] |= QueryMaker.equal("REF_CAT", "L3").mask(catalog)
-
-    # Rename/add columns
-    catalog["morphology_info"] = catalog["TYPE"].getfield("<U1").view(np.int32)
-
+    # Shape infomation
     e_abs = np.hypot(catalog["SHAPE_E1"], catalog["SHAPE_E2"])
     catalog["ba"] = (1 - e_abs) / (1 + e_abs)
     catalog["phi"] = np.rad2deg(np.arctan2(catalog["SHAPE_E2"], catalog["SHAPE_E1"]) * 0.5)
@@ -183,6 +166,32 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
     sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
     fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
+    fracflux_wise = [f"FRACFLUX_W{b}" for b in range(1, 5)]
+
+    # Do galaxy/star separation
+    bright_stars = Query(
+        "SHAPE_R < 1",
+        "r_mag < 17",
+        (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
+    )
+    possible_galaxy = Query("FITBITS % 2 > 0", "(FITBITS >> 5) % 16 == 0")
+    likely_galaxy_1 = Query(_n_or_more_lt(fracflux_grz, 3, 0.02), _n_or_more_lt(fracflux_wise, 3, 10))
+    likely_galaxy_2 = Query(_n_or_more_lt(fracflux_grz, 3, 0.008), _n_or_more_lt(fracflux_wise, 2, 80))
+
+    type_queries = {
+        0: bright_stars,
+        1: QueryMaker.equal("TYPE", "PSF"),
+        2: QueryMaker.equal("TYPE", "REX"),
+        3: QueryMaker.equal("TYPE", "EXP"),
+        4: QueryMaker.equal("TYPE", "DEV"),
+        5: QueryMaker.equal("TYPE", "SER"),
+        6: QueryMaker.equal("REF_CAT", "L3"),
+        7: Query(possible_galaxy, likely_galaxy_1),
+        8: Query(possible_galaxy, likely_galaxy_2),
+    }
+
+    catalog["morphology_info"] = get_remove_flag(catalog, type_queries)
+    catalog["is_galaxy"] = (catalog["morphology_info"] % 4 > 0) & (catalog["morphology_info"] >> 6 == 0)
 
     remove_queries = {
         1: _n_or_more_gt(allmask_grz, 2, 0),
@@ -259,11 +268,7 @@ SPEC_MATCHING_ORDER = (
 
 def apply_manual_fixes(base):
 
-    fill_values_by_query(
-        base,
-        QueryMaker.isin(
-            "OBJID",
-            [
+    galaxies_not_stars = [
                 915147800000001877,
                 901039870000003755,
                 903341560000000816,
@@ -289,10 +294,10 @@ def apply_manual_fixes(base):
                 901215290000002014,
                 904461200000003516,
                 904488130000004194,
-            ],
-        ),
-        dict(is_galaxy=True),
-    )
+    ]
+    mask = Query.isin("OBJID", galaxies_not_stars).mask(base)
+    base["is_galaxy"][mask] = True
+    base["morphology_info"][mask] += (1 << 10)
 
     # NSA (v1.0.1) 343647 (255.5115, 22.9355)
     fill_values_by_query(
