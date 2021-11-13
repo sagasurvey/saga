@@ -195,7 +195,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["is_galaxy"] = (
         (catalog["morphology_info"] % 4 == 0)
         | ((catalog["morphology_info"] >> 6) % 2 > 0)
-        | ((catalog["morphology_info"] >> 7) % 8 > 4)
+        # | ((catalog["morphology_info"] >> 7) % 8 > 4)  # TODO: add this back
     )
 
     remove_queries = {
