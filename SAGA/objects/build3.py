@@ -212,7 +212,7 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     catalog["REMOVE_decals"] = catalog["REMOVE"]
 
     if to_remove is not None:
-        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int)
+        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int32)
 
     if to_recover is not None:
         idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
@@ -242,7 +242,7 @@ def prepare_delve_catalog_for_merging(catalog, to_remove=None, to_recover=None, 
     catalog["REMOVE_delve"] = catalog["REMOVE"]
 
     if to_remove is not None:
-        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int)
+        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int32)
 
     if to_recover is not None:
         idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
@@ -269,31 +269,31 @@ SPEC_MATCHING_ORDER = (
 def apply_manual_fixes(base):
 
     galaxies_not_stars = [
-                915147800000001877,
-                901039870000003755,
-                903341560000000816,
-                903442030000003771,
-                903233250000000577,
-                900906460000008966,
-                900906460000009106,
-                900896600000003831,
-                900809940000005200,
-                900800510000009934,
-                900809940000005279,
-                901029370000006715,
-                901039840000008707,
-                901039860000005713,
-                901018960000005296,
-                901039870000003755,
-                901050380000000229,
-                900896580000007542,
-                902577060000004414,
-                900452390000002003,
-                904733050000000124,
-                904501610000001442,
-                901215290000002014,
-                904461200000003516,
-                904488130000004194,
+        915147800000001877,
+        901039870000003755,
+        903341560000000816,
+        903442030000003771,
+        903233250000000577,
+        900906460000008966,
+        900906460000009106,
+        900896600000003831,
+        900809940000005200,
+        900800510000009934,
+        900809940000005279,
+        901029370000006715,
+        901039840000008707,
+        901039860000005713,
+        901018960000005296,
+        901039870000003755,
+        901050380000000229,
+        900896580000007542,
+        902577060000004414,
+        900452390000002003,
+        904733050000000124,
+        904501610000001442,
+        901215290000002014,
+        904461200000003516,
+        904488130000004194,
     ]
     mask = Query.isin("OBJID", galaxies_not_stars).mask(base)
     base["is_galaxy"][mask] = True

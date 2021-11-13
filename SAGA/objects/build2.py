@@ -104,7 +104,7 @@ def set_remove_flag(catalog, remove_queries=None, manual_remove=None, manual_rec
     remove_queries = [] if remove_queries is None else list(remove_queries)
 
     if manual_remove is None:
-        manual_remove = np.array([], dtype=np.int)
+        manual_remove = np.array([], dtype=np.int64)
 
     remove_queries.insert(0, QueryMaker.in1d("OBJID", manual_remove))
 
@@ -692,7 +692,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         specs_to_merge = specs[group_slice]
         rank = np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.int, len(specs_to_merge))
         rank += (10 - specs_to_merge["ZQUALITY"]) * (rank.max() + 1)
-        rank = rank.astype(np.float) + np.where(
+        rank = rank.astype(np.float32) + np.where(
             Query((np.isfinite, "SPEC_Z_ERR"), "SPEC_Z_ERR > 0", "SPEC_Z_ERR < 1").mask(specs_to_merge),
             specs_to_merge["SPEC_Z_ERR"],
             0.99999,
@@ -847,12 +847,12 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
     is_sga = QueryMaker.equal("REF_CAT", "L3")
     is_good_galaxy = Query(C.is_clean2, C.is_galaxy2, "radius > 0", C.has_spec)
 
-    base["spec_rank"] = C.has_spec.mask(base).astype(np.int16) * 2
+    base["spec_rank"] = C.has_spec.mask(base).astype(np.int32) * 2
     if has_ref_cat:
-        base["spec_rank"] += is_sga.mask(base).astype(np.int16)
+        base["spec_rank"] += is_sga.mask(base).astype(np.int32)
         is_good_galaxy |= is_sga
     elif has_obj_nsaid and nsa is not None:
-        base["spec_rank"] += is_nsa.mask(base).astype(np.int16)
+        base["spec_rank"] += is_nsa.mask(base).astype(np.int32)
         is_good_galaxy |= is_nsa
     base["spec_rank"] *= -1
 

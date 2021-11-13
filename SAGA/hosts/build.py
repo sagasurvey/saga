@@ -336,15 +336,15 @@ def add_selection_flags(d):
         "DIST <= 40.75",
     )
 
-    d["HOST_SCORE"] = (env_allowed & sample_allowed).mask(d).astype(np.int)
-    d["HOST_SCORE"] += (env_preferred & sample_allowed).mask(d).astype(np.int)
-    d["HOST_SCORE"] += (env_allowed & sample_preferred).mask(d).astype(np.int) * 2
+    d["HOST_SCORE"] = (env_allowed & sample_allowed).mask(d).astype(np.int32)
+    d["HOST_SCORE"] += (env_preferred & sample_allowed).mask(d).astype(np.int32)
+    d["HOST_SCORE"] += (env_allowed & sample_preferred).mask(d).astype(np.int32) * 2
     assert ((env_preferred & sample_preferred).filter(d, "HOST_SCORE") == 4).all()
 
     image_allowed = Query("COVERAGE_DECALS_DR9 >= 0.95")
     image_preferred = Query("COVERAGE_DECALS_DR9 >= 0.99")
-    d["HAS_IMAGE"] = image_allowed.mask(d).astype(np.int)
-    d["HAS_IMAGE"] += image_preferred.mask(d).astype(np.int)
+    d["HAS_IMAGE"] = image_allowed.mask(d).astype(np.int32)
+    d["HAS_IMAGE"] += image_preferred.mask(d).astype(np.int32)
 
     return d
 

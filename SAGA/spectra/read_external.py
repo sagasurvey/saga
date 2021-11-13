@@ -146,7 +146,7 @@ def read_ozdes(file_path):
         specs.rename_column("qop", "ZQUALITY")
 
     # flag 3 = probably galaxy, 4 = definite galaxy, 6 = confirmed star
-    specs["ZQUALITY"] = specs["ZQUALITY"].astype(np.int16)
+    specs["ZQUALITY"] = specs["ZQUALITY"].astype(np.int32)
     specs = Query("ZQUALITY >= 3").filter(specs)
 
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})

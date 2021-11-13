@@ -454,7 +454,7 @@ class ObjectCatalog(object):
 
     def load_nsa(self, version="0.1.2"):
         nsa = self._database["nsa_v{}".format(version)].read()
-        remove_mask = np.zeros(len(nsa), np.bool)
+        remove_mask = np.zeros(len(nsa), bool)
         objs_to_remove = []
         fixes_dict = {}
         cols = nsa.colnames

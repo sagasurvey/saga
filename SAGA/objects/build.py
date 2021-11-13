@@ -98,9 +98,9 @@ def initialize_base_catalog(base):
     """
     base = add_skycoord(base)
 
-    base["REMOVE"] = np.int16(-1)
-    base["ZQUALITY"] = np.int16(-1)
-    base["SATS"] = np.int16(-1)
+    base["REMOVE"] = np.int32(-1)
+    base["ZQUALITY"] = np.int32(-1)
+    base["SATS"] = np.int32(-1)
 
     base["SPEC_HA_EW"] = np.float32(-9999.0)
     base["SPEC_HA_EWERR"] = np.float32(-9999.0)
@@ -523,7 +523,7 @@ def clean_repeat_spectra(spectra):
     """
     spectra = add_skycoord(spectra)
     spec_repeat = get_empty_str_array(len(spectra), 48)
-    not_done = np.ones(len(spectra), np.bool)
+    not_done = np.ones(len(spectra), bool)
 
     spec_repeat_col = "TELNAME" if "TELNAME" in spectra.colnames else "SPEC_REPEAT"
 
@@ -729,7 +729,7 @@ def clean_sdss_spectra(base):
     def find_sdss_only(t):
         return np.fromiter(
             ((x and set(x.split("+")).issubset({"NSA", "SDSS"})) for x in t["SPEC_REPEAT"]),
-            np.bool,
+            bool,
             len(t),
         )
 
@@ -771,7 +771,7 @@ def find_satellites(base, version=1):
     -------
     base : astropy.table.Table
     """
-    base["SATS"] = np.int16(-1)
+    base["SATS"] = np.int32(-1)
 
     is_galaxy = C.is_galaxy if version == 1 else C.is_galaxy2
     is_clean = C.is_clean if version == 1 else C.is_clean2

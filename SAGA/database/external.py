@@ -773,7 +773,7 @@ def download_catalogs_for_hosts(
     -------
     failed : np.array
     """
-    failed = np.zeros(len(hosts), np.bool)
+    failed = np.zeros(len(hosts), bool)
 
     for i, host in enumerate(hosts):
         host_id = host[host_id_label]

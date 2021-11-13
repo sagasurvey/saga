@@ -137,7 +137,7 @@ def assign_targeting_score_v1(base, manual_selected_objids=None, gmm_parameters=
         "-(ug+abs(ug_err))*0.1+(gr-abs(gr_err)) < 0.5",
     )
 
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
     fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})
     fill_values_by_query(base, ~C.is_galaxy, {"TARGETING_SCORE": 1200})
     fill_values_by_query(base, ~C.is_clean, {"TARGETING_SCORE": 1300})
@@ -153,13 +153,13 @@ def assign_targeting_score_v1(base, manual_selected_objids=None, gmm_parameters=
 
     need_random_selection = np.flatnonzero(base["TARGETING_SCORE"] == 800)
     if len(need_random_selection) > 50:
-        random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
+        random_mask = np.zeros(len(need_random_selection), dtype=bool)
         random_mask[:50] = True
         np.random.RandomState(123).shuffle(random_mask)  # pylint: disable=no-member
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 600
 
-    base["TARGETING_SCORE"] += np.round((1.0 - base["P_GMM_sdss"]) * 80.0).astype(np.int) + 10
+    base["TARGETING_SCORE"] += np.round((1.0 - base["P_GMM_sdss"]) * 80.0).astype(np.int32) + 10
 
     fill_values_by_query(base, C.is_sat, {"TARGETING_SCORE": 150})
 
@@ -212,9 +212,9 @@ def assign_targeting_score_v2(
         basic_cut &= ~C.has_spec
 
     base = add_cut_scores(base)
-    base["P_GMM"] = np.float(0)
-    base["log_L_GMM"] = np.float(0)
-    base["TARGETING_SCORE"] = 1000
+    base["P_GMM"] = np.float64(0)
+    base["log_L_GMM"] = np.float64(0)
+    base["TARGETING_SCORE"] = np.int32(1000)
     base["index"] = np.arange(len(base))
 
     surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
@@ -359,14 +359,14 @@ def assign_targeting_score_v2(
         Query(basic_cut, "TARGETING_SCORE >= 700", "TARGETING_SCORE < 800").mask(base)
     )
     if len(need_random_selection) > n_random:
-        random_mask = np.zeros(len(need_random_selection), dtype=np.bool)
+        random_mask = np.zeros(len(need_random_selection), dtype=bool)
         random_mask[:n_random] = True
         np.random.RandomState(seed).shuffle(random_mask)  # pylint: disable=no-member
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 500
 
     base["TARGETING_SCORE"] += (8 - np.digitize(base["score_sb_r"], np.linspace(19.25, 22, 7))) * 10 + (
-        9 - np.floor(base["P_GMM"] * 10).astype(np.int)
+        9 - np.floor(base["P_GMM"] * 10).astype(np.int32)
     )
 
     fill_values_by_query(base, ~basic_cut, {"TARGETING_SCORE": 1100})
@@ -456,7 +456,7 @@ def assign_targeting_score_v2plus(
         basic = Query(basic, ~C.has_spec)
 
     base = add_cut_scores(base)
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
     surveys = [col[6:] for col in base.colnames if col.startswith("OBJID_")]
 
     exclusion_cuts = Query()
@@ -585,7 +585,7 @@ def assign_targeting_score_v2plus(
                 )
 
     p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
-    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
+    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int32)
     base["TARGETING_SCORE"] += np.where(base["TARGETING_SCORE"] >= 200, p, p // 10)
 
     base.sort("TARGETING_SCORE")
@@ -639,7 +639,7 @@ def assign_targeting_score_v3(
         basic = Query(basic, ~C.has_spec)
 
     base = add_cut_scores(base)
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
 
     exclusion_cuts = Query()
 
@@ -738,7 +738,7 @@ def assign_targeting_score_v3(
                 )
 
     p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
-    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
+    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int32)
     base["TARGETING_SCORE"] += np.where(base["TARGETING_SCORE"] >= 200, p, p // 10)
 
     base.sort("TARGETING_SCORE")
@@ -792,7 +792,7 @@ def assign_targeting_score_v3_extended(
         basic = Query(basic, ~C.has_spec)
 
     base = add_cut_scores(base)
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
 
     exclusion_cuts = Query()
 
@@ -889,7 +889,7 @@ def assign_targeting_score_v3_extended(
                 )
 
     p = np.round(np.abs(np.log10(np.maximum(base["p_sat_corrected"], 1e-9))) * 10)
-    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int)
+    p = np.where(np.isfinite(p) & (p < 90), p, 89).astype(np.int32)
     base["TARGETING_SCORE"] += np.where(base["TARGETING_SCORE"] >= 200, p, p // 10)
 
     base.sort("TARGETING_SCORE")
@@ -903,7 +903,7 @@ def assign_targeting_score_lowz(base, manual_selected_objids=None, gmm_parameter
     base["pass_gr_ri_cut"] = Query("0.5*gr + 0.05 > ri").mask(base)
     base["pass_r_sb_cut"] = Query("0.9*r_mag + 5.25 < sb_r").mask(base)
 
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
     basic = Query("r_mag > 18", "pass_r_gr_cut", "pass_gr_ri_cut", "pass_r_sb_cut")
     if not ignore_specs:
         basic &= ~C.has_spec
@@ -922,7 +922,7 @@ def assign_targeting_score_lowz(base, manual_selected_objids=None, gmm_parameter
 
 
 def assign_targeting_score_lowz_v2(base, manual_selected_objids=None, ignore_specs=False, **kwargs):
-    base["TARGETING_SCORE"] = 1000
+    base["TARGETING_SCORE"] = np.int32(1000)
 
     targeting_cuts = Query(
         C.griz_cut,

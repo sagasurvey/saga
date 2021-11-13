@@ -10,7 +10,7 @@ _SPECS_COLUMNS = (
     ("DEC", "<f8"),
     ("SPEC_Z", "<f4"),
     ("SPEC_Z_ERR", "<f4"),
-    ("ZQUALITY", "<i2"),
+    ("ZQUALITY", "<i4"),
     ("SPECOBJID", "<U48"),
     ("MASKNAME", "<U48"),
     ("TELNAME", "<U6"),

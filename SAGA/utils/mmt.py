@@ -28,7 +28,7 @@ def read_mmt_config(filepath):
             if len(line) > 1:
                 i += 1
     t = read_mmt_catalog(filepath, i)
-    t["rank"] = t["rank"].astype(np.int)
+    t["rank"] = t["rank"].astype(np.int32)
     return t
 
 
