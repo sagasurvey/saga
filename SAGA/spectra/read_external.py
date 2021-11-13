@@ -53,7 +53,6 @@ def read_2df(file_path):
     specs.rename_column("DEJ2000", "DEC")
     specs.rename_column("q_z", "ZQUALITY")
     specs.rename_column("z", "SPEC_Z")
-    specs.rename_column("n_z", "EM_ABS")
 
     # LOWZ REDSHIFTS IN 2dF ARE PROBLEMATIC, SET ZQ = 2
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})

@@ -16,7 +16,7 @@ Label | Unit | Definition
 `phi` | - | position angle of the galaxy
 `sma` | - | semi-major axis at about ~ mag/arcsec^2 surface brightness isophote
 `REF_CAT` | - | whether this object is in the SGA (`L3`) or the Gaia (`G2`) catalogs
-`SGA_ID` | - | SGA ID for objects in the SGA catalog 
+`SGA_ID` | - | SGA ID for objects in the SGA catalog
 `<band>_mag` | mag | ugrizy magnitude from primary survey, e.g., `r_mag`. [99 or NaN if no measurement]
 `<band>_err` | mag | ugrizy magnitude error from primary survey, e.g., `r_err`. [99 or NaN if no measurement]
 `r_fibermag` | mag | r-band fiber magnitude (fiber diameter = 1.5 arcsec)
@@ -31,8 +31,7 @@ Label | Unit | Definition
 `MASKNAME` | - | spectroscopic mask name
 `RA_spec` | deg | Right ascension J2000 of the spectroscopic object
 `DEC_spec`  | deg |  Declination J2000 of the spectroscopic object
-`spec_phot_sep` | arcsec | separation between the photometric and the spectroscopic coordinates 
-`EM_ABS` | - | emission line or absorption line (obsolete; do not use)
+`spec_phot_sep` | arcsec | separation between the photometric and the spectroscopic coordinates
 `HELIO_CORR` | - | True of heliocentric correction has be applied
 `EW_Halpha` | angstrom | Halpha equivalent width
 `EW_Halpha_err` | angstrom | Error on Halpha equivalent width
@@ -102,11 +101,11 @@ Label | Unit | Definition
 `really_need_spec` | - | number of remaining targets within main targeting cuts (r < 20.75, within Rvir)
 `really_need_spec_bright` | - | number of remaining targets within main targeting cuts (r < 17.77, within Rvir)
 `specs_ours_rvir` | - | number of SAGA redshifts within Rvir
-`sats_total` | - | number of satellites 
+`sats_total` | - | number of satellites
 `sats_r_limit` | - | number of satellites (r < 20.75)
 `sats_Mr_limit` | - | number of satellites (Mr < -12.3)
 `sats_bright` | - | number of satellites (r < 17.77)
-`sats_ours` | - | number of SAGA-discovered satellites 
+`sats_ours` | - | number of SAGA-discovered satellites
 `sats_ours_r_limit` | - | number of SAGA-discovered satellites (r < 20.75)
 `sats_ours_Mr_limit` | - | number of SAGA-discovered satellites (Mr < -12.3)
 `sats_ours_bright` | - | number of SAGA-discovered satellites (r < 17.77)

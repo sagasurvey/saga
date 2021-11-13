@@ -14,7 +14,6 @@ _SPECS_COLUMNS = (
     ("SPECOBJID", "<U48"),
     ("MASKNAME", "<U48"),
     ("TELNAME", "<U6"),
-    ("EM_ABS", "<i2"),
     ("HELIO_CORR", "|b1"),
 )
 
