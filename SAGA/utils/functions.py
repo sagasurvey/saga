@@ -121,12 +121,10 @@ def get_remove_flag(catalog, remove_queries, dtype=None):
 
     if dtype is None:
         n = len(remove_queries)
-        if n < 16:
+        if n < 32:
             dtype = np.int32
-        elif n < 32:
-            dtype = np.int64
         elif n < 64:
-            dtype = np.uint64
+            dtype = np.int64
         else:
             raise ValueError("too many remove queries")
 
