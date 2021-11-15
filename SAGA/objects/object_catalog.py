@@ -736,7 +736,7 @@ class ObjectCatalog(object):
                 "Write base catalog to {}".format(data_obj.path),
             )
             try:
-                data_obj.write(base)
+                data_obj.write(base, add_meta=True)
             except (IOError, OSError) as e:
                 print(
                     time.strftime("[%m/%d %H:%M:%S]"),
@@ -788,7 +788,7 @@ class ObjectCatalog(object):
         t = self.load(**defaults)
 
         if save_to is not False:
-            save_to.write(t, overwrite=overwrite)
+            save_to.write(t, overwrite=overwrite, add_meta=True)
 
         return t
 
@@ -943,9 +943,8 @@ class ObjectCatalog(object):
 
         t = self.load(**defaults)
 
-        t.meta = {"mtime": time.time()}
         if save_to is not False:
-            save_to.write(t, overwrite=overwrite)
+            save_to.write(t, overwrite=overwrite, add_meta=True)
 
         return t
 

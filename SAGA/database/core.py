@@ -2,6 +2,7 @@ import gzip
 import logging
 import os
 import shutil
+import time
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -12,6 +13,7 @@ from astropy.table import Table
 from astropy.utils.data import clear_download_cache
 
 from ..utils import makedirs_if_needed
+from ..version import __version__
 
 try:
     FileExistsError
@@ -175,6 +177,11 @@ class FitsTable(FileObject):
         if "coord" in table.columns and table["coord"].info.dtype.name == "object":
             coord = table["coord"]
             del table["coord"]
+        if kwargs.get("add_meta"):
+            if not getattr(table, "meta", None):
+                table.meta = {}
+            table.meta["mtime"] = time.time()
+            table.meta["saga_version"] = __version__
         compress = self.compress_after_write or self.path.endswith(".gz")
         file_open = gzip.open if compress else open
         makedirs_if_needed(self.path)
