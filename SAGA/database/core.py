@@ -181,7 +181,7 @@ class FitsTable(FileObject):
             if not getattr(table, "meta", None):
                 table.meta = {}
             table.meta["mtime"] = time.time()
-            table.meta["saga_version"] = __version__
+            table.meta["version"] = __version__
         compress = self.compress_after_write or self.path.endswith(".gz")
         file_open = gzip.open if compress else open
         makedirs_if_needed(self.path)
