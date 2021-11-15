@@ -32,18 +32,13 @@ def _ivar2err(ivar):
         return 1.0 / np.sqrt(ivar)
 
 
-def _n_or_more_gt(cols, n, cut):
-    def _n_or_more_gt_this(*arrays, n=n, cut=cut):
-        return np.count_nonzero((np.stack(arrays) > cut), axis=0) >= n
-
-    return Query((_n_or_more_gt_this,) + tuple(cols))
-
-
-def _n_or_more_lt(cols, n, cut):
-    def _n_or_more_lt_this(*arrays, n=n, cut=cut):
-        return np.count_nonzero((np.stack(arrays) < cut), axis=0) >= n
-
-    return Query((_n_or_more_lt_this,) + tuple(cols))
+try:
+    reduce_compare = QueryMaker.reduce_compare
+except AttributeError:
+    def reduce_compare(columns, reduce_func, compare_func, compare_value):
+        def _func(*arrays, reduce_func=reduce_func, compare_func=compare_func, compare_value=compare_value):
+            return compare_func(reduce_func(np.stack(arrays), axis=0), compare_value)
+        return Query((_func,) + tuple(columns))
 
 
 SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "D26", "PA", "BA"]
@@ -164,9 +159,8 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
 
     allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
     sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
-    sigma_wise = [f"SIGMA_GOOD_W{b}" for b in range(1, 5)]
+    sigma_wise = [f"SIGMA_GOOD_W{b}" for b in "1234"]
     fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
-    fracflux_wise = [f"FRACFLUX_W{b}" for b in range(1, 5)]
 
     # Do galaxy/star separation
     bright_stars = Query(
@@ -174,9 +168,6 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         "r_mag < 17",
         (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
     )
-    possible_galaxy = Query("FITBITS % 2 > 0", "(FITBITS >> 5) % 16 == 0")
-    likely_galaxy_1 = Query(_n_or_more_lt(fracflux_grz, 3, 0.02), _n_or_more_lt(fracflux_wise, 3, 10))
-    likely_galaxy_2 = Query(_n_or_more_lt(fracflux_grz, 3, 0.008), _n_or_more_lt(fracflux_wise, 2, 80))
 
     type_queries = {
         0: bright_stars,
@@ -186,24 +177,25 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         4: QueryMaker.equal("TYPE", "DEV"),
         5: QueryMaker.equal("TYPE", "SER"),
         6: QueryMaker.equal("REF_CAT", "L3"),
-        7: Query(likely_galaxy_1),
-        8: Query(likely_galaxy_2),
-        9: Query(possible_galaxy),
+        7: Query("FITBITS % 2 > 0", "(FITBITS >> 5) % 16 == 0"),
+        8: reduce_compare(fracflux_grz, np.max, np.less, 0.7),
+        9: reduce_compare(sigma_grz, np.max, np.greater, 100),
     }
 
     catalog["morphology_info"] = get_remove_flag(catalog, type_queries)
     catalog["is_galaxy"] = (
-        (catalog["morphology_info"] % 4 == 0)
-        | ((catalog["morphology_info"] >> 6) % 2 > 0)
-        # | ((catalog["morphology_info"] >> 7) % 8 > 4)  # TODO: add this back
-    )
+        Query("morphology_info % 4 == 0")
+        | Query("(morphology_info >> 6) % 2 == 1")
+        | Query("(morphology_info >> 7) % 8 == 7")
+    ).mask(catalog)
 
     remove_queries = {
-        1: _n_or_more_gt(allmask_grz, 2, 0),
+        1: reduce_compare(allmask_grz, np.median, np.greater, 0),
         2: Query("FLUX_R <= 0"),
         3: Query("FLUX_G <= 0", "FLUX_Z <= 0"),
-        4: (_n_or_more_lt(sigma_grz, 3, 60) & _n_or_more_gt(fracflux_grz, 1, 2)),
-        5: _n_or_more_lt(sigma_grz + sigma_wise, 7, 20),
+        4: (reduce_compare(sigma_grz, np.max, np.less, 60) & reduce_compare(fracflux_grz, np.max, np.greater, 2)),
+        5: reduce_compare(sigma_grz + sigma_wise, np.max, np.less, 20),
+        6: Query("(morphology_info >> 7) % 2 == 1", "(morphology_info >> 8) % 4 < 3"),
     }
 
     catalog["REMOVE"] = np.where(np.char.isalnum(catalog["REF_CAT"]), 0, get_remove_flag(catalog, remove_queries))
