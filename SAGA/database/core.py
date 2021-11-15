@@ -177,7 +177,7 @@ class FitsTable(FileObject):
         if "coord" in table.columns and table["coord"].info.dtype.name == "object":
             coord = table["coord"]
             del table["coord"]
-        if kwargs.get("add_meta"):
+        if kwargs.pop("add_meta", False):
             if not getattr(table, "meta", None):
                 table.meta = {}
             table.meta["mtime"] = time.time()
