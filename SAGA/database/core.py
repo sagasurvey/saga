@@ -301,7 +301,7 @@ class DataObject(object):
 
         return table
 
-    def write(self, table, dest=None, overwrite=False):
+    def write(self, table, dest=None, overwrite=False, **kwargs):
         """
         write the data to file
 
@@ -326,7 +326,7 @@ class DataObject(object):
         if f.isfile() and not overwrite:
             raise FileExistsError("set overwrite to True to overwrite the file")
 
-        f.write(table)
+        f.write(table, **kwargs)
 
     def download(self, local_file_path=None, overwrite=False, compress=False, set_as_local=True):
         """
