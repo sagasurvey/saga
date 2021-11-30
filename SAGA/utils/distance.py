@@ -28,7 +28,8 @@ def z2v(z):
 
 
 def z2d(z):
-    return ensure_scalar(COSMO.luminosity_distance(ensure_scalar(z, "")), "Mpc")
+    z = np.asarray(ensure_scalar(z, ""))
+    return ensure_scalar(COSMO.luminosity_distance(z), "Mpc")
 
 
 def d2z(d, zmax=0.1):
