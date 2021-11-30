@@ -7,7 +7,7 @@ from collections import defaultdict
 import numpy as np
 from astropy.table import Table, unique, vstack
 from astropy.time import Time
-from easyquery import Query, QueryMaker
+from easyquery import Query
 
 from .. import utils
 from ..database import CsvTable, Database, DataObject, FileObject, FitsTable
@@ -28,7 +28,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
+def _calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     r = base["r_mag"]
 
     gr = np.where(
@@ -54,66 +54,51 @@ def calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def calc_fiducial_p_sat_v3(base, params=(-2.759, -6.1327, -0.3378, 3.1311, -8.423, 0.5)):
+def _calc_fiducial_p_sat_v3(base, params=(-2.9277, -7.4097, 2.8065, 3.0996, -4.9687, 0.27)):
     r = base["r_mag"]
+
+    hs = np.where(base["human_selected"] > 0, 1, 0)
 
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
         np.where(
             C.valid_z_mag.mask(base),
-            base["rz"] + 0.2,
-            1.1 - 0.04 * r,
-        ),
-    )
-
-    sb = np.where(
-        C.valid_sb.mask(base),
-        base["sb_r"],
-        np.where(
-            C.valid_r_fibermag.mask(base),
-            19.9 + 0.88 * (base["r_fibermag"] - 18),
-            21.5 + 0.35 * (r - 14),
+            0.67231756 + 0.37501174 * base["r_mag"] - 0.3938203 * base["z_mag"],
+            0.92852026 - 0.02951143 * base["r_mag"],
         ),
     )
 
     rf = np.where(
         C.valid_r_fibermag.mask(base),
         base["r_fibermag"],
-        21.5 + 0.55 * (r - 18),
+        np.where(
+            C.valid_sb.mask(base),
+            -1.584347 + 0.26432422 * base["r_mag"] + 0.8013437 * base["sb_r"],
+            11.612417 + 0.5422449 * base["r_mag"],
+        ),
     )
 
-    mu = params[0] * r + params[1] * gr + params[2] * sb + params[3] * rf + params[4]
+    mu = params[0] * r + params[1] * gr + params[2] * rf + params[3] * hs + params[4]
     mu = np.where(np.isnan(mu), np.inf, mu)
     p = params[-1] / (1 + np.exp(-mu))
 
     return p
 
 
-def calc_fiducial_p_sat_corrected(base, human_selected=None, bias=0.15, p_func=calc_fiducial_p_sat_v3, **kwargs):
+def _correct_fiducial_p_sat(base, fiducial_p_label="p_sat_approx", bias=None, version=3):
+    p = np.array(base[fiducial_p_label])
 
-    p = p_func(base, **kwargs)
-
-    if human_selected is not None:
-        mask = Query(~C.has_spec, QueryMaker.in1d("OBJID", human_selected)).mask(base)
-    elif "human_selected" in base.colnames:
+    if bias and "human_selected" in base.colnames:
         mask = Query(~C.has_spec, "human_selected > 0").mask(base)
-    else:
-        mask = None
+        p[mask] = p[mask] * (1 - bias) + bias
 
-    if mask is not None:
-        p_orig = p[mask]
-        if callable(bias):
-            p[mask] = bias(p_orig)
-        elif bias > 1:
-            p[mask] = bias * p_orig / (1 + (bias - 1) * p_orig)
-        elif bias > 0 and bias < 1:
-            p[mask] = p_orig * (1 - bias) + bias
-        else:
-            raise ValueError("bias not correctly specified")
+    if "SATS" in base.colnames:
+        p[Query(C.has_spec, C.is_sat).mask(base)] = 1
+        p[Query(C.has_spec, ~C.is_sat).mask(base)] = 0
 
-    p[Query(C.has_spec, C.is_sat).mask(base)] = 1
-    p[Query(C.has_spec, ~C.is_sat).mask(base)] = 0
+    good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
+    p[~good_obj.mask(base)] = 0
 
     return p
 
@@ -261,26 +246,18 @@ class ObjectCatalog(object):
                 if col not in table.colnames:
                     table[col] = -1
 
-        p_sat_dict = {"p_sat_approx": 0}
-        if version == 3:
-            p_func = calc_fiducial_p_sat_v3
-            p_bias = 0.15
+        if "HOST_DIST" in table.colnames and version >= 2:
+            table["human_selected"] = np.isin(table["OBJID"], self._database["human_selected"].read()["OBJID"]).astype(np.int32)
+
+        if version >= 3:
+            p_func = _calc_fiducial_p_sat_v3
+            p_bias = None
         else:
-            p_func = calc_fiducial_p_sat_v2
+            p_func = _calc_fiducial_p_sat_v2
             p_bias = 0.25
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = p_func(table)
-            if "HOST_DIST" in table.colnames:
-                table["p_sat_corrected"] = calc_fiducial_p_sat_corrected(
-                    table,
-                    human_selected=self._database["human_selected"].read()["OBJID"],
-                    bias=p_bias,
-                    p_func=p_func,
-                )
-                p_sat_dict["p_sat_corrected"] = 0
-
-        good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
-        fill_values_by_query(table, ~good_obj, p_sat_dict)
+            table["p_sat_corrected"] = _correct_fiducial_p_sat(table, bias=p_bias, version=version)
 
         if add_skycoord:
             table = utils.add_skycoord(table)
