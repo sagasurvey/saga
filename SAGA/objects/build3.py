@@ -552,7 +552,7 @@ def add_galex(base, galex):
         base[f"RA_{band}"] = np.float64(np.nan)
         base[f"DEC_{band}"] = np.float64(np.nan)
         base[f"{band}_mag"] = np.float32(np.nan)
-        base[f"{band}_magerr"] = np.float32(np.nan)
+        base[f"{band}_err"] = np.float32(np.nan)
 
     if galex is None:
         return base
@@ -599,7 +599,7 @@ def add_galex(base, galex):
         base[f"RA_{band}"][idx_base] = galex["ra"][idx_galex]
         base[f"DEC_{band}"][idx_base] = galex["dec"][idx_galex]
         base[f"{band}_mag"][idx_base] = galex["mag"][idx_galex]
-        base[f"{band}_magerr"][idx_base] = galex["magerr"][idx_galex]
+        base[f"{band}_err"][idx_base] = galex["magerr"][idx_galex]
 
     return base
 
@@ -622,7 +622,7 @@ def add_galex_sfr(base, galex_sfr):
         ("RA_nuv", "RA"),
         ("DEC_nuv", "DEC"),
         ("nuv_mag", "mag_nuv"),
-        ("nuv_magerr", "err_nuv"),
+        ("nuv_err", "err_nuv"),
         ("nuv_snr", "SN"),
         ("nuv_sfr", "NUV_SFR"),
         ("nuv_sfr_flag", "NUV_SFR_flag"),
