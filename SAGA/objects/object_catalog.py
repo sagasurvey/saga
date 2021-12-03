@@ -585,7 +585,13 @@ class ObjectCatalog(object):
         )
         print(time.strftime("[%m/%d %H:%M:%S]"), "All spectra loaded.")
 
-        halpha = self._database["spectra_halpha"].read()
+        # Loading post-processed catalogs
+        halpha = self._database["spectra_halpha"].read() if build_version >= 2 else None
+        galex_sfr = self._database["galex_sfr"].read() if build_version >= 3 else None
+        if galex_sfr is not None:
+            galex_sfr = Query("NUV_SFR_flag >= 0").filter(galex_sfr)
+            galex_sfr.sort("ID")
+            galex_sfr = unique(galex_sfr, "ID")
 
         manual_lists = dict()
         for survey, col in manual_keys:
@@ -687,6 +693,7 @@ class ObjectCatalog(object):
                     sga=sga,
                     spectra=spectra,
                     halpha=halpha,
+                    galex_sfr=galex_sfr,
                     convert_to_sdss_filters=convert_to_sdss_filters,
                     debug=debug_this,
                     **manual_lists,

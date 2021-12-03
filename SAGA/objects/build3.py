@@ -10,7 +10,7 @@ from astropy.table import Table, vstack, unique
 from easyquery import Query, QueryMaker
 
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
-from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, calc_normalized_dist, get_coord
+from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, calc_normalized_dist, get_coord, match_ids
 from ..utils.distance import v2z
 from . import build, build2
 from . import cuts as C
@@ -413,17 +413,9 @@ def match_sga(base, sga):
         sga.sort("SGA_ID")
 
     has_sga_idx = np.flatnonzero(base["SGA_ID"] > -1)
+    base_idx, sga_idx = match_ids(base["SGA_ID"][has_sga_idx], sga["SGA_ID"])
 
-    sga_idx = np.searchsorted(sga["SGA_ID"], base["SGA_ID"][has_sga_idx])
-    sga_idx[sga_idx >= len(sga)] = -1
-    matched = base["SGA_ID"][has_sga_idx] == sga["SGA_ID"][sga_idx]
-    if not matched.all():
-        has_sga_idx = has_sga_idx[matched]
-        sga_idx = sga_idx[matched]
-
-    sga = sga[sga_idx]
-
-    return has_sga_idx, sga
+    return has_sga_idx[base_idx], sga[sga_idx]
 
 
 def add_sga(base, sga):
@@ -612,6 +604,47 @@ def add_galex(base, galex):
     return base
 
 
+def add_galex_sfr(base, galex_sfr):
+
+    base["nuv_snr"] = np.float32(np.nan)
+    base["nuv_sfr"] = np.float32(np.nan)
+    base["nuv_sfr_flag"] = np.int32(-1)
+
+    if galex_sfr is None:
+        return base
+
+    base_idx, galex_idx = match_ids(base["OBJID"], galex_sfr["ID"])
+
+    if len(base_idx) == 0:
+        return base
+
+    for col1, col2 in (
+        ("RA_nuv", "RA"),
+        ("DEC_nuv", "DEC"),
+        ("nuv_mag", "mag_nuv"),
+        ("nuv_magerr", "err_nuv"),
+        ("nuv_snr", "SN"),
+        ("nuv_sfr", "NUV_SFR"),
+        ("nuv_sfr_flag", "NUV_SFR_flag"),
+    ):
+        base[col1][base_idx] = galex_sfr[col2][galex_idx]
+
+    return base
+
+
+def add_quenched_flag(base):
+
+    base["quenched"] = np.int32(-1)
+
+    if "EW_Halpha" in base.colnames:
+        mask = np.isfinite(base["EW_Halpha"])
+        base["quenched"][mask] = 0
+        mask &= (base["EW_Halpha"] < 2)
+        base["quenched"][mask] = 1
+
+    return base
+
+
 def build_full_stack(  # pylint: disable=unused-argument
     host,
     decals=None,
@@ -622,6 +655,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     sga=None,
     spectra=None,
     halpha=None,
+    galex_sfr=None,
     debug=None,
     delve=None,
     delve_remove=None,
@@ -682,6 +716,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = add_galex(base, galex)
     del galex
 
+    base = add_galex_sfr(base, galex_sfr)
+    del galex_sfr
+
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
         base = identify_host(base)
@@ -689,5 +726,6 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = build2.add_surface_brightness(base)
     base = build.add_stellar_mass(base)
     base = add_spec_phot_sep(base)
+    base = add_quenched_flag(base)
 
     return base

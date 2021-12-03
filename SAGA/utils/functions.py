@@ -32,6 +32,7 @@ __all__ = [
     "calc_normalized_dist",
     "get_coord",
     "nearest_neighbor_join",
+    "match_ids",
 ]
 
 
@@ -343,3 +344,17 @@ def nearest_neighbor_join(
     d[sep_label] = sep.arcsec
 
     return d
+
+
+def match_ids(id1, id2, id2_sorter=None):
+    """
+    Find `id1` in `id2`. `id2` should be sorted.
+    Ruturns `id1_indices` and `id1_indices` such that
+    `id1[id1_indices] == id2[id2_indices]`.
+    """
+    s = np.searchsorted(id2, id1, sorter=id2_sorter)
+    s[s >= len(id2)] = -1
+    if id2_sorter is not None:
+        s = id2_sorter[s]
+    matched = (id1 == id2[s])
+    return np.flatnonzero(matched), s[matched]

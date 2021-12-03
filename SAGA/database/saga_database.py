@@ -362,6 +362,12 @@ class Database(object):
                     format="ascii.fast_basic",
                 )
             ),
+            "galex_sfr": DataObject(
+                FileObject(
+                    os.path.join(self._shared_dir, "Spectra", "galax_sfr.dat"),
+                    format="ascii.fast_basic",
+                )
+            ),
         }
 
         self._tables["spectra_raw_all"] = DataObject(
