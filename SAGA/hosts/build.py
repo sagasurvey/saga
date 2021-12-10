@@ -371,7 +371,7 @@ def find_local_group_like(d):
     d["NEAREST_MW_DIST"][rematch_idx] = dist.to_value("Mpc")
     d["NEAREST_MW_SEP"][rematch_idx] = sep.deg
 
-    idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)
+    idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)  # pylint: disable=no-member
     dist = dist.to_value("Mpc")
     mask = (dist > 0)
 
