@@ -1,10 +1,17 @@
+import io
 import os
 
 import numpy as np
 import requests
 from astropy.coordinates import SkyCoord, match_coordinates_sky
+from astropy.io import fits
 from astropy.table import hstack
 from easyquery import Query
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 __all__ = [
     "get_sdss_bands",
@@ -17,6 +24,7 @@ __all__ = [
     "get_all_colors",
     "add_skycoord",
     "get_empty_str_array",
+    "get_decals_cutout_url",
     "get_decals_viewer_image",
     "fill_values_by_query",
     "get_remove_flag",
@@ -86,15 +94,33 @@ def add_skycoord(table, ra_label="RA", dec_label="DEC", coord_label="coord", uni
     return table
 
 
-def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256, out=None, use_dev=False, timeout=120):  # pylint: disable=W0613
+def get_decals_cutout_url(ra, dec, pixscale=0.262, layer="ls-dr9", size=256, use_dev=False, file_type="jpg"):
+    if file_type not in ("jpg", "fits"):
+        raise ValueError("file_type must be either 'jpg' or 'fits'")
     dev = "-dev" if use_dev else ""
-    url = f"https://www.legacysurvey.org/viewer{dev}/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}"
+    return f"https://www.legacysurvey.org/viewer{dev}/cutout.{file_type}/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={int(size)}"
+
+
+def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256,
+                            out=None, use_dev=False, timeout=120, file_type="jpg", convert_to_data=False):
+    url = get_decals_cutout_url(ra, dec, pixscale, layer, size, use_dev, file_type)
     content = requests.get(url, timeout=timeout).content
+    extention = f".{file_type}"
     if out is not None:
-        if not out.lower().endswith(".jpg"):
-            out += ".jpg"
-        with open(out, "wb") as f:
-            f.write(content)
+        if isinstance(out, str):
+            if not out.lower().endswith(extention):
+                out += extention
+            with open(out, "wb") as f:
+                f.write(content)
+        else:
+            out.write(content)
+    if convert_to_data:
+        if file_type == "fits":
+            return fits.open(io.BytesIO(content))
+        if file_type == "jpg":
+            if Image is None:
+                raise ImportError("PIL is required to convert jpg to data")
+            return Image.open(io.BytesIO(content), formats=["JPEG"])
     return content
 
 

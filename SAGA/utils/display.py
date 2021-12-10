@@ -41,8 +41,8 @@ def read_marks_from_clipboard(extract_marked_value=True, extract_cols="objid", m
 
 def show_images(
     table,
-    pixscale=0.2,
-    size=200,
+    side_arcmin=0.75,
+    size=180,
     keys=(
         "OBJID",
         "RA",
@@ -70,25 +70,13 @@ def show_images(
         keys_used = [dec_label] + keys_used
     if ra_label not in keys_used:
         keys_used = [ra_label] + keys_used
+    size = int(size)
+    pixscale = side_arcmin * 60.0 / size
     for row in table:
-
-        url = "https://www.legacysurvey.org/viewer{dev}/jpeg-cutout/?ra={ra}&dec={dec}&pixscale={pixscale}&layer={layer}&size={size}".format(
-            ra=row[ra_label],
-            dec=row[dec_label],
-            layer=layer,
-            pixscale=pixscale,
-            size=size,
-            dev=dev,
-        )
-
-        link = "https://www.legacysurvey.org/viewer{dev}?ra={ra}&dec={dec}&layer={layer}&zoom=16".format(
-            ra=row[ra_label],
-            dec=row[dec_label],
-            layer=layer,
-            dev=dev,
-        )
+        prefix = f"https://www.legacysurvey.org/viewer{dev}"
+        url = f"{prefix}/cutout.jpg?ra={row[ra_label]}&dec={row[dec_label]}&pixscale={pixscale}&layer={layer}&size={size}"
+        link = f"{prefix}?ra={row[ra_label]}&dec={row[dec_label]}&layer={layer}&zoom=16"
         title = "\n".join((f"{k} = {row[k]}" for k in keys_used))
-
         out.append(
             f'<a href="{link}" target="_blank"><img src="{url}" style="display:inline-block; width:{size}px; height:{size}px" title="{title}" /></a>'
         )
