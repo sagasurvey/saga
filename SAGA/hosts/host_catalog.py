@@ -373,6 +373,7 @@ class HostCatalog(object):
             edd_lim17=self._database["edd_lim17_slim"].read(),
             nsa=self._database["nsa_v0.1.2"].read(),
             nsa1=self._database["nsa_v1.0.1"].read(),
+            sga=self._database["sga_v3.0"].read()["SGA_ID", "PGC", "MORPHTYPE"],
             remove_list=self._database["host_remove"].read(),
             stars=self._database["hipparcos2"].read(),
             coverage_maps={

@@ -78,6 +78,8 @@ Label | Unit | Definition
 `K_ABS` | Mag | Absolute Ks-band luminosity
 `M_HALO` | - | log (halo mass / Msun), for the group it belongs to, if any
 `REMOVED_BY_HAND` | - | True if the host is flagged as not usable by hand
+`SGA_ID` | - | SGA v3.0 ID
+`MORPHTYPE` | - | Morphology, using MORPHTYPE column from SGA catalog
 `BRIGHTEST_K_R1` | mag | Ks-band mag of brightest galaxy (<60 Mpc) within 1 Rvir
 `BRIGHTEST_K_R2` | mag | Ks-band mag of brightest galaxy (<60 Mpc) within 2 Rvir
 `BRIGHTEST_K_BG_R1` | mag | Ks-band mag of brightest galaxy (>60 Mpc) within 1 Rvir
@@ -92,7 +94,13 @@ Label | Unit | Definition
 `COVERAGE_DES_DR1` | - | Fraction of DES Dr1 coverage within 1 Rvir
 `COVERAGE_SDSS` | - | Fraction of SDSS coverage within 1 Rvir
 `HOST_SCORE` | - | Usable hosts if >=4
-`HAS_IMAGE` | - | Has image coverage if > 0
+`HAS_IMAGE` | - | Has image coverage if >= 1
+`NEAREST_MW` | - | HOSTID of the nearest MW-like host
+`NEAREST_MW_DIST` | Mpc | 3D distance in Mpc to NEAREST_MW
+`NEARBY_MW_COUNT_1` | - | Number of MW-list hosts within 1 Mpc (not including self)
+`NEARBY_MW_COUNT_1.5` | - | Number of MW-list hosts within 1.5 Mpc (not including self)
+`NEARBY_MW_COUNT_2` | - | Number of MW-list hosts within 2 Mpc (not including self)
+
 
 ### Host statistics schema
 

@@ -52,15 +52,16 @@ has_decals_image = Query("COVERAGE_DECALS_DR9 >= 0.95")
 has_des_image = Query("COVERAGE_DES_DR1 >= 0.95")
 has_sdss_image = Query("COVERAGE_SDSS >= 0.95")
 has_decals_dr8_image = Query("COVERAGE_DECALS_DR8 >= 0.95")
+has_decals_dr9_image = Query("COVERAGE_DECALS_DR9 >= 0.95")
+has_decals_dr9_image_99 = Query("COVERAGE_DECALS_DR9 >= 0.99")
 
 has_image = Query("HAS_IMAGE > 0")
 has_better_image = Query("HAS_IMAGE > 1")
 
 potential_hosts = Query("HOST_SCORE > 0")
-good_exceptions = QueryMaker.in1d("HOSTID", ("nsa163956", "nsa135739", "pgc67817"))
-good_hosts = Query("HOST_SCORE >= 4") | good_exceptions
+good_hosts = Query("HOST_SCORE >= 4")
 good = good_hosts & has_image
-build_default = potential_hosts & has_image
+build_default = good
 cos_saga = QueryMaker.in1d(
     "HOSTID",
     (
@@ -94,7 +95,7 @@ complete_definition2 = Query(
     "paper2_need_spec < 999999",
 )
 complete_definition3 = Query(
-    "paper3_need_spec / paper3_total < 0.2",
+    "paper3_need_spec / paper3_total < 0.4",
     "paper3_total > 0",
     "paper3_need_spec < 999999",
 )
@@ -104,3 +105,19 @@ observed = good_hosts & observed_definition
 unobserved = good & (~observed_definition)
 complete = observed & complete_definition
 incomplete = observed & (~complete_definition)
+
+environment_allowed = Query(
+    "abs(GLAT) >= 25",
+    "BRIGHTEST_K_R1 >= K_TC + 1",
+    "BRIGHTEST_STAR_R1 >= 5",
+    "M_HALO < 13",
+    "REMOVED_BY_HAND == 0",
+)
+environment_preferred = Query(environment_allowed, "BRIGHTEST_K_R1 >= K_TC + 1.6")
+mass_allowed = Query("K_ABS >= -24.7", "K_ABS <= -22.9")
+mass_preferred = Query("K_ABS >= -24.6", "K_ABS <= -23.0")
+distance_allowed = Query("DIST >= 20", "DIST <= 42", "V_HELIO >= 1400")
+distance_preferred = Query("DIST >= 25", "DIST <= 40.75", "V_HELIO >= 1400")
+
+has_mw_mass_neighbor = QueryMaker.not_equal("NEARBY_MW_COUNT_1.5", 0)
+is_local_group_like = QueryMaker.equal("NEARBY_MW_COUNT_1.5", 1)

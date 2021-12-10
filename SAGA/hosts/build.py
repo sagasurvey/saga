@@ -7,12 +7,13 @@ This file contains the functions to build the master list and host list
 import astropy.units as u
 import healpy as hp
 import numpy as np
-from astropy.coordinates import Distance, SkyCoord
+from astropy.coordinates import Distance, SkyCoord, match_coordinates_3d, search_around_3d
 from astropy.cosmology import WMAP9  # pylint: disable=no-name-in-module
 from astropy.table import Table, join, vstack
 from astropy.time import Time
 from easyquery import Query, QueryMaker
 
+from . import cuts as H
 from ..external.calc_kcor import calc_kcor
 from ..utils import add_skycoord, fill_values_by_query
 from ..utils.distance import d2z, m2d, v2z, z2m
@@ -141,6 +142,19 @@ def add_nsa(d, nsa):
         nsa_matched = nsa_matched["pgc", "NSAID"]
 
     return join_by_pgc(d, nsa_matched)
+
+
+def add_sga(d, sga):
+    if sga is None:
+        return d
+    if "PGC" in sga.colnames:
+        sga.rename_column("PGC", "pgc")
+    d = join_by_pgc(d, sga, "left", "sga")
+    d["SGA_ID"].fill_value = -1
+    d["SGA_ID"] = d["SGA_ID"].filled()
+    d["MORPHTYPE"].fill_value = ""
+    d["MORPHTYPE"] = d["MORPHTYPE"].filled()
+    return d
 
 
 def add_manual_remove_flag(d, remove):
@@ -295,6 +309,8 @@ def clean_up_columns(d):
         "K_ABS",
         "M_HALO",
         "REMOVED_BY_HAND",
+        "SGA_ID",
+        "MORPHTYPE",
     ]
 
     needed_cols.extend(
@@ -309,40 +325,18 @@ def clean_up_columns(d):
 
 
 def add_selection_flags(d):
-
-    env_allowed = Query(
-        "abs(GLAT) >= 25",
-        "BRIGHTEST_K_R1 >= K_TC + 1",
-        "BRIGHTEST_STAR_R1 >= 5",
-        "M_HALO < 13",
-        "REMOVED_BY_HAND == 0",
-    )
-
-    env_preferred = Query(env_allowed, "BRIGHTEST_K_R1 >= K_TC + 1.6")
-
-    sample_allowed = Query(
-        "K_ABS >= -24.7",
-        "K_ABS <= -22.9",
-        "DIST >= 20",
-        "DIST <= 42",
-        "V_HELIO >= 1400",
-    )
-
-    sample_preferred = Query(
-        sample_allowed,
-        "K_ABS >= -24.6",
-        "K_ABS <= -23.0",
-        "DIST >= 25",
-        "DIST <= 40.75",
-    )
+    env_allowed = H.environment_allowed
+    env_preferred = H.environment_preferred
+    sample_allowed = H.mass_allowed & H.distance_allowed
+    sample_preferred = H.mass_preferred & H.distance_preferred
 
     d["HOST_SCORE"] = (env_allowed & sample_allowed).mask(d).astype(np.int32)
     d["HOST_SCORE"] += (env_preferred & sample_allowed).mask(d).astype(np.int32)
     d["HOST_SCORE"] += (env_allowed & sample_preferred).mask(d).astype(np.int32) * 2
     assert ((env_preferred & sample_preferred).filter(d, "HOST_SCORE") == 4).all()
 
-    image_allowed = Query("COVERAGE_DECALS_DR9 >= 0.95")
-    image_preferred = Query("COVERAGE_DECALS_DR9 >= 0.99")
+    image_allowed = H.has_decals_dr9_image
+    image_preferred = H.has_decals_dr9_image_99
     d["HAS_IMAGE"] = image_allowed.mask(d).astype(np.int32)
     d["HAS_IMAGE"] += image_preferred.mask(d).astype(np.int32)
 
@@ -352,6 +346,42 @@ def add_selection_flags(d):
 def apply_manual_fixes(d):
     # pgc64427 too many stars, affecting the DES DR1 catalog
     fill_values_by_query(d, QueryMaker.equals("HOSTID", "pgc64427"), {"HOST_SCORE": 3})
+
+    # not good hosts but are already very complete
+    fill_values_by_query(d, QueryMaker.isin("HOSTID", ("nsa163956", "nsa135739", "pgc67817")), {"HOST_SCORE": 4})
+
+    # not enough image coverage
+    fill_values_by_query(d, QueryMaker.equals("HOSTID", "pgc69094"), {"HAS_IMAGE": 0})
+
+    return d
+
+
+def find_local_group_like(d):
+    d['coord'] = SkyCoord(d['RA'], d['DEC'], d['DIST'], unit=('deg', 'deg', 'Mpc'))
+    mw_mass = (H.mass_preferred | H.good_hosts).filter(d)
+
+    idx, sep, dist = match_coordinates_3d(d["coord"], mw_mass["coord"], nthneighbor=1)
+    d["NEAREST_MW"] = mw_mass["HOSTID"][idx]
+    d["NEAREST_MW_DIST"] = dist.to_value("Mpc")
+    d["NEAREST_MW_SEP"] = sep.deg
+
+    rematch_idx = np.flatnonzero(d["NEAREST_MW"] == d["HOSTID"])
+    idx2, sep, dist = match_coordinates_3d(d["coord"][rematch_idx], mw_mass['coord'], nthneighbor=2)
+    d["NEAREST_MW"][rematch_idx] = mw_mass["HOSTID"][idx2]
+    d["NEAREST_MW_DIST"][rematch_idx] = dist.to_value("Mpc")
+    d["NEAREST_MW_SEP"][rematch_idx] = sep.deg
+
+    idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)
+    dist = dist.to_value("Mpc")
+    mask = (dist > 0)
+
+    for d_cut in (1, 1.5, 2):
+        col = f"NEARBY_MW_COUNT_{d_cut}"
+        d[col] = 0
+        idx, count = np.unique(idx1[mask & (dist < d_cut)], return_counts=True)
+        d[col][idx] = count
+
+    del d["coord"]
     return d
 
 
@@ -361,6 +391,7 @@ def build_master_list(
     edd_lim17,
     nsa,
     nsa1,
+    sga=None,
     remove_list=None,
     stars=None,
     coverage_maps=None,
@@ -387,6 +418,9 @@ def build_master_list(
 
     d = add_nsa(d, nsa1)
     del nsa1
+
+    d = add_sga(d, sga)
+    del sga
 
     d = add_hostid(d)
 
@@ -432,5 +466,6 @@ def build_master_list(
     d.sort("PGC")
     d = add_selection_flags(d)
     d = apply_manual_fixes(d)
+    d = find_local_group_like(d)
 
     return d
