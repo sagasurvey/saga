@@ -41,6 +41,7 @@ __all__ = [
     "get_coord",
     "nearest_neighbor_join",
     "match_ids",
+    "binned_percentile",
 ]
 
 
@@ -384,3 +385,55 @@ def match_ids(id1, id2, id2_sorter=None):
         s = id2_sorter[s]
     matched = (id1 == id2[s])
     return np.flatnonzero(matched), s[matched]
+
+
+def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
+    """
+    Parameters
+    ----------
+    x : array_like
+        The input data to be binned.
+    values : array_like
+        The input values to calculate percentiles.
+    percentiles : array_like
+        The percentiles to calculate.
+    bins : int or array_like, optional
+        If bins is an int, it defines the number of equal-width bins in the
+        given range. If bins is a sequence, it defines the bin edges.
+    interpolation : {'linear', 'lower', 'higher', 'midpoint', 'nearest'}
+        This optional parameter specifies the interpolation method to use,
+
+    Returns
+    -------
+    bin_edges : ndarray
+        The edges of the bins used in the calculation.
+    counts : ndarray
+        Number of values in each bin.
+    percentiles : ndarray
+        The requested percentiles, with a shape of (len(percentiles), len(bins)-1).
+    """
+    mask = np.isfinite(x) & np.isfinite(values)
+    x = x[mask]
+    sorter = np.argsort(x)
+    x = x[sorter]
+    values = values[mask][sorter]
+
+    if isinstance(bins, int):
+        bins = np.linspace(x.min(), x.max(), bins)
+    else:
+        bins = np.atleast_1d(bins).ravel()
+
+    indices = np.searchsorted(x, bins)
+    percentiles = np.atleast_1d(percentiles).ravel()
+
+    count = []
+    out = []
+    for i, j in zip(indices[:-1], indices[1:]):
+        count.append(j - i)
+        if j == i:
+            nan = np.empty(percentiles.size)
+            nan.fill(np.nan)
+            out.append(nan)
+        else:
+            out.append(np.percentile(values[i:j], percentiles, interpolation=interpolation))
+    return bins, np.array(count), np.stack(out).T
