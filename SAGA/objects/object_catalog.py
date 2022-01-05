@@ -54,7 +54,7 @@ def _calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def _calc_fiducial_p_sat_v3(base, params=(-2.9277, -7.4097, 2.8065, 3.0996, -4.9687, 0.27)):
+def _calc_fiducial_p_sat_v3(base, params=(-2.74119, -7.47602, 2.57946, 1.6604, -4.24451, 0.4933)):
     r = base["r_mag"]
 
     hs = np.where(base["human_selected"] > 0, 1, 0)
@@ -64,8 +64,8 @@ def _calc_fiducial_p_sat_v3(base, params=(-2.9277, -7.4097, 2.8065, 3.0996, -4.9
         base["gr"],
         np.where(
             C.valid_z_mag.mask(base),
-            0.67231756 + 0.37501174 * base["r_mag"] - 0.3938203 * base["z_mag"],
-            0.92852026 - 0.02951143 * base["r_mag"],
+            0.60447764 + 0.37438834 * base["r_mag"] - 0.3896615 * base["z_mag"],
+            0.87112784 - 0.02662872 * base["r_mag"],
         ),
     )
 
@@ -74,8 +74,8 @@ def _calc_fiducial_p_sat_v3(base, params=(-2.9277, -7.4097, 2.8065, 3.0996, -4.9
         base["r_fibermag"],
         np.where(
             C.valid_sb.mask(base),
-            -1.584347 + 0.26432422 * base["r_mag"] + 0.8013437 * base["sb_r"],
-            11.612417 + 0.5422449 * base["r_mag"],
+            -1.5557698 + 0.240722 * base["r_mag"] + 0.8187604 * base["sb_r"],
+            12.071777 + 0.51810336 * base["r_mag"],
         ),
     )
 
