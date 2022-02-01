@@ -256,7 +256,7 @@ def prepare_mmt_catalog(
     target_catalog,
     write_to=None,
     verbose=True,
-    remove_outskirts=True,
+    remove_outskirts=1.1,
     targeting_score_threshold=900,
     flux_star_kwargs=None,
 ):
@@ -280,6 +280,7 @@ def prepare_mmt_catalog(
     flux_star_kwargs : dict or None, optional
         min_dist_to_target : 20 (arcsec)
         rank : 5
+        limit_to : 100
 
     Returns
     -------
@@ -310,7 +311,8 @@ def prepare_mmt_catalog(
         )
 
     if remove_outskirts:
-        target_catalog = (Query("RHOST_KPC < 400.0") | Query("RHOST_ARCM < 40.0")).filter(target_catalog)
+        remove_outskirts = 1.1 if remove_outskirts is True else float(remove_outskirts)
+        target_catalog = (Query(f"RHOST_KPC < {300 * remove_outskirts}") | Query(f"RHOST_ARCM < {30 * remove_outskirts}")).filter(target_catalog)
 
     is_target = Query("TARGETING_SCORE >= 0", "TARGETING_SCORE < {}".format(targeting_score_threshold))
 
@@ -328,8 +330,8 @@ def prepare_mmt_catalog(
         is_star = Query(
             "is_galaxy == 0",
             "REMOVE == 0",
-            "morphology_info == 80",
-            QueryMaker.startswith("REF_CAT", "G"),
+            Query("morphology_info == 80") | Query("(morphology_info >> 1) % 2 == 1"),
+            QueryMaker.startswith("REF_CAT", "G") | QueryMaker.startswith("REF_CAT", "T"),
             "g_mag < 19",
             "r_mag < 19",
             "z_mag < 19",
@@ -370,8 +372,10 @@ def prepare_mmt_catalog(
     if flux_star_kwargs is None:
         flux_star_kwargs = {}
 
-    fs_min_dist_to_target = max(0, float(flux_star_kwargs.get("min_dist_to_target", 20)))  # arcsec
+    fs_min_dist_to_target = float(flux_star_kwargs.get("min_dist_to_target", 20))  # arcsec
+    fs_max_dist_to_center = float(flux_star_kwargs.get("max_dist_to_center", 60))  # arcmin
     fs_rank = int(flux_star_kwargs.get("rank", 5))
+    fs_limit = int(flux_star_kwargs.get("limit_to", 100))
 
     # move flux star rank
     if fs_rank < 1 or fs_rank > 8:
@@ -383,7 +387,7 @@ def prepare_mmt_catalog(
         is_flux_star = Query("rank == {}".format(fs_rank))
         is_target = Query("rank >= 1", "rank <= 8", "rank != {}".format(fs_rank))
 
-    if fs_min_dist_to_target:
+    if fs_min_dist_to_target > 0:
         target_catalog = add_skycoord(target_catalog)
         flux_star_indices = np.flatnonzero(is_flux_star.mask(target_catalog))
         is_target_mask = is_target.mask(target_catalog)
@@ -395,6 +399,17 @@ def prepare_mmt_catalog(
         target_catalog["rank"][flux_star_indices[sep < fs_min_dist_to_target]] = 0
         target_catalog = Query("rank > 0").filter(target_catalog)
         del target_catalog["coord"]
+
+    if fs_max_dist_to_center > 0:
+        to_remove = Query(is_flux_star, "RHOST_ARCM > {}".format(fs_max_dist_to_center))
+        target_catalog = (~to_remove).filter(target_catalog)
+
+    if fs_limit > 0 and is_flux_star.count(target_catalog) > fs_limit:
+        fs_idx = np.flatnonzero(is_flux_star.mask(target_catalog))
+        max_r = target_catalog["RHOST_ARCM"][fs_idx].max()
+        s = np.random.RandomState(fs_limit).rand(len(fs_idx)) / ((target_catalog["RHOST_ARCM"][fs_idx] / max_r) ** 0.25)
+        target_catalog["rank"][fs_idx[s.argsort()[fs_limit:]]] = 0
+        target_catalog = Query("rank > 0").filter(target_catalog)
 
     if verbose:
         print(
