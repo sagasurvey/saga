@@ -4,7 +4,12 @@ from easyquery import Query, QueryMaker
 from ..database import FastCsvTable, FileObject, FitsTable
 from ..utils import fill_values_by_query
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
-from .manual_fixes import fixes_2df_spec_by_objid, fixes_ozdes_spec_by_objid, fixes_6df_spec_by_objid
+from .manual_fixes import (
+    fixes_2df_spec_by_objid,
+    fixes_ozdes_spec_by_objid,
+    fixes_6df_spec_by_objid,
+    fixes_wigglez_spec_by_objid,
+)
 
 __all__ = [
     "read_gama",
@@ -185,6 +190,9 @@ def read_wigglez(file_path):
     specs["TELNAME"] = "WIGGZ"
     specs["MASKNAME"] = "WIGGZ"
     specs["HELIO_CORR"] = True
+
+    for objid, fixes in fixes_wigglez_spec_by_objid.items():
+        fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
     return ensure_specs_dtype(specs)
 

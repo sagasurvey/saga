@@ -23,3 +23,7 @@ fixes_ozdes_spec_by_objid = {
 fixes_6df_spec_by_objid = {
     "g2117041-090029": {"ZQUALITY": 1},
 }
+
+fixes_wigglez_spec_by_objid = {
+    "S00J233708065+00124129": {"ZQUALITY": 1},
+}
