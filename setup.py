@@ -34,6 +34,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
     keywords="SAGA",
     packages=find_packages(),
@@ -43,10 +44,8 @@ setup(
         "astropy>=2.0",
         "easyquery>=0.1.5",
         "requests>=2.18",
-        "fast3tree>=0.3.1",
-        "healpy>=1.12",
     ],
     extras_require={
-        "full": ["ipython", "scikit-learn", "pyperclip"],
+        "full": ["healpy>=1.12", "fast3tree>=0.3.1", "ipython", "scikit-learn", "pyperclip"],
     },
 )

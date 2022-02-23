@@ -12,7 +12,6 @@ import numpy as np
 from astropy.coordinates import SkyCoord, search_around_sky
 from astropy.table import join, vstack, unique
 from easyquery import Query, QueryMaker
-from fast3tree import find_friends_of_friends
 
 from ..spectra import (SPECS_COLUMNS, SPEED_OF_LIGHT, ensure_specs_dtype,
                        extract_nsa_spectra, extract_sdss_spectra)
@@ -22,6 +21,13 @@ from ..utils import (add_skycoord, calc_normalized_dist, fill_values_by_query,
 from ..utils.distance import v2z
 from . import build
 from . import cuts as C
+
+_HAS_FAST3TREE_ = True
+try:
+    from fast3tree import find_friends_of_friends
+except ImportError:
+    _HAS_FAST3TREE_ = False
+
 
 # pylint: disable=logging-format-interpolation
 
@@ -451,6 +457,8 @@ def assign_photometry_choice(stacked_catalog, indices, is_last):
 
 
 def merge_catalogs(debug=None, **catalog_dict):
+    if not _HAS_FAST3TREE_:
+        raise RuntimeError("fast3tree is required to run merge_catalogs")
 
     survey_priority = ("des", "decals", "sdss")
 
@@ -1108,6 +1116,9 @@ def build_full_stack(  # pylint: disable=unused-argument
     -------
     base : astropy.table.Table
     """
+    if not _HAS_FAST3TREE_:
+        raise RuntimeError("fast3tree is required to build")
+
     if sdss is None and des is None and decals is None:
         raise ValueError("No photometry catalog to build!")
 
