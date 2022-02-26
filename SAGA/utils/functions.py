@@ -1,5 +1,6 @@
 import io
 import os
+import time
 
 import numpy as np
 import requests
@@ -96,6 +97,7 @@ def add_skycoord(table, ra_label="RA", dec_label="DEC", coord_label="coord", uni
 
 
 def get_decals_cutout_url(ra, dec, pixscale=0.262, layer="ls-dr9", size=256, use_dev=False, file_type="jpg"):
+    file_type = str(file_type).lower()
     if file_type not in ("jpg", "fits"):
         raise ValueError("file_type must be either 'jpg' or 'fits'")
     dev = "-dev" if use_dev else ""
@@ -103,10 +105,37 @@ def get_decals_cutout_url(ra, dec, pixscale=0.262, layer="ls-dr9", size=256, use
 
 
 def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256,
-                            out=None, use_dev=False, timeout=120, file_type="jpg", convert_to_data=False):
+                            out=None, use_dev=False, timeout=60, file_type="jpg",
+                            convert_to_data=False, cache_dir=None, retry=10):
     url = get_decals_cutout_url(ra, dec, pixscale, layer, size, use_dev, file_type)
-    content = requests.get(url, timeout=timeout).content
     extention = f".{file_type}"
+
+    content = cache_path = None
+    if cache_dir:
+        cache_path = os.path.join(cache_dir, url.partition("?")[2].replace("&", "_").replace("=", "") + extention)
+        try:
+            with open(cache_path, "rb") as f:
+                content = f.read()
+        except (IOError, OSError):
+            pass
+        else:
+            cache_path = None
+
+    if content is None:
+        for i in range(int(retry) + 1):
+            try:
+                content = requests.get(url, timeout=timeout).content
+            except requests.ReadTimeout:
+                time.sleep((i + 1) * 5)
+            else:
+                if cache_path:
+                    makedirs_if_needed(cache_path)
+                    with open(cache_path, "wb") as f:
+                        f.write(content)
+                break
+        else:
+            raise RuntimeError("Cannot obtain image from {}".format(url))
+
     if out is not None:
         if isinstance(out, str):
             if not out.lower().endswith(extention):
@@ -115,13 +144,16 @@ def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256,
                 f.write(content)
         else:
             out.write(content)
+
     if convert_to_data:
         if file_type == "fits":
             return fits.open(io.BytesIO(content))
+
         if file_type == "jpg":
             if Image is None:
                 raise ImportError("PIL is required to convert jpg to data")
             return Image.open(io.BytesIO(content), formats=["JPEG"])
+
     return content
 
 
