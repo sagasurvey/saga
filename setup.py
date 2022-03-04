@@ -44,8 +44,12 @@ setup(
         "astropy>=2.0",
         "easyquery>=0.1.5",
         "requests>=2.18",
+        "healpy>=1.12",
+        "fast3tree>=0.3.1",
+        "scikit-learn",
+        "pyperclip"
     ],
     extras_require={
-        "full": ["healpy>=1.12", "fast3tree>=0.3.1", "ipython", "scikit-learn", "pyperclip"],
+        "full": ["ipython"],
     },
 )
