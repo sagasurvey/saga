@@ -4,9 +4,8 @@ SAGA.hosts.build
 This file contains the functions to build the master list and host list
 """
 
-import astropy.units as u
-import healpy as hp
 import numpy as np
+import astropy.units as u
 from astropy.coordinates import Distance, SkyCoord, match_coordinates_3d, search_around_3d
 from astropy.cosmology import WMAP9  # pylint: disable=no-name-in-module
 from astropy.table import Table, join, vstack
@@ -17,6 +16,13 @@ from . import cuts as H
 from ..external.calc_kcor import calc_kcor
 from ..utils import add_skycoord, fill_values_by_query
 from ..utils.distance import d2z, m2d, v2z, z2m
+
+_HAS_HEALPY = True
+try:
+    import healpy as hp
+except ImportError:
+    _HAS_HEALPY = False
+
 
 SAGA_NAMES = {
     37845: "Alice",
@@ -250,6 +256,8 @@ def find_nearby_brightest(
 
 
 def add_image_coverage(d, coverage_map, name, nest=True):
+    if not _HAS_HEALPY:
+        raise ImportError("Healpy is needed to run `add_image_coverage`")
     frac = []
     nside = hp.npix2nside(len(coverage_map))
     for obj in d:
@@ -453,7 +461,7 @@ def build_master_list(
     else:
         d["BRIGHTEST_STAR"] = 99.0
 
-    if coverage_maps:
+    if _HAS_HEALPY and coverage_maps:
         for name, coverage_map in coverage_maps.items():
             d = add_image_coverage(d, coverage_map, name)
 
