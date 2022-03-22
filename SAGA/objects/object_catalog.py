@@ -595,15 +595,17 @@ class ObjectCatalog(object):
 
         manual_lists = dict()
         for survey, col in manual_keys:
-            for list_type in ("remove", "recover"):
+            for list_type in ("remove", "recover", "correction"):
                 key = "{}_{}".format(survey, list_type)
                 try:
                     mlist = self._database[key]
                 except KeyError:
                     continue
-                val = get_unique_objids(mlist.read()[col])
+                val = mlist.read()
                 if not len(val):
                     continue
+                if list_type in ("remove", "recover"):
+                    val = get_unique_objids(val[col])
                 if "_" in survey:
                     new_key = "{}_{}".format(survey.partition("_")[0], list_type)
                     if new_key not in manual_lists:

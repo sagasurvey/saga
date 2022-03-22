@@ -43,6 +43,8 @@ except AttributeError:
         return Query((_func,) + tuple(columns))
 
 
+_D26_TO_EFF_RATIO = 3.0
+
 SGA_COLUMNS = ["SGA_ID", "PGC", "RA_LEDA", "DEC_LEDA", "Z_LEDA", "D25_LEDA", "PA_LEDA", "BA_LEDA", "REF", "SMA_MOMENT", "D26", "PA", "BA"]
 GALEX_COLUMNS = ["ra", "dec", "nuv_exptime", "nuv_mag", "nuv_magerr", "nuv_artifact", "fuv_exptime", "fuv_mag", "fuv_magerr", "fuv_artifact"]
 
@@ -123,8 +125,8 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
     del e_abs
 
     # SHAPE_R is half-light semi-major axis
-    d26_to_eff = 3.0  # multiply by 3 to account for the ratio b/w sma and effective radius
-    catalog["sma"] = catalog["SHAPE_R"] * d26_to_eff
+    # multiply by _D26_TO_EFF_RATIO to account for the ratio b/w sma and effective radius
+    catalog["sma"] = catalog["SHAPE_R"] * _D26_TO_EFF_RATIO
 
     # multiply by sqrt(ba) to get effective radius
     sqrt_ba = np.sqrt(catalog["ba"])
@@ -249,6 +251,36 @@ def prepare_delve_catalog_for_merging(catalog, to_remove=None, to_recover=None, 
         catalog["REMOVE"][idx] = 0
 
     return catalog
+
+
+def apply_photometric_correction(base, correction):
+
+    idx1, idx2 = match_ids(base["OBJID"], correction["OBJID"])
+    if not len(idx2):
+        return base
+
+    correction = correction[idx2]
+
+    base["is_galaxy"][idx1] = True
+    base["RA"][idx1] = correction["RA"]
+    base["DEC"][idx1] = correction["DEC"]
+    base["r_mag"][idx1] = correction["RMAG_GALFIT"]
+    base["g_mag"][idx1] = correction["RMAG_GALFIT"] + correction["GR_GALFIT"]
+    base["radius"][idx1] = correction["RADIUS_GALFIT"]
+    base["ba"][idx1] = correction["BA_GALFIT"]
+    base["phi"][idx1] = correction["PA_GALFIT"]
+    base["sma"][idx1] = correction["RADIUS_GALFIT"] / np.sqrt(correction["BA_GALFIT"]) * _D26_TO_EFF_RATIO
+
+    for idx in idx1:
+        obj = base[idx]
+        mask = calc_normalized_dist(base["RA"], base["DEC"], obj["RA"], obj["DEC"], obj["sma"], obj["ba"], obj["phi"], 1) < 1
+        mask &= (base["r_mag"] > obj["r_mag"] - 0.1)
+        mask &= base["is_galaxy"]
+        base["REMOVE"][mask] += 1 << 11
+
+    base["REMOVE"][idx1] = 0
+
+    return base
 
 
 SPEC_MATCHING_ORDER = (
@@ -410,7 +442,7 @@ def fix_zero_radius_for_galaxies(base):
     base["sma"][idx] = np.exp((22.5 - base["r_mag"][idx]) * 0.4)
 
     idx = np.flatnonzero(Query(is_galaxy, ~valid_radius).mask(base))
-    base["radius"][idx] = base["sma"][idx] / 3.0 * np.sqrt(base["ba"][idx])
+    base["radius"][idx] = base["sma"][idx] / _D26_TO_EFF_RATIO * np.sqrt(base["ba"][idx])
 
     return base
 
@@ -659,6 +691,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     decals=None,
     decals_remove=None,
     decals_recover=None,
+    decals_correction=None,
     sdss=None,
     nsa=None,
     sga=None,
@@ -682,7 +715,8 @@ def build_full_stack(  # pylint: disable=unused-argument
     """
     if decals is not None:
         base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
-        del decals, decals_remove, decals_recover
+        base = apply_photometric_correction(base, decals_correction)
+        del decals, decals_remove, decals_recover, decals_correction
     elif delve is not None:
         base = prepare_delve_catalog_for_merging(delve, delve_remove, delve_recover)
         del delve, delve_remove, delve_recover
