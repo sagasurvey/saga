@@ -405,18 +405,14 @@ def nearest_neighbor_join(
     return d
 
 
-def match_ids(id1, id2, id2_sorter=None):
+def match_ids(id1, id2, assume_unique=False):
     """
     Find `id1` in `id2`. `id2` should be sorted.
-    Ruturns `id1_indices` and `id1_indices` such that
+    Ruturns `id1_indices` and `id2_indices` such that
     `id1[id1_indices] == id2[id2_indices]`.
     """
-    s = np.searchsorted(id2, id1, sorter=id2_sorter)
-    s[s >= len(id2)] = -1
-    if id2_sorter is not None:
-        s = id2_sorter[s]
-    matched = (id1 == id2[s])
-    return np.flatnonzero(matched), s[matched]
+    _, id1_indices, id2_indices = np.intersect1d(id1, id2, assume_unique=assume_unique, return_indices=True)
+    return id1_indices, id2_indices
 
 
 def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
