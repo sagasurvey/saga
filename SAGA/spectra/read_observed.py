@@ -132,7 +132,7 @@ def read_generic_spectra(
         if helio_corr is None:
             this["HELIO_CORR"] = False
         else:
-            this["SPEC_Z"] += float(helio_corr)
+            this["SPEC_Z"] = np.expm1(np.log1p(this["SPEC_Z"], dtype=np.float64) - np.log1p(-float(helio_corr)))
             this["HELIO_CORR"] = True
 
         output.append(this)
