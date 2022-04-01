@@ -14,7 +14,7 @@ Label | Unit | Definition
 `radius_err` | arcsec | Estimated error on effective radius of object
 `ba` | - | galaxy aspect ratio (minor-to-major axis ratio; b/a)
 `phi` | - | position angle of the galaxy
-`sma` | - | semi-major axis at about ~ mag/arcsec^2 surface brightness isophote
+`sma` | - | semi-major axis at about 26 mag/arcsec^2 surface brightness isophote (roughly 3x half-light semi-major axis)
 `REF_CAT` | - | whether this object is in the SGA (`L3`) or the Gaia (`G2`) catalogs
 `SGA_ID` | - | SGA ID for objects in the SGA catalog
 `<band>_mag` | mag | ugrizy magnitude from primary survey, e.g., `r_mag`. [99 or NaN if no measurement]
@@ -47,7 +47,7 @@ Label | Unit | Definition
 `HOST_VHOST` | km/s |  Recession (Heliocentric) velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
-`p_sat_approx` | - | Raw pproximated probability of this object being a satellite. Do NOT use.
+`p_sat_approx` | - | Raw approximated probability of this object being a satellite. **Do NOT use**.
 `p_sat_corrected` | - | Corrected approximated probability of this object being a satellite. Use with care.
 
 _*For SAGA DR2, data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`). For SAGA DR3, these are taken from LS DR9._
@@ -106,8 +106,16 @@ Label | Unit | Definition
 
 Label | Unit | Definition
 --- | --- | ---
-`really_need_spec` | - | number of remaining targets within main targeting cuts (r < 20.75, within Rvir)
-`really_need_spec_bright` | - | number of remaining targets within main targeting cuts (r < 17.77, within Rvir)
+`paper2_need_spec` | - | number of remaining (no redshift) targets within Paper 2 targeting cuts (r < 20.75, within Rvir)
+`paper2_total` | - | number of total targets within Paper 2 targeting cuts (r < 20.75, within Rvir)
+`paper3_need_spec` | - | number of remaining (no redshift) targets within Paper 3 targeting cuts (r < 20.75, within Rvir)
+`paper3_total` | - | number of total targets within Paper 3 targeting cuts (r < 20.75, within Rvir)
+`paper3_failed` | - | number of failed targets within Paper 3 targeting cuts (r < 20.75, within Rvir)
+`paper3_targeted` | - | number of targeted targets within Paper 3 targeting cuts (r < 20.75, within Rvir)
+`paper3plus_need_spec` | - | same as `paper3_need_spec` but include selected targets outside of nominal targeting cuts
+`paper3plus_total` | - | same as `paper3_total` but include selected targets outside of nominal targeting cuts
+`paper3plus_failed` | - | same as `paper3_failed` but include selected targets outside of nominal targeting cuts
+`paper3plus_targeted` | - | same as `paper3_targeted` but include selected targets outside of nominal targeting cuts
 `specs_ours_rvir` | - | number of SAGA redshifts within Rvir
 `sats_total` | - | number of satellites
 `sats_r_limit` | - | number of satellites (r < 20.75)
@@ -117,4 +125,4 @@ Label | Unit | Definition
 `sats_ours_r_limit` | - | number of SAGA-discovered satellites (r < 20.75)
 `sats_ours_Mr_limit` | - | number of SAGA-discovered satellites (Mr < -12.3)
 `sats_ours_bright` | - | number of SAGA-discovered satellites (r < 17.77)
-`sats_missed_approx` | - | model-predicted number of missed satellites within main targeting cuts (r < 20.75, within Rvir)
+`sats_missed_corrected` | - | model-predicted number of missed satellites within main targeting cuts (r < 20.75, within Rvir)
