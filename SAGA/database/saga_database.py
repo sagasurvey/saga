@@ -272,6 +272,19 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
+            "spectra_gama_dr4": DataObject(
+                FitsTable("http://www.gama-survey.org/dr4/data/cat/SpecCat/v27/SpecObjv27.fits"),
+                FitsTable(
+                    os.path.join(
+                        self._shared_dir,
+                        "Spectra",
+                        "Final",
+                        "GAMA",
+                        "GAMA_SpecObj_dr4.fits",
+                    )
+                ),
+                use_local_first=True,
+            ),
             "spectra_ozdes_dr1": DataObject(
                 FitsTable("http://www.mso.anu.edu.au/ozdes/OzDES-DR1.fits"),
                 FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "OzDES", "OzDES-DR1.fits")),
@@ -378,7 +391,7 @@ class Database(object):
             SpectraData(
                 os.path.join(self._shared_dir, "Spectra", "Final"),
                 {
-                    "gama": self._tables["spectra_gama_dr3"],
+                    "gama": self._tables["spectra_gama_dr4"],
                     "2df": self._tables["spectra_2df"],
                     "2dflens": self._tables["spectra_2dflens"],
                     "6df": self._tables["spectra_6df"],

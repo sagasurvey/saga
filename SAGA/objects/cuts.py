@@ -165,6 +165,8 @@ _known_telnames = {
     "SDSS",
     "NSA",
     "GAMA",
+    "GAMALT",
+    "GAMAEX",
     "OzDES",
     "2dFLen",
     "WIGGZ",

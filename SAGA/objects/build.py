@@ -593,7 +593,7 @@ def add_cleaned_spectra(base, spectra_clean):
         nearby_obj_indices = np.flatnonzero(sep < _get_spec_search_radius(spec["SPEC_Z"]))
 
         if len(nearby_obj_indices) == 0:
-            if spec["TELNAME"] != "GAMA":
+            if spec["TELNAME"] not in C._known_telnames:
                 logging.warning(
                     "In SAGA.objects.build.add_cleaned_spectra()\n No object within 20 arcsec of {} spec ({}, {})".format(
                         spec["TELNAME"], spec["RA"], spec["DEC"]
@@ -630,7 +630,7 @@ def add_cleaned_spectra(base, spectra_clean):
                 closest_obj_index = indices[sep[indices].argmin()]
                 break
         else:
-            if spec["TELNAME"] != "GAMA":
+            if spec["TELNAME"] not in C._known_telnames:
                 logging.warning(
                     "In SAGA.objects.build.add_cleaned_spectra()\n No object can be matched to {} spec ({}, {})".format(
                         spec["TELNAME"], spec["RA"], spec["DEC"]

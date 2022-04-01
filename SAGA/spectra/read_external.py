@@ -17,19 +17,22 @@ __all__ = [
     "read_2dflens",
     "read_6df",
     "read_ozdes",
+    "read_wigglez",
     "read_ukst",
     "read_lcrs",
     "read_slackers",
+    "read_alfalfa",
 ]
 
 
 def read_gama(file_path):
+    # Ref: http://www.gama-survey.org/dr4/data/cat/SpecCat/v27/SpecCat.notes
+
     if not hasattr(file_path, "read"):
         file_path = FitsTable(file_path)
-    specs = file_path.read()["RA", "DEC", "SPECID", "CATAID", "NQ", "Z", "SURVEY"]
+    specs = file_path.read()["RA", "DEC", "SPECID", "CATAID", "NQ", "Z", "SURVEY_CODE"]
 
-    specs = Query("NQ >= 3", (lambda x: x != "SDSS", "SURVEY")).filter(specs)
-    del specs["SURVEY"]
+    specs = Query("NQ >= 3", QueryMaker.isin("SURVEY_CODE", [1, 2, 6, 10, 12], invert=True)).filter(specs)
 
     specs.rename_column("SPECID", "SPECOBJID")
     specs.rename_column("CATAID", "MASKNAME")
@@ -39,8 +42,9 @@ def read_gama(file_path):
     fill_values_by_query(specs, "ZQUALITY > 4", {"ZQUALITY": 4})
 
     specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
-    specs["TELNAME"] = "GAMA"
+    specs["TELNAME"] = np.where(specs["SURVEY_CODE"] == 5, "GAMA", np.where(specs["SURVEY_CODE"] == 11, "GAMALT", "GAMAEX"))
     specs["HELIO_CORR"] = True
+    del specs["SURVEY_CODE"]
 
     return ensure_specs_dtype(specs)
 
