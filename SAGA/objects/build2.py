@@ -851,8 +851,8 @@ def remove_shreds_near_spec_obj(base, nsa=None, shreds_recover=None):
     has_ref_cat = "REF_CAT" in base.colnames
     has_obj_nsaid = "OBJ_NSAID" in base.colnames
 
-    is_nsa = Query("OBJ_NSAID > -1")
-    is_sga = QueryMaker.equal("REF_CAT", "L3")
+    is_nsa = Query(C.is_clean2, C.is_galaxy2, "OBJ_NSAID > -1")
+    is_sga = Query(C.is_clean2, C.is_galaxy2, QueryMaker.equal("REF_CAT", "L3"))
     is_good_galaxy = Query(C.is_clean2, C.is_galaxy2, "radius > 0", C.has_spec)
 
     base["spec_rank"] = C.has_spec.mask(base).astype(np.int32) * 2

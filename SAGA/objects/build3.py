@@ -263,6 +263,7 @@ def apply_photometric_correction(base, correction):
     correction = correction[idx2]
 
     base["is_galaxy"][idx1] = True
+    base["morphology_info"][idx1] += (1 << 10)
     base["RA"][idx1] = correction["RA"]
     base["DEC"][idx1] = correction["DEC"]
     base["r_mag"][idx1] = correction["RMAG_GALFIT"]
@@ -292,7 +293,7 @@ def apply_morphology_correction(base, correction):
 
     correction = correction[idx2]
     base["is_galaxy"][idx1] = correction["is_galaxy"].astype(bool)
-    base["morphology_info"][idx1] += (1 << 10)
+    base["morphology_info"][idx1] += (1 << 11)
     base["REMOVE"][idx1] = 0
 
     return base
@@ -602,9 +603,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     """
     if decals is not None:
         base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
-        base = apply_photometric_correction(base, decals_correction)
-        base = apply_morphology_correction(base, decals_morphology)
-        del decals, decals_remove, decals_recover, decals_correction, decals_morphology
+        del decals, decals_remove, decals_recover
     elif delve is not None:
         base = prepare_delve_catalog_for_merging(delve, delve_remove, delve_recover)
         del delve, delve_remove, delve_recover
@@ -618,6 +617,12 @@ def build_full_stack(  # pylint: disable=unused-argument
         base, sga = add_sga(base, sga)
 
     base = cap_sma_value(base)
+    if decals_correction is not None:
+        base = apply_photometric_correction(base, decals_correction)
+        del decals_correction
+    if decals_morphology is not None:
+        base = apply_morphology_correction(base, decals_morphology)
+        del decals_morphology
     base = apply_manual_fixes(base)
     base = fix_zero_radius_for_galaxies(base)
 

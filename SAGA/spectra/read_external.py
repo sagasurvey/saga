@@ -32,7 +32,7 @@ def read_gama(file_path):
         file_path = FitsTable(file_path)
     specs = file_path.read()["RA", "DEC", "SPECID", "CATAID", "NQ", "Z", "SURVEY_CODE"]
 
-    specs = Query("NQ >= 3", QueryMaker.isin("SURVEY_CODE", [1, 2, 6, 10, 12], invert=True)).filter(specs)
+    specs = Query("NQ >= 3", "Z > 0", QueryMaker.isin("SURVEY_CODE", [1, 2, 6, 12], invert=True)).filter(specs)
 
     specs.rename_column("SPECID", "SPECOBJID")
     specs.rename_column("CATAID", "MASKNAME")
