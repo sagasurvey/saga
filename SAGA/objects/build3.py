@@ -14,6 +14,7 @@ from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, calc_no
 from ..utils.distance import v2z
 from . import build, build2
 from . import cuts as C
+from .manual_fixes import fixes_to_decals_dr9
 
 
 def filter_nearby_object(catalog, host, radius_deg=1.001, remove_coord=True):
@@ -283,6 +284,20 @@ def apply_photometric_correction(base, correction):
     return base
 
 
+def apply_morphology_correction(base, correction):
+
+    idx1, idx2 = match_ids(base["OBJID"], correction["OBJID"])
+    if not len(idx2):
+        return base
+
+    correction = correction[idx2]
+    base["is_galaxy"][idx1] = correction["is_galaxy"].astype(bool)
+    base["morphology_info"][idx1] += (1 << 10)
+    base["REMOVE"][idx1] = 0
+
+    return base
+
+
 SPEC_MATCHING_ORDER = (
     (Query("SPEC_Z < 0.002", "REMOVE == 0", "is_galaxy == 0", "sep < 5"), "sep"),
     (Query("SPEC_Z < 0.002", "REMOVE % 2 == 0", "is_galaxy == 0", "sep < 5"), "sep"),
@@ -299,137 +314,8 @@ SPEC_MATCHING_ORDER = (
 
 
 def apply_manual_fixes(base):
-
-    galaxies_not_stars = [
-        915147800000001877,
-        901039870000003755,
-        903341560000000816,
-        903442030000003771,
-        903233250000000577,
-        900906460000008966,
-        900906460000009106,
-        900896600000003831,
-        900809940000005200,
-        900800510000009934,
-        900809940000005279,
-        901029370000006715,
-        901039840000008707,
-        901039860000005713,
-        901018960000005296,
-        901039870000003755,
-        901050380000000229,
-        900896580000007542,
-        902577060000004414,
-        900452390000002003,
-        904733050000000124,
-        904501610000001442,
-        901215290000002014,
-        904461200000003516,
-        904488130000004194,
-    ]
-    mask = QueryMaker.isin("OBJID", galaxies_not_stars).mask(base)
-    base["is_galaxy"][mask] = True
-    base["morphology_info"][mask] += (1 << 10)
-
-    # NSA (v1.0.1) 343647 (255.5115, 22.9355)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 904604600000003107),
-        dict(
-            is_galaxy=True,
-            REMOVE=0,
-            sma=28.0,
-            radius=11.7,
-            radius_err=0.5,
-            ba=0.7,
-            phi=97.0,
-            g_mag=13.86,
-            r_mag=13.14,
-            z_mag=12.54,
-            g_err=0.005,
-            r_err=0.002,
-            z_err=0.005,
-            REF_CAT="N1",
-        ),
-    )
-
-    # (330.14926, -43.140017)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 901050380000007338),
-        dict(sma=100),
-    )
-
-    # (224.594532 -1.090942)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 903255060000002115),
-        dict(sma=270, ba=0.15, phi=81.0),
-    )
-
-    # (198.1743458, 22.829911)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 904589200000000836),
-        dict(sma=60, ba=0.55, phi=50.0),
-    )
-
-    # (163.0159, 10.1479)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 903897920000000718),
-        dict(sma=135, ba=0.75, phi=40.0),
-    )
-
-    # (40.9350, -29.0035)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 901704030000004690),
-        dict(sma=170, phi=83.0),
-    )
-
-    # (330.1370, -43.3897)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 901039870000000760),
-        dict(sma=36.0),
-    )
-
-    # (35.4017, -5.5212)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 902988610000000241),
-        dict(sma=138.0),
-    )
-
-    # (138.5198, 40.1133)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 915434150000002223),
-        dict(sma=150.0),
-    )
-
-    # (38.38663275686441 -39.16816117470768)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 901215290000002014),
-        dict(sma=6.0, ba=0.5, phi=50.0, radius=1.414, g_mag=18.5972, r_mag=18.4526),
-    )
-
-    # (0.8709052543168931 21.251459040814208)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 904501610000001442),
-        dict(sma=7.0, ba=0.5, phi=50.0, radius=1.65, g_mag=18.4544, r_mag=18.0713),
-    )
-
-    # (178.9711155613407	6.5926109008099205)
-    fill_values_by_query(
-        base,
-        QueryMaker.equal("OBJID", 903684670000004855),
-        dict(sma=10.5, ba=0.4, phi=30.0, radius=2.21, g_mag=19.348, r_mag=19.03),
-    )
-
+    for objid, fixes in fixes_to_decals_dr9.items():
+        fill_values_by_query(base, QueryMaker.equal("OBJID", objid), fixes)
     return base
 
 
@@ -692,6 +578,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     decals_remove=None,
     decals_recover=None,
     decals_correction=None,
+    decals_morphology=None,
     sdss=None,
     nsa=None,
     sga=None,
@@ -716,7 +603,8 @@ def build_full_stack(  # pylint: disable=unused-argument
     if decals is not None:
         base = prepare_decals_catalog_for_merging(decals, decals_remove, decals_recover)
         base = apply_photometric_correction(base, decals_correction)
-        del decals, decals_remove, decals_recover, decals_correction
+        base = apply_morphology_correction(base, decals_morphology)
+        del decals, decals_remove, decals_recover, decals_correction, decals_morphology
     elif delve is not None:
         base = prepare_delve_catalog_for_merging(delve, delve_remove, delve_recover)
         del delve, delve_remove, delve_recover

@@ -595,7 +595,7 @@ class ObjectCatalog(object):
 
         manual_lists = dict()
         for survey, col in manual_keys:
-            for list_type in ("remove", "recover", "correction"):
+            for list_type in ("remove", "recover", "correction", "morphology"):
                 key = "{}_{}".format(survey, list_type)
                 try:
                     mlist = self._database[key]

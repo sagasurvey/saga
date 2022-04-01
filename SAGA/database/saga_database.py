@@ -77,6 +77,11 @@ known_google_sheets = {
         "1Oi1cSVIOORCMBFz_gU1_yn9bUSrr-GUjk8axuUS-DO4",
         1637356032,
     ),
+    "decals_dr9_morphology": GoogleSheets(
+        "1Oi1cSVIOORCMBFz_gU1_yn9bUSrr-GUjk8axuUS-DO4",
+        1727798925,
+        include_names=["OBJID", "is_galaxy"],
+    ),
     "shreds_recover": GoogleSheets(
         "1Y3nO7VyU4jDiBPawCs8wJQt2s_PIAKRj-HSrmcWeQZo",
         763845590,
