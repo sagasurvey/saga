@@ -16,7 +16,7 @@ from ..utils import makedirs_if_needed
 from ..version import __version__
 
 try:
-    FileExistsError
+    FileExistsError  # pylint: disable=used-before-assignment
 except NameError:
     FileExistsError = OSError  # pylint: disable=redefined-builtin
 
