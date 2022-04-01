@@ -182,3 +182,13 @@ has_our_specs = QueryMaker.vectorize(lambda x: x and not set(x.split("+")).issub
 has_been_targeted = QueryMaker.vectorize(
     lambda x: x and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT_ALL"
 )
+
+is_failed_target = Query(has_been_targeted, ~has_spec)
+was_failed_target = Query(
+    has_spec,
+    QueryMaker.vectorize(
+        lambda x, y: x and not (set(x.split("+")) - set(y.split("+"))).issubset(_known_telnames),
+        "SPEC_REPEAT_ALL",
+        "SPEC_REPEAT",
+    ),
+)
