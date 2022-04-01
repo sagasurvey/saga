@@ -799,7 +799,6 @@ class ObjectCatalog(object):
         base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
-        paper3plus_targeting_cut = C.paper3_targeting_cut | Query(C.high_priority_sb_tight, C.gr_cut_tight, C.ba_cut) | "human_selected > 0"
         d = dict()
 
         # fmt: off
@@ -809,8 +808,8 @@ class ObjectCatalog(object):
         d["paper3_total"] = Query(basic_targeting_cuts, C.paper3_targeting_cut)
         d["paper3_failed"] = Query(d["paper3_need_spec"], C.has_been_targeted)
         d["paper3_targeted"] = Query(d["paper3_total"], C.has_been_targeted)
-        d["paper3plus_need_spec"] = Query(basic_targeting_cuts, paper3plus_targeting_cut, ~C.has_spec)
-        d["paper3plus_total"] = Query(basic_targeting_cuts, paper3plus_targeting_cut)
+        d["paper3plus_need_spec"] = Query(basic_targeting_cuts, C.paper3plus_targeting_cut, ~C.has_spec)
+        d["paper3plus_total"] = Query(basic_targeting_cuts, C.paper3plus_targeting_cut)
         d["paper3plus_failed"] = Query(d["paper3plus_need_spec"], C.has_been_targeted)
         d["paper3plus_targeted"] = Query(d["paper3plus_total"], C.has_been_targeted)
 

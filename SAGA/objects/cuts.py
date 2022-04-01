@@ -134,6 +134,7 @@ very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p
 
 paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = high_priority_sb_tight & high_priority_gr
 paper3_targeting_cut = paper2_targeting_cut & ba_cut
+paper3plus_targeting_cut = paper3_targeting_cut | Query(high_priority_sb_tight, gr_cut_tight, ba_cut) | Query("human_selected > 0")
 
 is_sat = Query("SATS == 1")
 is_host = Query("SATS == 3")
