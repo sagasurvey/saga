@@ -799,19 +799,20 @@ class ObjectCatalog(object):
         base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
-
+        paper3plus_targeting_cut = C.paper3_targeting_cut | Query(C.high_priority_sb_tight, C.gr_cut_tight, C.ba_cut) | "human_selected > 0"
         d = dict()
 
         # fmt: off
-        d["need_spec"] = Query(basic_targeting_cuts, C.very_relaxed_targeting_cuts, ~C.has_spec)
-        d["need_spec_griz"] = Query(basic_targeting_cuts, C.griz_cut, ~C.has_spec)
-        d["really_need_spec"] = Query(basic_targeting_cuts, C.main_targeting_cuts, ~C.has_spec)
-        d["really_need_spec_strict"] = Query(d["really_need_spec"], C.faint_end_limit_strict)
-        d["really_need_spec_bright"] = Query(d["really_need_spec"], C.sdss_limit)
         d["paper2_need_spec"] = Query(basic_targeting_cuts, C.paper2_targeting_cut, ~C.has_spec)
         d["paper2_total"] = Query(basic_targeting_cuts, C.paper2_targeting_cut)
         d["paper3_need_spec"] = Query(basic_targeting_cuts, C.paper3_targeting_cut, ~C.has_spec)
         d["paper3_total"] = Query(basic_targeting_cuts, C.paper3_targeting_cut)
+        d["paper3_failed"] = Query(d["paper3_need_spec"], C.has_been_targeted)
+        d["paper3_targeted"] = Query(d["paper3_total"], C.has_been_targeted)
+        d["paper3plus_need_spec"] = Query(basic_targeting_cuts, paper3plus_targeting_cut, ~C.has_spec)
+        d["paper3plus_total"] = Query(basic_targeting_cuts, paper3plus_targeting_cut)
+        d["paper3plus_failed"] = Query(d["paper3plus_need_spec"], C.has_been_targeted)
+        d["paper3plus_targeted"] = Query(d["paper3plus_total"], C.has_been_targeted)
 
         d["specs_total"] = C.has_spec
         d["specs_r_limit"] = Query(C.has_spec, C.faint_end_limit)
@@ -826,15 +827,12 @@ class ObjectCatalog(object):
             new_key = key.replace("specs_", "sats_")
             d[new_key] = Query(d[key], C.is_sat)
 
+        for key in [k for k in d if k.startswith("specs_ours")]:
+            new_key = key + "_rvir"
+            d[new_key] = Query(d[key], C.sat_rcut)
+
         d["low_z_total"] = Query(d["specs_total"], C.is_very_low_z)
         d["low_z_ours"] = Query(d["specs_ours"], C.is_very_low_z)
-
-        d["specs_main"] = Query(d["specs_total"], basic_targeting_cuts, C.main_targeting_cuts)
-        d["specs_main_bright"] = Query(d["specs_bright"], basic_targeting_cuts, C.main_targeting_cuts)
-
-        d["specs_ours_rvir"] = Query(d["specs_ours"], C.sat_rcut)
-        d["specs_ours_main"] = Query(d["specs_main"], C.has_our_specs_only)
-        d["specs_ours_main_bright"] = Query(d["specs_main_bright"], C.has_our_specs_only)
 
         d["specs_ours_aat"] = Query(d["specs_ours"], C.has_aat_spec)
         d["specs_ours_mmt"] = Query(d["specs_ours"], C.has_mmt_spec)
@@ -879,7 +877,7 @@ class ObjectCatalog(object):
         data.sort("HOSTID")
 
         if save_to is not False:
-            if hosts != "build_default" and save_to.isfile() and overwrite:
+            if hosts not in ("build_default", "good") and save_to.isfile() and overwrite:
                 data = unique(vstack([data, save_to.read()]), "HOSTID")
                 data.sort("HOSTID")
             save_to.write(data, overwrite=overwrite)
