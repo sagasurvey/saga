@@ -3,7 +3,7 @@
 Code to access, create and edit SAGA Survey data catalogs.
 Project website: http://sagasurvey.org/
 The MIT License (MIT)
-Copyright (c) 2018-2021 The SAGA Survey
+Copyright (c) 2018-2022 The SAGA Survey
 http://opensource.org/licenses/MIT
 """
 
@@ -31,21 +31,21 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Astronomy",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     keywords="SAGA",
     packages=find_packages(),
     install_requires=[
-        "numpy>=1.15.3",
-        "numexpr>=2.6",
-        "astropy>=2.0",
-        "easyquery>=0.1.5",
-        "requests>=2.18",
+        "numpy>=1.16",
+        "numexpr>=2.7",
+        "astropy>=3.0",
+        "easyquery>=0.2",
+        "requests>=2.20",
     ],
     extras_require={
-        "full": ["healpy>=1.12", "fast3tree>=0.3.1", "ipython", "scikit-learn", "pyperclip"],
+        "full": ["healpy>=1.12", "fast3tree>=0.3.1", "ipython>=7.0", "scikit-learn>=0.20", "pyperclip>=1.7"],
     },
 )

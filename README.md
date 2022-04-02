@@ -7,16 +7,16 @@ to determine dwarf galaxy satellite systems around 100 Milky Way analogs down
 to the brightness of the Leo I galaxy (Mr < −12.3).
 
 This `SAGA` package contains code to generate and access SAGA data catalogs.
-This package is intended for SAGA internal use, but it is licensed under the 
-MIT license. 
+This package is intended for SAGA internal use, but it is licensed under the
+MIT license.
 If you use this package or part of it in your research, please considering citing
 [SAGA II paper (Mao et al., 2021)](https://ui.adsabs.harvard.edu/abs/2021ApJ...907...85M/abstract).
 
-- Visit [yymao/FoFCatalogMatching](https://github.com/yymao/FoFCatalogMatching) 
+- Visit [yymao/FoFCatalogMatching](https://github.com/yymao/FoFCatalogMatching)
   if you are looking for the friends-of-friends sky catalog matching code.
-- Visit [yymao.github.io/decals-image-list-tool/](https://yymao.github.io/decals-image-list-tool/) 
-  if you are looking for the web app for listing cutouts from the egacy Surveys.
-- Visit [sagasurvey.org](https://sagasurvey.org) for the most up-to-date SAGA results! 
+- Visit [yymao.github.io/decals-image-list-tool/](https://yymao.github.io/decals-image-list-tool/)
+  if you are looking for the web app for listing cutouts from the Legacy Surveys.
+- Visit [sagasurvey.org](https://sagasurvey.org) for the most up-to-date SAGA results!
 
 
 ## Installation
@@ -31,8 +31,7 @@ To force an update, run
 pip install --upgrade --no-deps --force-reinstall https://github.com/sagasurvey/saga/archive/master.zip
 ```
 
-The code should be compatible with Python 3.6+, 
-but Python 3.6 support may be dropping in 2022. 
+As of April 2022, this code base is compatible with Python 3.7 and above.
 
 ### Dependencies
 
