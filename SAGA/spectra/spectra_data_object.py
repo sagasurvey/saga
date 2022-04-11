@@ -61,6 +61,10 @@ class SpectraData(object):
                         before_time=before_time,
                         exclude_spec_masks=exclude_spec_masks,
                     ),
+                    read_observed.read_coadd(
+                        os.path.join(self.spectra_dir_path, "COADD"),
+                        exclude_spec_masks=exclude_spec_masks,
+                    ),
                     read_observed.read_wiyn(os.path.join(self.spectra_dir_path, "WIYN")),
                     read_observed.read_imacs(os.path.join(self.spectra_dir_path, "IMACS")),
                 ]
