@@ -249,17 +249,14 @@ class ObjectCatalog(object):
         if "HOST_DIST" in table.colnames and version >= 2:
             table["human_selected"] = np.isin(table["OBJID"], self._database["human_selected"].read()["OBJID"]).astype(np.int32)
 
-        if version >= 3:
-            p_func = _calc_fiducial_p_sat_v3
-            p_bias = None
-        else:
-            p_func = _calc_fiducial_p_sat_v2
-            p_bias = 0.25
         with np.errstate(over="ignore", invalid="ignore"):
-            table["p_sat_approx"] = p_func(table)
-            table["p_sat_corrected"] = _correct_fiducial_p_sat(table, bias=p_bias, version=version)
-            if "r_fibermag" in table.colnames:
-                table["p_sat_no_color"] = 0.5 / (1.0 + np.exp(2.9282 * table["r_mag"] - 3.4139 * table["r_fibermag"] + 21.9201))
+            table["p_sat_model1"] = _calc_fiducial_p_sat_v2(table)  # paper2 model
+            if version >= 3:
+                table["p_sat_model2"] = _calc_fiducial_p_sat_v3(table)
+                table["p_sat_model3"] = 0.5 / (1.0 + np.exp(2.9282 * table["r_mag"] - 3.4139 * table["r_fibermag"] + 21.9201))
+                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model3")
+            else:
+                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model1", bias=0.25, version=version)
 
         if add_skycoord:
             table = utils.add_skycoord(table)
@@ -842,7 +839,6 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_approx"].append(Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_approx").sum())
         data["sats_missed_corrected"].append(
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )

@@ -47,7 +47,6 @@ Label | Unit | Definition
 `HOST_VHOST` | km/s |  Recession (Heliocentric) velocity of host
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
-`p_sat_approx` | - | Raw approximated probability of this object being a satellite. **Do NOT use**.
 `p_sat_corrected` | - | Corrected approximated probability of this object being a satellite. Use with care.
 
 _*For SAGA DR2, data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`). For SAGA DR3, these are taken from LS DR9._

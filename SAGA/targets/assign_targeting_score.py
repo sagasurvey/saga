@@ -934,7 +934,7 @@ def assign_targeting_score_lowz_v2(base, manual_selected_objids=None, ignore_spe
         targeting_cuts = Query(targeting_cuts, ~C.has_spec)
 
     fill_values_by_query(base, targeting_cuts, {"TARGETING_SCORE": 900})
-    fill_values_by_query(base, Query(targeting_cuts, "p_sat_approx >= 0.002"), {"TARGETING_SCORE": 800})
+    fill_values_by_query(base, Query(targeting_cuts, "p_sat_model1 >= 0.002"), {"TARGETING_SCORE": 800})
 
     if manual_selected_objids is not None:
         q = Query((lambda x: np.in1d(x, manual_selected_objids), "OBJID"))
