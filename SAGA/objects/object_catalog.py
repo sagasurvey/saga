@@ -258,6 +258,8 @@ class ObjectCatalog(object):
         with np.errstate(over="ignore", invalid="ignore"):
             table["p_sat_approx"] = p_func(table)
             table["p_sat_corrected"] = _correct_fiducial_p_sat(table, bias=p_bias, version=version)
+            if "r_fibermag" in table.colnames:
+                table["p_sat_no_color"] = 0.5 / (1.0 + np.exp(2.9282 * table["r_mag"] - 3.4139 * table["r_fibermag"] + 21.9201))
 
         if add_skycoord:
             table = utils.add_skycoord(table)
