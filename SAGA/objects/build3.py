@@ -570,6 +570,15 @@ def add_quenched_flag(base):
         mask &= (base["EW_Halpha"] < 2)
         base["quenched"][mask] = 1
 
+    if "nuv_sfr" in base.colnames and "nuv_snr" in base.colnames:
+        mask = (base["nuv_snr"] >= 15) & np.isfinite(base["nuv_sfr"]) & np.isfinite(base["log_sm"])
+        base["quenched"][mask] = 0
+        mask &= (base['nuv_sfr'] - base['log_sm'] < 11)
+        base["quenched"][mask] = 1
+
+    # Set by hand: NUCLEUS QUENCHED, BUT CLEARLY SF. NO GALEX COVERAGE
+    fill_values_by_query(base, QueryMaker.isin("OBJID", [902122170000000530, 915501860000000035]), {"quenched": 0})
+
     return base
 
 
