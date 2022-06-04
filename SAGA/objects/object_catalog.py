@@ -28,7 +28,7 @@ def get_unique_objids(objid_col):
     return np.unique(np.asarray(objid_col, dtype=np.int64))
 
 
-def _calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
+def _p_sat_model_paper2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     r = base["r_mag"]
 
     gr = np.where(
@@ -54,11 +54,7 @@ def _calc_fiducial_p_sat_v2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def _calc_fiducial_p_sat_v3(base, params=(-2.74119, -7.47602, 2.57946, 1.6604, -4.24451, 0.4933)):
-    r = base["r_mag"]
-
-    hs = np.where(base["human_selected"] > 0, 1, 0)
-
+def _p_sat_model_paper3(base, params=(0.85, -4.069, 2.133, -13.862)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -69,7 +65,7 @@ def _calc_fiducial_p_sat_v3(base, params=(-2.74119, -7.47602, 2.57946, 1.6604, -
         ),
     )
 
-    rf = np.where(
+    r_fib = np.where(
         C.valid_r_fibermag.mask(base),
         base["r_fibermag"],
         np.where(
@@ -79,14 +75,16 @@ def _calc_fiducial_p_sat_v3(base, params=(-2.74119, -7.47602, 2.57946, 1.6604, -
         ),
     )
 
-    mu = params[0] * r + params[1] * gr + params[2] * rf + params[3] * hs + params[4]
+    r_diff = r_fib - params[0] * base["r_mag"]
+
+    mu = params[1] * gr + params[2] * r_diff + params[3]
     mu = np.where(np.isnan(mu), np.inf, mu)
-    p = params[-1] / (1 + np.exp(-mu))
+    p = 1.0 / (1 + np.exp(-mu))
 
     return p
 
 
-def _correct_fiducial_p_sat(base, fiducial_p_label="p_sat_approx", bias=None, version=3):
+def _correct_fiducial_p_sat(base, fiducial_p_label, bias=None, version=3):
     p = np.array(base[fiducial_p_label])
 
     if bias and "human_selected" in base.colnames:
@@ -250,13 +248,12 @@ class ObjectCatalog(object):
             table["human_selected"] = np.isin(table["OBJID"], self._database["human_selected"].read()["OBJID"]).astype(np.int32)
 
         with np.errstate(over="ignore", invalid="ignore"):
-            table["p_sat_model1"] = _calc_fiducial_p_sat_v2(table)  # paper2 model
+            table["p_sat_model_p2"] = _p_sat_model_paper2(table)  # paper2 model
             if version >= 3:
-                table["p_sat_model2"] = _calc_fiducial_p_sat_v3(table)
-                table["p_sat_model3"] = 0.5 / (1.0 + np.exp(2.9282 * table["r_mag"] - 3.4139 * table["r_fibermag"] + 21.9201))
-                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model3")
+                table["p_sat_model_p3"] = _p_sat_model_paper3(table)
+                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model_p3")
             else:
-                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model1", bias=0.25, version=version)
+                table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model_p2", bias=0.25, version=version)
 
         if add_skycoord:
             table = utils.add_skycoord(table)
