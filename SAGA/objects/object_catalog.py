@@ -456,6 +456,9 @@ class ObjectCatalog(object):
         except KeyError:
             return None
         sga = sga.read()[build3.SGA_COLUMNS]
+        # remove by SGA ID
+        objs_to_remove = [763688]
+        sga = sga[np.isin(sga["SGA_ID"], objs_to_remove, invert=True)]
         return sga
 
     def build_and_write_to_database(
