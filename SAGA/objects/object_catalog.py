@@ -54,7 +54,7 @@ def _p_sat_model_paper2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def _p_sat_model_paper3(base, params=(0.85, -4.91, 2.19, -13.46)):
+def _p_sat_model_paper3(base, params=(0.8, -5.12, 2.55, -17.5, 0.8)):
     gr = np.where(
         C.valid_g_mag.mask(base),
         base["gr"],
@@ -79,7 +79,7 @@ def _p_sat_model_paper3(base, params=(0.85, -4.91, 2.19, -13.46)):
 
     mu = params[1] * gr + params[2] * r_diff + params[3]
     mu = np.where(np.isnan(mu), np.inf, mu)
-    p = 1.0 / (1 + np.exp(-mu))
+    p = params[-1] / (1 + np.exp(-mu))
 
     return p
 
