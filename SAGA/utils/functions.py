@@ -415,7 +415,41 @@ def match_ids(id1, id2, assume_unique=False):
     return id1_indices, id2_indices
 
 
-def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
+def _quantile_with_weights(a, q, weights, alpha, beta):
+    """
+    Calculates the quantiles of a with weights.
+    Assumeing a is sorted.
+    """
+    weights = np.cumsum(weights, dtype=np.float64)
+    q_true = (weights - alpha) / (weights[-1] - alpha - beta + 1)
+    return np.interp(q, q_true, a)
+
+
+def _quantile_method_to_alpha_beta(method):
+    return dict(linear=1.0, hazen=0.5, weibull=0, median_unbiased=(1 / 3), normal_unbiased=(3 / 8))[method]
+
+
+def percentile_with_weights(a, percentiles, weights=None, method="median_unbiased"):
+    """
+    Calculates the percentile of x with weights.
+    """
+    if weights is None:
+        return np.percentile(a, percentiles, method=method)
+
+    a = np.asanyarray(a)
+    percentiles = np.atleast_1d(percentiles).ravel()
+    weights = np.asanyarray(weights)
+
+    mask = np.isfinite(a) & np.isfinite(weights) & (weights > 0)
+    a = a[mask]
+    sorter = np.argsort(a)
+    a = a[sorter]
+    weights = weights[mask][sorter]
+    alpha = beta = _quantile_method_to_alpha_beta(method)
+    return _quantile_with_weights(a, percentiles / 100, weights, alpha, beta)
+
+
+def binned_percentile(x, values, percentiles, bins=10, method="median_unbiased", weights=None):
     """
     Parameters
     ----------
@@ -428,7 +462,7 @@ def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
     bins : int or array_like, optional
         If bins is an int, it defines the number of equal-width bins in the
         given range. If bins is a sequence, it defines the bin edges.
-    interpolation : {'linear', 'lower', 'higher', 'midpoint', 'nearest'}
+    method : {'linear', 'lower', 'higher', 'midpoint', 'nearest'}
         This optional parameter specifies the interpolation method to use,
 
     Returns
@@ -440,6 +474,9 @@ def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
     percentiles : ndarray
         The requested percentiles, with a shape of (len(percentiles), len(bins)-1).
     """
+    x = np.asanyarray(x)
+    values = np.asanyarray(values)
+
     mask = np.isfinite(x) & np.isfinite(values)
     x = x[mask]
     sorter = np.argsort(x)
@@ -454,6 +491,15 @@ def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
     indices = np.searchsorted(x, bins)
     percentiles = np.atleast_1d(percentiles).ravel()
 
+    if weights is None:
+        def _calc_percentiles(values, weights):
+            return np.quantile(values, percentiles / 100, method=method)
+    else:
+        weights = weights[mask][sorter]
+
+        def _calc_percentiles(values, weights):
+            return percentile_with_weights(values, percentiles, weights, method)
+
     count = []
     out = []
     for i, j in zip(indices[:-1], indices[1:]):
@@ -463,5 +509,5 @@ def binned_percentile(x, values, percentiles, bins=10, interpolation='linear'):
             nan.fill(np.nan)
             out.append(nan)
         else:
-            out.append(np.percentile(values[i:j], percentiles, interpolation=interpolation))
+            out.append(_calc_percentiles(values[i:j], weights=(weights[i:j] if weights is not None else None)))
     return bins, np.array(count), np.stack(out).T
