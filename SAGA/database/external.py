@@ -483,7 +483,7 @@ class DatalabQuery(DownloadableBase):
 
         # taken from https://github.com/noaodatalab/datalab/blob/master/dl/queryClient.py#L1791
         r = requests.get(
-            "https://datalab.noao.edu/query/query",
+            "https://datalab.noirlab.edu/query/query",
             {"sql": query, "ofmt": "ascii", "async": False},
             headers={
                 "Content-Type": "application/octet-stream",
