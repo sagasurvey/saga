@@ -42,6 +42,9 @@ __all__ = [
     "get_coord",
     "nearest_neighbor_join",
     "match_ids",
+    "calc_data_quantiles",
+    "calc_cdf",
+    "percentile_with_weights",
     "binned_percentile",
 ]
 
@@ -415,18 +418,30 @@ def match_ids(id1, id2, assume_unique=False):
     return id1_indices, id2_indices
 
 
-def _quantile_with_weights(a, q, weights, alpha, beta):
-    """
-    Calculates the quantiles of a with weights.
-    Assumeing a is sorted.
-    """
+def calc_data_quantiles(a, weights=None, method="median_unbiased"):
+    a = np.ravel(a)
+    weights = np.ones_like(a) if weights is None else np.ravel(weights)
+
+    mask = np.isfinite(a)
+    mask &= np.isfinite(weights)
+    mask &= (weights > 0)
+
+    a = a[mask]
+    sorter = np.argsort(a)
+    a = a[sorter]
+    weights = weights[mask][sorter]
     weights = np.cumsum(weights, dtype=np.float64)
-    q_true = (weights - alpha) / (weights[-1] - alpha - beta + 1)
-    return np.interp(q, q_true, a)
+
+    alpha = beta = dict(linear=1.0, hazen=0.5, weibull=0, median_unbiased=(1 / 3), normal_unbiased=(3 / 8), interpolated_inverted_cdf=0)[method]
+    if method == "interpolated_inverted_cdf":
+        beta = 1.0
+    q = (weights - alpha) / (weights[-1] - alpha - beta + 1)
+    return a, q
 
 
-def _quantile_method_to_alpha_beta(method):
-    return dict(linear=1.0, hazen=0.5, weibull=0, median_unbiased=(1 / 3), normal_unbiased=(3 / 8))[method]
+def calc_cdf(a, bins, weights=None, method="median_unbiased"):
+    a, q = calc_data_quantiles(a, weights=weights, method=method)
+    return np.interp(bins, a, q, left=0, right=1)
 
 
 def percentile_with_weights(a, percentiles, weights=None, method="median_unbiased"):
@@ -435,18 +450,8 @@ def percentile_with_weights(a, percentiles, weights=None, method="median_unbiase
     """
     if weights is None:
         return np.percentile(a, percentiles, method=method)
-
-    a = np.asanyarray(a)
-    percentiles = np.atleast_1d(percentiles).ravel()
-    weights = np.asanyarray(weights)
-
-    mask = np.isfinite(a) & np.isfinite(weights) & (weights > 0)
-    a = a[mask]
-    sorter = np.argsort(a)
-    a = a[sorter]
-    weights = weights[mask][sorter]
-    alpha = beta = _quantile_method_to_alpha_beta(method)
-    return _quantile_with_weights(a, percentiles / 100, weights, alpha, beta)
+    a, q = calc_data_quantiles(a, weights=weights, method=method)
+    return np.interp(np.atleast_1d(percentiles).ravel() / 100, q, a)
 
 
 def binned_percentile(x, values, percentiles, bins=10, method="median_unbiased", weights=None):
