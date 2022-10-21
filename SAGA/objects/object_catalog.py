@@ -54,24 +54,24 @@ def _p_sat_model_paper2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def _p_sat_model_paper3(base, params=(0.8, -3.74, 2.48, -17.81, 1.25, 0.8)):
+def _p_sat_model_paper3(base, params=(0.8, -4.04, 2.47, -17.6, 1.25, 0.8)):
     gr = np.where(
-        C.valid_g_mag.mask(base),
+        Query("gr > -1", "gr < 10").mask(base),
         base["gr"],
         np.where(
-            C.valid_z_mag.mask(base),
-            0.60447764 + 0.37438834 * base["r_mag"] - 0.3896615 * base["z_mag"],
-            0.87112784 - 0.02662872 * base["r_mag"],
+            Query("rz > -0.25", "rz < 1.5").mask(base),
+            0.1679866 + 1.0276194 * base["r_mag"] - 1.026017 * base["z_mag"],
+            0.8387913 - 0.0252538 * base["r_mag"],
         ),
     )
 
     r_fib = np.where(
-        C.valid_r_fibermag.mask(base),
+        Query("r_fibermag >= r_mag", "r_fibermag < 30").mask(base),
         base["r_fibermag"],
         np.where(
-            C.valid_sb.mask(base),
-            -1.5557698 + 0.240722 * base["r_mag"] + 0.8187604 * base["sb_r"],
-            12.071777 + 0.51810336 * base["r_mag"],
+            Query("sb_r > 15", "sb_r < 30").mask(base),
+            -1.730775 + 0.22267 * base["r_mag"] + 0.84099 * base["sb_r"],
+            10.50927 + 0.60664 * base["r_mag"],
         ),
     )
 
