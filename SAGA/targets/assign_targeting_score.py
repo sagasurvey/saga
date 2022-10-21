@@ -513,7 +513,7 @@ def assign_targeting_score_v2plus(
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
     fill_values_by_query(
         base,
-        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        Query(basic, bright_main | very_low_sb_cut | Query("p_sat_corrected >= 0.1")),
         {"TARGETING_SCORE": 200},
     )
 
@@ -673,7 +673,7 @@ def assign_targeting_score_v3(
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 300})
     fill_values_by_query(
         base,
-        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        Query(basic, bright_main | very_low_sb_cut | Query("p_sat_corrected >= 0.1")),
         {"TARGETING_SCORE": 200},
     )
 
@@ -823,7 +823,7 @@ def assign_targeting_score_v3_extended(
     fill_values_by_query(base, Query(basic, main_targeting_cuts), {"TARGETING_SCORE": 200})
     fill_values_by_query(
         base,
-        Query(basic, bright_main | very_low_sb_cut | "p_sat_corrected >= 0.1"),
+        Query(basic, bright_main | very_low_sb_cut | Query("p_sat_corrected >= 0.1")),
         {"TARGETING_SCORE": 190},
     )
 

@@ -130,7 +130,7 @@ relaxed_targeting_cuts = Query(
     relaxed_cut_rz,
 )
 
-very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | "p_sat_model_p2 >= 1e-4"
+very_relaxed_targeting_cuts = paper1_targeting_cut | relaxed_targeting_cuts | Query("p_sat_model_p2 >= 1e-4")
 
 paper2_targeting_cut = high_priority_cuts = main_targeting_cuts = high_priority_sb_tight & high_priority_gr
 paper3_targeting_cut = paper2_targeting_cut & ba_cut
