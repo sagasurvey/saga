@@ -698,7 +698,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         # now it's the real thing, we have more than one specs
         # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
         specs_to_merge = specs[group_slice]
-        rank = np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.int, len(specs_to_merge))
+        rank = np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.int32, len(specs_to_merge))
         rank += (10 - specs_to_merge["ZQUALITY"]) * (rank.max() + 1)
         rank = rank.astype(np.float32) + np.where(
             Query((np.isfinite, "SPEC_Z_ERR"), "SPEC_Z_ERR > 0", "SPEC_Z_ERR < 1").mask(specs_to_merge),
