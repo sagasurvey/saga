@@ -720,7 +720,7 @@ class GalexQuery(DownloadableBase):
         if not _HAS_MAST_:
             raise RuntimeError("Needs astroquery to access Galex!")
         n_max = 500000
-        return MastCatalogs.query_region(self.coord, self.radius, catalog="Galex", pagesize=n_max, maxrecords=n_max).filled()
+        return MastCatalogs.query_region(self.coord, radius=self.radius, catalog="Galex", pagesize=n_max, maxrecords=n_max).filled()
 
     def download_as_file(self, file_path, overwrite=False, compress=True):
         if os.path.isfile(file_path) and not overwrite:
