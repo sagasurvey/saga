@@ -57,6 +57,11 @@ class SpectraData(object):
                         exclude_spec_masks=exclude_spec_masks,
                     ),
                     read_observed.read_aat_mz(
+                        os.path.join(self.spectra_dir_path, "AAT_EXT"),
+                        before_time=before_time,
+                        exclude_spec_masks=exclude_spec_masks,
+                    ),
+                    read_observed.read_aat_mz(
                         os.path.join(self.spectra_dir_path, "AAT_LOWZ"),
                         before_time=before_time,
                         exclude_spec_masks=exclude_spec_masks,
