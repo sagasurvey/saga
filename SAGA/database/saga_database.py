@@ -386,7 +386,7 @@ class Database(object):
             ),
             "galex_sfr": DataObject(
                 FileObject(
-                    os.path.join(self._shared_dir, "Spectra", "galax_sfr.dat"),
+                    os.path.join(self._shared_dir, "Spectra", "galex_sfr_NUV.dat"),
                     format="ascii.fast_basic",
                 )
             ),
