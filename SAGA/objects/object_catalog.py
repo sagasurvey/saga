@@ -586,11 +586,18 @@ class ObjectCatalog(object):
 
         # Loading post-processed catalogs
         halpha = self._database["spectra_halpha"].read() if build_version >= 2 else None
-        galex_sfr = self._database["galex_sfr"].read() if build_version >= 3 else None
-        if galex_sfr is not None:
-            galex_sfr = Query("NUV_SFR_flag >= 0").filter(galex_sfr)
-            galex_sfr.sort("ID")
-            galex_sfr = unique(galex_sfr, "ID")
+        galex_precalculated_lists = []
+        if build_version >= 3:
+            for key in ["galex_sfr", "galex_sfr_host", "galex_sfr_lowz"]:
+                try:
+                    t = self._database[key]
+                except KeyError:
+                    continue
+                t = t.read()
+                t = Query("NUV_SFR_flag >= 0").filter(t)
+                t = unique(t, "ID")
+                galex_precalculated_lists.append(t)
+                del t
 
         manual_lists = dict()
         for survey, col in manual_keys:
@@ -694,7 +701,7 @@ class ObjectCatalog(object):
                     sga=sga,
                     spectra=spectra,
                     halpha=halpha,
-                    galex_sfr=galex_sfr,
+                    galex_precalculated_lists=galex_precalculated_lists,
                     convert_to_sdss_filters=convert_to_sdss_filters,
                     debug=debug_this,
                     **manual_lists,
@@ -797,6 +804,10 @@ class ObjectCatalog(object):
         data["HOSTID"].append(host_id)
         base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
+        host_in_base = Query("SATS == 3").filter(base)[0]
+        for col in ["r_mag", "gr", "radius", "sb_r", "SERSIC"]:
+            data[col].append(host_in_base[col])
+
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
         d = dict()
 
@@ -824,6 +835,10 @@ class ObjectCatalog(object):
         for key in [k for k in d if k.startswith("specs_")]:
             new_key = key.replace("specs_", "sats_")
             d[new_key] = Query(d[key], C.is_sat)
+
+        for key in [k for k in d if k.startswith("sats_")]:
+            new_key = key.replace("sats_", "sats_sf_")
+            d[new_key] = Query(d[key], "quenched == 0")
 
         for key in [k for k in d if k.startswith("specs_ours")]:
             new_key = key + "_rvir"

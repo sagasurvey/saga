@@ -390,6 +390,18 @@ class Database(object):
                     format="ascii.fast_basic",
                 )
             ),
+            "galex_sfr_host": DataObject(
+                FileObject(
+                    os.path.join(self._shared_dir, "Spectra", "galex_sfr_NUV_host.dat"),
+                    format="ascii.fast_basic",
+                )
+            ),
+            "galex_sfr_lowz": DataObject(
+                FileObject(
+                    os.path.join(self._shared_dir, "Spectra", "lowz_galex_sfr_NUV.dat"),
+                    format="ascii.fast_basic",
+                )
+            ),
         }
 
         self._tables["spectra_raw_all"] = DataObject(

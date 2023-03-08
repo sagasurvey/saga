@@ -12,7 +12,7 @@ from easyquery import Query, QueryMaker
 from ..spectra import extract_nsa_spectra, extract_sdss_spectra
 from ..utils import add_skycoord, fill_values_by_query, get_remove_flag, calc_normalized_dist, get_coord, match_ids
 from ..utils.distance import v2z
-from . import build, build2
+from . import build, build2, calc_sfr
 from . import cuts as C
 from .manual_fixes import fixes_to_decals_dr9
 
@@ -532,30 +532,57 @@ def add_galex(base, galex):
     return base
 
 
-def add_galex_sfr(base, galex_sfr):
+def add_galex_precalculated(base, *galex_precalculated_lists):
 
     base["nuv_snr"] = np.float32(np.nan)
-    base["nuv_sfr"] = np.float32(np.nan)
-    base["nuv_sfr_flag"] = np.int32(-1)
+    base["nuv_mag_flag"] = np.int32(-1)
 
-    if galex_sfr is None:
-        return base
+    for galex in galex_precalculated_lists:
+        base_idx, galex_idx = match_ids(base["OBJID"], galex["ID"])
 
-    base_idx, galex_idx = match_ids(base["OBJID"], galex_sfr["ID"])
+        if len(base_idx) == 0:
+            return base
 
-    if len(base_idx) == 0:
-        return base
+        for col1, col2 in (
+            ("RA_nuv", "RA"),
+            ("DEC_nuv", "DEC"),
+            ("nuv_mag", "mag_nuv"),
+            ("nuv_err", "err_nuv"),
+            ("nuv_snr", "SN"),
+            ("nuv_mag_flag", "NUV_SFR_flag"),
+        ):
+            base[col1][base_idx] = galex[col2][galex_idx]
 
-    for col1, col2 in (
-        ("RA_nuv", "RA"),
-        ("DEC_nuv", "DEC"),
-        ("nuv_mag", "mag_nuv"),
-        ("nuv_err", "err_nuv"),
-        ("nuv_snr", "SN"),
-        ("nuv_sfr", "NUV_SFR"),
-        ("nuv_sfr_flag", "NUV_SFR_flag"),
-    ):
-        base[col1][base_idx] = galex_sfr[col2][galex_idx]
+    return base
+
+
+def add_sfr(base):
+
+    if "EW_Halpha" in base.colnames:
+
+        base["Halpha_sfr"] = np.float32(np.nan)
+        base["Halpha_sfr_err"] = np.float32(np.nan)
+
+        mask = Query(C.valid_Halpha, "dist_estimate > 0").mask(base)
+        t = base[["EW_Halpha", "EW_Halpha_err", "SPEC_Z", "Mr"]][mask]
+        with np.errstate(all="ignore"):
+            log_sfr, log_sfr_err = calc_sfr.calc_SFR_Halpha(*(c.astype(np.float64) for c in t.itercols()))
+
+        base["Halpha_sfr"][mask] = log_sfr
+        base["Halpha_sfr_err"][mask] = log_sfr_err
+
+    if "nuv_mag_flag" in base.colnames:
+
+        base["nuv_sfr"] = np.float32(np.nan)
+        base["nuv_sfr_err"] = np.float32(np.nan)
+
+        mask = Query("dist_estimate > 0", "nuv_mag_flag != -1").mask(base)
+        t = base[["nuv_mag", "nuv_err", "EBV", "dist_estimate"]][mask]
+        with np.errstate(all="ignore"):
+            log_sfr, log_sfr_err = calc_sfr.calc_SFR_NUV(*(c.astype(np.float64) for c in t.itercols()))
+
+        base["nuv_sfr"][mask] = log_sfr
+        base["nuv_sfr_err"][mask] = log_sfr_err
 
     return base
 
@@ -565,18 +592,16 @@ def add_quenched_flag(base):
     base["quenched"] = np.int32(-1)
 
     if "EW_Halpha" in base.colnames:
-        mask = np.isfinite(base["EW_Halpha"])
-        base["quenched"][mask] = 0
-        mask &= (base["EW_Halpha"] < 2)
-        base["quenched"][mask] = 1
+        # assume quenched until showing SF
+        fill_values_by_query(base, C.valid_Halpha, {"quenched": 1})
+        fill_values_by_query(base, Query("EW_Halpha - abs(EW_Halpha_err) >= 2"), {"quenched": 0})
 
-    if "nuv_sfr" in base.colnames and "nuv_snr" in base.colnames:
-        mask = (base["nuv_snr"] >= 15) & np.isfinite(base["nuv_sfr"]) & np.isfinite(base["log_sm"])
-        mask &= (base['nuv_sfr'] - base['log_sm'] > -11)
-        base["quenched"][mask] = 0
+    if "nuv_sfr" in base.colnames:
+        fill_values_by_query(base, Query("nuv_sfr - log_sm - abs(nuv_sfr_err) >= -11", "nuv_mag_flag == 1"), {"quenched": 0})
 
-    # Set by hand: NUCLEUS QUENCHED, BUT CLEARLY SF. NO GALEX COVERAGE
-    fill_values_by_query(base, QueryMaker.isin("OBJID", [902122170000000530, 915501860000000035]), {"quenched": 0})
+    # Set by hand:
+    fill_values_by_query(base, Query("OBJID == 902436850000000279"), {"quenched": 1})  # foreground stars w/uv
+    fill_values_by_query(base, Query("OBJID == 902122170000000530"), {"quenched": 0})  # no galex data
 
     return base
 
@@ -593,7 +618,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     sga=None,
     spectra=None,
     halpha=None,
-    galex_sfr=None,
+    galex_precalculated_lists=None,
     debug=None,
     delve=None,
     delve_remove=None,
@@ -660,8 +685,8 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = add_galex(base, galex)
     del galex
 
-    base = add_galex_sfr(base, galex_sfr)
-    del galex_sfr
+    base = add_galex_precalculated(base, *galex_precalculated_lists)
+    del galex_precalculated_lists
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
@@ -670,6 +695,7 @@ def build_full_stack(  # pylint: disable=unused-argument
     base = build2.add_surface_brightness(base)
     base = build.add_stellar_mass(base)
     base = add_spec_phot_sep(base)
+    base = add_sfr(base)
     base = add_quenched_flag(base)
 
     return base

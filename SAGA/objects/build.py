@@ -9,7 +9,7 @@ from easyquery import Query, QueryMaker
 from ..external.calc_kcor import calc_kcor
 from ..utils import (add_skycoord, fill_values_by_query, get_empty_str_array,
                      get_sdss_bands)
-from ..utils.distance import d2z, v2z, z2m, z2v
+from ..utils.distance import d2z, v2z, z2m, z2v, z2d
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
 
@@ -849,11 +849,14 @@ def add_z_cosmo(base):
     For the rest, use v_virgo to get z_cosmo.
 
     """
-
     base = add_skycoord(base)
-    has_spec_mask = C.has_spec.mask(base)
+
     base["z_cosmo"] = np.float32(np.nan)
+    base["dist_estimate"] = np.float32(np.nan)
+
+    has_spec_mask = C.has_spec.mask(base)
     base["z_cosmo"][has_spec_mask] = v2z(vhelio2virgo(z2v(base["SPEC_Z"][has_spec_mask]), base["coord"][has_spec_mask]))
+    base["dist_estimate"][has_spec_mask] = z2d(base["z_cosmo"][has_spec_mask])
 
     if "SATS" in base.colnames:
         host_or_sats_mask = (C.is_sat | "SATS == 3").mask(base)
@@ -862,6 +865,7 @@ def add_z_cosmo(base):
             if "HOST_ZCOSMO" in base.colnames
             else d2z(base["HOST_DIST"][host_or_sats_mask])
         )
+        base["dist_estimate"][host_or_sats_mask] = base["HOST_DIST"][host_or_sats_mask]
 
     return base
 
