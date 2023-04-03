@@ -6,27 +6,22 @@ import numpy as np
 __all__ = ["calc_SFR_NUV", "calc_SFR_Halpha"]
 
 
-def calc_SFR_NUV(NUV_mag, NUV_mag_err, EBV, dist_mpc, internal_ext=0.5):
+def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.25):
     """
     Convert NUV magnitudes into a SFR
     Based on Iglesias-Paramo (2006), Eq 3
     https://ui.adsabs.harvard.edu/abs/2006ApJS..164...38I/abstract
     """
 
-    # GALACTIC REDDENING FROM SALIM 2016, EQ7
-    ANUV = 8.36 * EBV + 14.3 * EBV**2 - 82.8 * EBV**3
-
     # DISTANCE OF HOST (in cm)
     dist = dist_mpc * 3.086e24
     dmod = np.log10(4.0 * np.pi * dist * dist)
 
-    # CORRECT FOR GALACTIC REDDENING AND INTERNAL EXTINCTION = 0.5
-    # 0.5 is based on an average correction from WISE band W4
-    m_nuv_ab = NUV_mag - ANUV - internal_ext
+    # CORRECT FOR INTERNAL EXTINCTION (assumed to be external extinction corrected)
+    m_nuv_ab = NUV_mag - internal_ext
 
-    # CONVERT GALEX m_AB TO FLUX:  erg sec-1 cm-2 Å-1)
+    # CONVERT GALEX m_AB TO FLUX:  erg sec-1 cm-2 Angstrom-1)
     # https://asd.gsfc.nasa.gov/archive/galex/FAQ/counts_background.html
-    #
     log_flux_nuv = -0.4 * (m_nuv_ab - 20.08 - 2.5 * np.log10(2.06e-16))
     log_flux_nuv_err = 0.4 * (NUV_mag_err)  # ADD EXTRA ERROR FOR REDDENING OR DISTANCE?
 
