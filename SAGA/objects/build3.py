@@ -556,6 +556,24 @@ def add_galex_precalculated(base, *galex_precalculated_lists):
     return base
 
 
+def correct_uv_external_extinction(base):
+    """
+    GALACTIC REDDENING FROM SALIM 2016, EQ7 (https://arxiv.org/abs/1610.00712)
+    """
+
+    EBV = base["EBV"]
+    EBV2 = EBV * EBV
+    EBV3 = EBV2 * EBV
+
+    ANUV = 8.36 * EBV + 14.3 * EBV2 - 82.8 * EBV3
+    AFUV = 10.47 * EBV + 8.59 * EBV2 - 82.8 * EBV3
+
+    base["nuv_mag"] -= ANUV
+    base["fuv_mag"] -= AFUV
+
+    return base
+
+
 def add_sfr(base):
 
     if "EW_Halpha" in base.colnames:
@@ -577,7 +595,7 @@ def add_sfr(base):
         base["nuv_sfr_err"] = np.float32(np.nan)
 
         mask = Query("dist_estimate > 0", "nuv_mag_flag != -1").mask(base)
-        t = base[["nuv_mag", "nuv_err", "EBV", "dist_estimate"]][mask]
+        t = base[["nuv_mag", "nuv_err", "dist_estimate"]][mask]
         with np.errstate(all="ignore"):
             log_sfr, log_sfr_err = calc_sfr.calc_SFR_NUV(*(c.astype(np.float64) for c in t.itercols()))
 
@@ -687,6 +705,8 @@ def build_full_stack(  # pylint: disable=unused-argument
 
     base = add_galex_precalculated(base, *galex_precalculated_lists)
     del galex_precalculated_lists
+
+    base = correct_uv_external_extinction(base)
 
     if "RHOST_KPC" in base.colnames:  # has host info (i.e., not for LOWZ)
         base = build.find_satellites(base, version=3)
