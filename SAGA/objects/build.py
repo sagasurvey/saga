@@ -771,6 +771,7 @@ def find_satellites(base, version=1):
     -------
     base : astropy.table.Table
     """
+    base["DVHOST"] = np.where(Query("SPEC_Z > -1").mask(base), z2v(base["SPEC_Z"]) - base["HOST_VHOST"], np.nan).astype(np.float32)
     base["SATS"] = np.int32(-1)
 
     is_galaxy = C.is_galaxy if version == 1 else C.is_galaxy2
