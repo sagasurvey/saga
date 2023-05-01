@@ -183,8 +183,8 @@ def add_hostid(d):
     nsa_col = "NSAID"
     d["HOSTID"] = np.where(
         (d[nsa_col].filled(-1) <= 0),
-        np.char.add("pgc", d[pgc_col].astype(np.unicode)),
-        np.char.add("nsa", d[nsa_col].astype(np.unicode)),
+        np.char.add("pgc", d[pgc_col].astype(str)),
+        np.char.add("nsa", d[nsa_col].astype(str)),
     )
     return d
 
@@ -366,28 +366,30 @@ def apply_manual_fixes(d):
 
 def find_local_group_like(d):
     d['coord'] = SkyCoord(d['RA'], d['DEC'], d['DIST'], unit=('deg', 'deg', 'Mpc'))
-    mw_mass = (H.mass_preferred | H.good_hosts).filter(d)
 
-    idx, sep, dist = match_coordinates_3d(d["coord"], mw_mass["coord"], nthneighbor=1)
-    d["NEAREST_MW"] = mw_mass["HOSTID"][idx]
-    d["NEAREST_MW_DIST"] = dist.to_value("Mpc")
-    d["NEAREST_MW_SEP"] = sep.deg
+    for key, selection in [("MW", (H.mass_preferred | H.good_hosts)), ("MASSIVE", Query("K_ABS <= -23.0"))]:
+        mw_mass = selection.filter(d)
 
-    rematch_idx = np.flatnonzero(d["NEAREST_MW"] == d["HOSTID"])
-    idx2, sep, dist = match_coordinates_3d(d["coord"][rematch_idx], mw_mass['coord'], nthneighbor=2)
-    d["NEAREST_MW"][rematch_idx] = mw_mass["HOSTID"][idx2]
-    d["NEAREST_MW_DIST"][rematch_idx] = dist.to_value("Mpc")
-    d["NEAREST_MW_SEP"][rematch_idx] = sep.deg
+        idx, sep, dist = match_coordinates_3d(d["coord"], mw_mass["coord"], nthneighbor=1)
+        d[f"NEAREST_{key}"] = mw_mass["HOSTID"][idx]
+        d[f"NEAREST_{key}_DIST"] = dist.to_value("Mpc")
+        d[f"NEAREST_{key}_SEP"] = sep.deg
 
-    idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)  # pylint: disable=no-member
-    dist = dist.to_value("Mpc")
-    mask = (dist > 0)
+        rematch_idx = np.flatnonzero(d[f"NEAREST_{key}"] == d["HOSTID"])
+        idx2, sep, dist = match_coordinates_3d(d["coord"][rematch_idx], mw_mass['coord'], nthneighbor=2)
+        d[f"NEAREST_{key}"][rematch_idx] = mw_mass["HOSTID"][idx2]
+        d[f"NEAREST_{key}_DIST"][rematch_idx] = dist.to_value("Mpc")
+        d[f"NEAREST_{key}_SEP"][rematch_idx] = sep.deg
 
-    for d_cut in (1, 1.5, 2):
-        col = f"NEARBY_MW_COUNT_{d_cut}"
-        d[col] = 0
-        idx, count = np.unique(idx1[mask & (dist < d_cut)], return_counts=True)
-        d[col][idx] = count
+        idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)  # pylint: disable=no-member
+        dist = dist.to_value("Mpc")
+        mask = (dist > 0)
+
+        for d_cut in (1, 1.5, 2):
+            col = f"NEARBY_{key}_COUNT_{d_cut}"
+            d[col] = 0
+            idx, count = np.unique(idx1[mask & (dist < d_cut)], return_counts=True)
+            d[col][idx] = count
 
     del d["coord"]
     return d
