@@ -6,7 +6,7 @@ import numpy as np
 __all__ = ["calc_SFR_NUV", "calc_SFR_Halpha"]
 
 
-def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.25):
+def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.7):
     """
     Convert NUV magnitudes into a SFR
     Based on Iglesias-Paramo (2006), Eq 3
