@@ -33,7 +33,8 @@ def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.25):
     l_nuv_msun = log_L_nuv - np.log10(3.826e33)
 
     # CONVVERT TO SFR:   EQ 3, inglesias- paramo 2006
-    log_SFR_NUV = l_nuv_msun - 9.33
+    # AND ACCOUNT FOR IMF
+    log_SFR_NUV = l_nuv_msun - 9.33 - np.log10(1.5)
     log_SFR_NUV_err = log_flux_nuv_err
 
     return log_SFR_NUV, log_SFR_NUV_err
