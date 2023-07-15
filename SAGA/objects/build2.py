@@ -783,6 +783,9 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
 
 def add_spectra(base, specs, debug=None, matching_order=None):
 
+    # Print spec counts
+    print(f"  [SPEC COUNT for {base['HOSTID'][0]}]", " ".join([f"{t}:{c}" for t, c in zip(*np.unique(specs["TELNAME"][specs["ZQUALITY"] >= 3], return_counts=True))]))
+
     # map ZQ >=4, 3, 2, <=1 to 0, 1, 2, 3
     specs["ZQUALITY_sort_key"] = 4 - specs["ZQUALITY"]
     fill_values_by_query(specs, "ZQUALITY_sort_key < 0", {"ZQUALITY_sort_key": 0})

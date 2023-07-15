@@ -177,6 +177,15 @@ _known_telnames = {
     "slack",
     "ALFALF",
     "SGA",
+    "HECS",
+    "HECMAP",
+    "BOSS"
+    "NED",
+    "VIPERS",
+    "PRIMUS",
+    "GEHA23",
+    "HETDEX",
+    "DESI",
 }
 has_our_specs_only = QueryMaker.vectorize(lambda x: bool(x) and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT")
 has_our_specs = QueryMaker.vectorize(lambda x: bool(x) and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT")

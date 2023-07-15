@@ -30,7 +30,9 @@ class SpectraData(object):
             if func is None:
                 print("Cannot find function to read {}".format(k))
                 continue
-            all_specs.append(func(v))
+            if not isinstance(v, (tuple, list)):
+                v = [v]
+            all_specs.extend([func(vi) for vi in v])
 
         if self.spectra_dir_path is not None:
             if before_time is not None and not isinstance(before_time, Time):
