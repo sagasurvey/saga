@@ -160,7 +160,8 @@ has_aat_spec = QueryMaker.contains("SPEC_REPEAT", "AAT")
 has_mmt_spec = QueryMaker.contains("SPEC_REPEAT", "MMT")
 has_aat_mmt_spec = has_aat_spec | has_mmt_spec
 
-_known_telnames = {
+_our_telnames = {"AAT", "BINO", "MMT", "COADD", "IMACS", "KECK", "MIKE", "PAL", "SALT" , "WIYN"}
+_ext_telnames = _known_telnames = {
     "HOST",
     "2dF",
     "6dF",
@@ -187,17 +188,17 @@ _known_telnames = {
     "HETDEX",
     "DESI",
 }
-has_our_specs_only = QueryMaker.vectorize(lambda x: bool(x) and set(x.split("+")).isdisjoint(_known_telnames), "SPEC_REPEAT")
-has_our_specs = QueryMaker.vectorize(lambda x: bool(x) and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT")
+has_our_specs_only = QueryMaker.vectorize(lambda x: bool(x) and set(x.split("+")).issubset(_our_telnames), "SPEC_REPEAT")
+has_our_specs = QueryMaker.vectorize(lambda x: bool(x) and not set(x.split("+")).isdisjoint(_our_telnames), "SPEC_REPEAT")
 has_been_targeted = QueryMaker.vectorize(
-    lambda x: bool(x) and not set(x.split("+")).issubset(_known_telnames), "SPEC_REPEAT_ALL"
+    lambda x: bool(x) and not set(x.split("+")).isdisjoint(_our_telnames), "SPEC_REPEAT_ALL"
 )
 
 is_failed_target = Query(has_been_targeted, ~has_spec)
 was_failed_target = Query(
     has_spec,
     QueryMaker.vectorize(
-        lambda x, y: bool(x) and not (set(x.split("+")) - set(y.split("+"))).issubset(_known_telnames),
+        lambda x, y: bool(x) and not (set(x.split("+")) - set(y.split("+"))).isdisjoint(_our_telnames),
         "SPEC_REPEAT_ALL",
         "SPEC_REPEAT",
     ),
