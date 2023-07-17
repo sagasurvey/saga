@@ -390,6 +390,36 @@ class Database(object):
                     format="ascii.fast_basic",
                 )
             ),
+            "spectra_hecs": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "rines_2013.fits")),
+            ),
+            "spectra_hectomap": DataObject(
+                FileObject(
+                    os.path.join(self._shared_dir, "Spectra", "Final", "other", "sohn_hectomap_2023.txt"),
+                    format="ascii.cds",
+                ),
+            ),
+            "spectra_vipers_w1": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "VIPERS_W1_SPECTRO_PDR2.fits.gz")),
+            ),
+            "spectra_vipers_w4": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "VIPERS_W4_SPECTRO_PDR2.fits.gz")),
+            ),
+            "spectra_primus": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "PRIMUS_2013_zcat_v1.fits.gz")),
+            ),
+            "spectra_geha23": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "DEIMOS_MW_geha23.fits")),
+            ),
+            "spectra_hetdex": DataObject(
+                FileObject(
+                    os.path.join(self._shared_dir, "Spectra", "Final", "other", "hetdex_sc1_detinfo_v3.2.ecsv"),
+                    format="ascii.ecsv",
+                ),
+            ),
+            "spectra_desi_edr": DataObject(
+                FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "DESI_zall-pix-edr-vac.fits")),
+            ),
             "galex_sfr_host": DataObject(
                 FileObject(
                     os.path.join(self._shared_dir, "Spectra", "galex_sfr_NUV_host.dat"),
@@ -419,6 +449,13 @@ class Database(object):
                     "slackers": self._tables["spectra_slackers"],
                     "palomar": self._tables["spectra_palomar"],
                     "alfalfa": self._tables["spectra_alfalfa"],
+                    "hecs": self._tables["spectra_hecs"],
+                    "hectomap": self._tables["spectra_hectomap"],
+                    "vipers": (self._tables["spectra_vipers_w1"], self._tables["spectra_vipers_w4"]),
+                    "primus": self._tables["spectra_primus"],
+                    "geha23": self._tables["spectra_geha23"],
+                    "hetdex": self._tables["spectra_hetdex"],
+                    "desi": self._tables["spectra_desi_edr"],
                 },
             )
         )

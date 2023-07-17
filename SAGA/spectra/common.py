@@ -20,12 +20,14 @@ _SPECS_COLUMNS = (
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
 
 
-def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_cols=False):
+def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_cols=False, remove_extra_cols=False):
+    cols = []
     cols_iter = cols_definition.items() if isinstance(cols_definition, dict) else cols_definition
     for c, t in cols_iter:
         if c not in spectra.colnames:
             if skip_missing_cols:
                 continue
+            cols.append(c)
             if t[1] == "f":
                 spectra[c] = np.nan
             elif t[1] == "i":
@@ -36,7 +38,13 @@ def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_col
                 spectra[c] = False
             else:
                 raise ValueError("unknown spec type!")
+        cols.append(c)
         if spectra[c].dtype.str != t:
             spectra.replace_column(c, spectra[c].astype(t))
+        if spectra[c].description:
+            spectra[c].description = None
+
+    if remove_extra_cols:
+        spectra = spectra[cols]
 
     return spectra

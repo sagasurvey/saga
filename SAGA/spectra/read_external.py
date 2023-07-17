@@ -1,4 +1,5 @@
 import numpy as np
+from astropy.table import unique
 from easyquery import Query, QueryMaker
 
 from ..database import FastCsvTable, FileObject, FitsTable
@@ -22,6 +23,13 @@ __all__ = [
     "read_lcrs",
     "read_slackers",
     "read_alfalfa",
+    "read_hecs",
+    "read_hectomap",
+    "read_vipers",
+    "read_primus",
+    "read_geha23",
+    "read_hetdex",
+    "read_desi",
 ]
 
 
@@ -44,9 +52,8 @@ def read_gama(file_path):
     specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
     specs["TELNAME"] = np.where(specs["SURVEY_CODE"] == 5, "GAMA", np.where(specs["SURVEY_CODE"] == 11, "GAMALT", "GAMAEX"))
     specs["HELIO_CORR"] = True
-    del specs["SURVEY_CODE"]
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_2df(file_path):
@@ -75,7 +82,7 @@ def read_2df(file_path):
     for objid, fixes in fixes_2df_spec_by_objid.items():
         fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_2dflens(file_path):
@@ -101,7 +108,7 @@ def read_2dflens(file_path):
     specs["MASKNAME"] = "2dFLenS"
     specs["HELIO_CORR"] = True
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_6df(file_path):
@@ -129,7 +136,7 @@ def read_6df(file_path):
     for objid, fixes in fixes_6df_spec_by_objid.items():
         fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_ozdes(file_path):
@@ -168,7 +175,7 @@ def read_ozdes(file_path):
     for objid, fixes in fixes_ozdes_spec_by_objid.items():
         fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_wigglez(file_path):
@@ -198,7 +205,7 @@ def read_wigglez(file_path):
     for objid, fixes in fixes_wigglez_spec_by_objid.items():
         fill_values_by_query(specs, QueryMaker.equals("SPECOBJID", objid), fixes)
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_ukst(file_path):
@@ -220,9 +227,10 @@ def read_ukst(file_path):
     specs["SPEC_Z_ERR"] = 100 / SPEED_OF_LIGHT
     specs["ZQUALITY"] = 4
     specs["TELNAME"] = "UKST"
+    specs["MASKNAME"] = "UKST"
     specs["HELIO_CORR"] = True
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_lcrs(file_path):
@@ -237,7 +245,6 @@ def read_lcrs(file_path):
     specs = specs[specs["cz"] != np.iinfo(np.int32).min]
     specs["SPEC_Z"] = specs["cz"].astype(np.float64) / SPEED_OF_LIGHT
     specs["SPEC_Z_ERR"] = specs["e_cz"].astype(np.float64) / SPEED_OF_LIGHT
-    del specs["cz"], specs["e_cz"]
 
     specs.rename_column("_RAJ2000", "RA")
     specs.rename_column("_DEJ2000", "DEC")
@@ -247,7 +254,7 @@ def read_lcrs(file_path):
     specs["ZQUALITY"] = 4
     specs["TELNAME"] = "LCRS"
     specs["HELIO_CORR"] = True
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_slackers(file_path):
@@ -279,7 +286,7 @@ def read_slackers(file_path):
     specs["TELNAME"] = "slack"
     specs["HELIO_CORR"] = True
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
 
 
 def read_alfalfa(file_path):
@@ -308,15 +315,197 @@ def read_alfalfa(file_path):
 
     specs["RA"] = np.where(valid_oc_coord, specs["RAdeg_OC"], specs["RAdeg_HI"])
     specs["DEC"] = np.where(valid_oc_coord, specs["DECdeg_OC"], specs["DECdeg_HI"])
-    del specs["RAdeg_OC"], specs["RAdeg_HI"], specs["DECdeg_OC"], specs["DECdeg_HI"]
 
     specs["SPEC_Z"] = specs["Vhelio"].astype(np.float64) / SPEED_OF_LIGHT
     specs["SPEC_Z_ERR"] = specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
     specs["ZQUALITY"] = np.where(specs["HIcode"] == 1, 4, 3)
-    del specs["Vhelio"], specs["W50"], specs["HIcode"]
 
     specs["TELNAME"] = "ALFALF"
     specs["MASKNAME"] = "ALFALFA"
     specs["HELIO_CORR"] = True
 
-    return ensure_specs_dtype(specs)
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_hecs(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FitsTable(file_path)
+
+    # https://vizier.cds.unistra.fr/viz-bin/VizieR-3?-source=J/ApJ/767/15/table2
+    specs = file_path.read()[
+        "RAJ2000",
+        "DEJ2000",
+        "cz",
+        "e_cz",
+        "q_cz",
+    ]
+
+    QueryMaker.equal("q_cz", "Q").filter(specs)
+    specs["SPEC_Z"] = specs["cz"].astype(np.float64) / SPEED_OF_LIGHT
+    specs["SPEC_Z_ERR"] = specs["e_cz"].astype(np.float64) / SPEED_OF_LIGHT
+
+    specs.rename_column("RAJ2000", "RA")
+    specs.rename_column("DEJ2000", "DEC")
+
+    specs["TELNAME"] = "HECS"
+    specs["MASKNAME"] = "HECS"
+    specs["ZQUALITY"] = 4
+    specs["SPECOBJID"] = np.arange(len(specs))
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_hectomap(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()[
+        "OBJID",
+        "RAdeg",
+        "DEdeg",
+        "zspec",
+        "e_zspec",
+        "r_zspec",
+    ]
+
+    specs.rename_column("OBJID", "SPECOBJID")
+    specs.rename_column("RAdeg", "RA")
+    specs.rename_column("DEdeg", "DEC")
+    specs.rename_column("zspec", "SPEC_Z")
+    specs.rename_column("e_zspec", "SPEC_Z_ERR")
+    specs["TELNAME"] = np.where(specs["r_zspec"] == "MMT", "HECMAP", specs["r_zspec"])
+    specs["MASKNAME"] = "HectoMap"
+    specs["ZQUALITY"] = 4
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_vipers(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FileObject(file_path, format="ascii.cds")
+    specs = file_path.read()[
+        "num",
+        "alpha",
+        "delta",
+        "zspec",
+        "zflg",
+        "pointing",
+    ]
+
+    specs["ZQUALITY"] = specs["zflg"].astype(np.int32)
+    specs["ZQUALITY"] = specs["ZQUALITY"] % 10
+    specs = (Query("ZQUALITY == 3") | "ZQUALITY == 4").filter(specs)
+
+    specs.rename_column("num", "SPECOBJID")
+    specs.rename_column("alpha", "RA")
+    specs.rename_column("delta", "DEC")
+    specs.rename_column("zspec", "SPEC_Z")
+    specs.rename_column("pointing", "MASKNAME")
+    specs["SPEC_Z_ERR"] = 160 / SPEED_OF_LIGHT
+    specs["TELNAME"] = "VIPERS"
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_primus(file_path):
+    # https://primus.ucsd.edu/version1.html
+
+    if not hasattr(file_path, "read"):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()[
+        "OBJNAME",
+        "RA",
+        "DEC",
+        "Z",
+        "ZQUALITY",
+        "MASK",
+    ]
+
+    specs = (Query("ZQUALITY == 3") | "ZQUALITY == 4").filter(specs)
+    specs["SPEC_Z_ERR"] = np.abs(specs["Z"] + 1) * np.where(specs["ZQUALITY"] == 4, 0.003, 0.015)
+
+    specs.rename_column("OBJNAME", "SPECOBJID")
+    specs.rename_column("Z", "SPEC_Z")
+    specs.rename_column("MASK", "MASKNAME")
+    specs["TELNAME"] = "PRIMUS"
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_geha23(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()[
+        "objname",
+        "RA",
+        "DEC",
+        "marz_z",
+        "marz_flag",
+        "masknames",
+    ]
+
+    specs = Query("marz_flag >= 3").filter(specs)
+    specs["SPEC_Z_ERR"] = 60 / SPEED_OF_LIGHT
+    specs.rename_column("objname", "SPECOBJID")
+    specs.rename_column("marz_z", "SPEC_Z")
+    specs.rename_column("marz_flag", "ZQUALITY")
+    specs.rename_column("masknames", "MASKNAME")
+    specs["TELNAME"] = "GEHA23"
+    specs["HELIO_CORR"] = True
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_hetdex(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FileObject(file_path, format="ascii.ecvs")
+    specs = file_path.read()[
+        "source_id",
+        "RA",
+        "DEC",
+        "z_hetdex",
+        "z_hetdex_conf",
+    ]
+    specs = Query("z_hetdex > 0", "z_hetdex_conf > 0.899").filter(specs)
+    specs.sort("z_hetdex_conf", reverse=True)
+    specs = unique(specs, "source_id")
+    specs.rename_column("source_id", "SPECOBJID")
+    specs.rename_column("z_hetdex", "SPEC_Z")
+    specs["RA"] = specs["RA"].value
+    specs["DEC"] = specs["DEC"].value
+    specs["ZQUALITY"] = np.where(specs["z_hetdex_conf"] > 0.949, 4, 3)
+    specs["SPEC_Z_ERR"] = 80 / SPEED_OF_LIGHT
+    specs["TELNAME"] = "HETDEX"
+    specs["MASKNAME"] = "HETDEX"
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_desi(file_path):
+    if not hasattr(file_path, "read"):
+        file_path = FitsTable(file_path)
+    specs = file_path.read()[
+        "TARGETID",
+        "TARGET_RA",
+        "TARGET_DEC",
+        "Z",
+        "ZERR",
+        "ZWARN",
+        "ZCAT_PRIMARY",
+        "PROGRAM",
+        "NPIXELS",
+    ]
+    specs = Query("TARGETID > 0", "NPIXELS > 0", "ZWARN == 0", "ZCAT_PRIMARY").filter(specs)
+    specs.rename_column("TARGETID", "SPECOBJID")
+    specs.rename_column("TARGET_RA", "RA")
+    specs.rename_column("TARGET_DEC", "DEC")
+    specs.rename_column("Z", "SPEC_Z")
+    specs.rename_column("ZERR", "SPEC_Z_ERR")
+    specs.rename_column("PROGRAM", "MASKNAME")
+    specs["ZQUALITY"] = 4
+    specs["TELNAME"] = "DESI"
+    specs["HELIO_CORR"] = True
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
