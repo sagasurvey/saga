@@ -144,6 +144,10 @@ is_high_z = Query("SPEC_Z >= 0.02")
 is_low_z = Query("SPEC_Z >= 0.003", ~is_high_z)
 is_very_low_z = Query("SPEC_Z >= 0.003", "SPEC_Z < 0.013")
 
+sample_gold = Query("dr3_sample == 1")
+sample_silver = Query("dr3_sample == 2")
+sample_participation = Query("dr3_sample == 3")
+
 obj_is_host = Query("OBJ_NSAID == HOST_NSAID", "OBJ_NSAID != -1")
 obj_is_host2 = Query("OBJ_NSAID == HOST_NSA1ID", "OBJ_NSAID != -1")
 obj_is_host3 = Query("OBJ_PGC == HOST_PGC", "OBJ_PGC != -1")
