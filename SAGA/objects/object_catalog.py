@@ -54,7 +54,7 @@ def _p_sat_model_paper2(base, params=(-1.96, 1.507, -5.498, 0.303, 0.487)):
     return p
 
 
-def _p_sat_model_paper3(base, params=(0.8, -4.04, 2.47, -17.6, 1.25, 0.8)):
+def _p_sat_model_paper3(base, params=(0.65, -3.84, 2.62, -25.6, 1.25, 0.75)):
     gr = np.where(
         Query("gr > -1", "gr < 10").mask(base),
         base["gr"],
@@ -97,6 +97,7 @@ def _correct_fiducial_p_sat(base, fiducial_p_label, bias=None, version=3):
 
     good_obj = Query(C.is_galaxy, C.is_clean) if version == 1 else Query(C.is_galaxy2, C.is_clean2)
     p[~good_obj.mask(base)] = 0
+    p[p < np.finfo(np.float32).eps] = 0
 
     return p
 
@@ -254,6 +255,12 @@ class ObjectCatalog(object):
                 table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model_p3")
             else:
                 table["p_sat_corrected"] = _correct_fiducial_p_sat(table, "p_sat_model_p2", bias=0.25, version=version)
+
+        # add dr3_sample label
+        table["dr3_sample"] = 0
+        fill_values_by_query(table, C.is_sat, {"dr3_sample": 3})
+        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 6.75"), {"dr3_sample": 2})
+        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 7.5"), {"dr3_sample": 1})
 
         if add_skycoord:
             table = utils.add_skycoord(table)
