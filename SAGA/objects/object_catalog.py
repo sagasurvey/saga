@@ -812,7 +812,7 @@ class ObjectCatalog(object):
         base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
         host_in_base = Query("SATS == 3").filter(base)[0]
-        for col in ["r_mag", "gr", "radius", "sb_r", "ba", "phi", "SERSIC"]:
+        for col in ["r_mag", "gr", "radius", "sb_r", "ba", "phi", "SERSIC", "log_sm"]:
             data[col].append(host_in_base[col])
 
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
