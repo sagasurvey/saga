@@ -865,6 +865,9 @@ class ObjectCatalog(object):
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )
 
+        sat_mag = C.is_sat.filter(base, "Mr")
+        data["brightest_sat"].append(sat_mag.min() if len(sat_mag) else np.nan)
+
         return data
 
     def generate_object_stats(self, hosts="build_default", save_to=None, overwrite=False, generate_func=None):
