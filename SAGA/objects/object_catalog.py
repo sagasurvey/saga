@@ -865,10 +865,10 @@ class ObjectCatalog(object):
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )
         data["sats_gold"].append(
-            Query(C.sample_gold).filter(base, "p_sat_corrected").sum()
+            C.sample_gold.filter(base, "p_sat_corrected").sum()
         )
         data["sats_gold_silver"].append(
-            Query(C.sample_silver).filter(base, "p_sat_corrected").sum()
+            (C.sample_gold | C.sample_silver).filter(base, "p_sat_corrected").sum()
         )
         sat_mag = C.is_sat.filter(base, "Mr")
         data["brightest_sat"].append(sat_mag.min() if len(sat_mag) else np.nan)
@@ -930,9 +930,9 @@ class ObjectCatalog(object):
         """
         defaults = dict(
             hosts="good",
-            cuts=Query(C.is_clean2, (
-                Query(C.is_galaxy2, C.sat_rcut, C.has_spec | "r_mag < 21")
-                | Query(C.has_spec, C.is_very_low_z)
+            cuts=Query(C.is_clean2, C.is_galaxy2, (
+                Query(C.sat_rcut, C.has_spec | "r_mag < 21" | "dr3_sample > 0")
+                | Query(C.has_spec, C.is_low_z)
             )),
             return_as="stack",
             add_skycoord=False,
