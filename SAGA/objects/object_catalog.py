@@ -812,7 +812,7 @@ class ObjectCatalog(object):
         base = self.load_single(host_id, cuts=Query(C.is_clean2, C.is_galaxy2), add_skycoord=False)
 
         host_in_base = Query("SATS == 3").filter(base)[0]
-        for col in ["r_mag", "gr", "radius", "sb_r", "ba", "phi", "SERSIC", "log_sm"]:
+        for col in ["r_mag", "gr", "radius", "sb_r", "ba", "phi", "SERSIC", "log_sm", "nuv_sfr"]:
             data[col].append(host_in_base[col])
 
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
@@ -864,7 +864,12 @@ class ObjectCatalog(object):
         data["sats_missed_corrected"].append(
             Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
         )
-
+        data["sats_gold"].append(
+            Query(C.sample_gold).filter(base, "p_sat_corrected").sum()
+        )
+        data["sats_gold_silver"].append(
+            Query(C.sample_silver).filter(base, "p_sat_corrected").sum()
+        )
         sat_mag = C.is_sat.filter(base, "Mr")
         data["brightest_sat"].append(sat_mag.min() if len(sat_mag) else np.nan)
 
