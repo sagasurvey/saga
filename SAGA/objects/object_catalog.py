@@ -259,8 +259,8 @@ class ObjectCatalog(object):
         # add dr3_sample label
         table["dr3_sample"] = 0
         fill_values_by_query(table, C.is_sat, {"dr3_sample": 3})
-        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 6.75"), {"dr3_sample": 2})
-        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 7.5"), {"dr3_sample": 1})
+        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 6.75", C.sat_rcut), {"dr3_sample": 2})
+        fill_values_by_query(table, Query("p_sat_corrected > 0", "log_sm_phony >= 7.5", C.sat_rcut), {"dr3_sample": 1})
 
         if add_skycoord:
             table = utils.add_skycoord(table)
