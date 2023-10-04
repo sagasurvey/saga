@@ -48,6 +48,7 @@ Label | Unit | Definition
 `RHOST_KPC` | kpc |  Projected radial distance of object to host
 `RHOST_ARCM` | arcm |  Projected radial distance of object to host
 `p_sat_corrected` | - | Corrected approximated probability of this object being a satellite. Use with care.
+`dr3_sample` | - | 1=Gold, 2=Silver, 3=Participation
 
 _*For SAGA DR2, data in these columns are taken from the primary survey source (see `survey`). There are additional columns with postfix to identify the quantities taken from specific surveys: SDSS DR14 (with postfix `_sdss`), DES DR1  (with postfix `_des`), and LS DR6/7  (with postfix `_decals`). For SAGA DR3, these are taken from LS DR9._
 
@@ -79,6 +80,7 @@ Label | Unit | Definition
 `REMOVED_BY_HAND` | - | True if the host is flagged as not usable by hand
 `SGA_ID` | - | SGA v3.0 ID
 `MORPHTYPE` | - | Morphology, using MORPHTYPE column from SGA catalog
+`LOG_MHI` | - | log (HI mass / Msun)
 `BRIGHTEST_K_R1` | mag | Ks-band mag of brightest galaxy (<60 Mpc) within 1 Rvir
 `BRIGHTEST_K_R2` | mag | Ks-band mag of brightest galaxy (<60 Mpc) within 2 Rvir
 `BRIGHTEST_K_BG_R1` | mag | Ks-band mag of brightest galaxy (>60 Mpc) within 1 Rvir
@@ -99,7 +101,11 @@ Label | Unit | Definition
 `NEARBY_MW_COUNT_1` | - | Number of MW-list hosts within 1 Mpc (not including self)
 `NEARBY_MW_COUNT_1.5` | - | Number of MW-list hosts within 1.5 Mpc (not including self)
 `NEARBY_MW_COUNT_2` | - | Number of MW-list hosts within 2 Mpc (not including self)
-
+`NEAREST_MASSIVE` | - | HOSTID of the nearest massive (MW+) host
+`NEAREST_MASSIVE_DIST` | Mpc | 3D distance in Mpc to NEAREST_MASSIVE
+`NEARBY_MASSIVE_COUNT_1` | - | Number of massive (MW+) hosts within 1 Mpc (not including self)
+`NEARBY_MASSIVE_COUNT_1.5` | - | Number of massive (MW+) hosts within 1.5 Mpc (not including self)
+`NEARBY_MASSIVE_COUNT_2` | - | Number of massive (MW+) hosts within 2 Mpc (not including self)
 
 ### Host statistics schema
 
@@ -125,3 +131,6 @@ Label | Unit | Definition
 `sats_ours_Mr_limit` | - | number of SAGA-discovered satellites (Mr < -12.3)
 `sats_ours_bright` | - | number of SAGA-discovered satellites (r < 17.77)
 `sats_missed_corrected` | - | model-predicted number of missed satellites within main targeting cuts (r < 20.75, within Rvir)
+`sats_gold` | - | number of satellites (incompleteness-corrected) in the Gold sample
+`sats_gold_silver` | - | number of satellites (incompleteness-corrected) in the Gold+Silver sample
+`brightest_sat` | mag | Mr of the brightest confirmed satellite
