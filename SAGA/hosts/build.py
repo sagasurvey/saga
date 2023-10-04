@@ -76,18 +76,22 @@ def notnull(d):
         return ~np.isnan(d)
 
 
-def join_by_pgc(d, to_join, join_type="left", postfix=None):
+def join_by_id(d, to_join, id_col, join_type="left", postfix=""):
     d = join(
         d,
         to_join,
-        "pgc",
+        id_col,
         join_type,
         uniq_col_name="{col_name}{table_name}",
-        table_names=["", (("_" + postfix) if postfix else "")],
+        table_names=["", ("_" + postfix)],
         metadata_conflicts="silent",
     )
     d.meta = {}
     return d
+
+
+def join_by_pgc(d, to_join, join_type="left", postfix=""):
+    return join_by_id(d, to_join, "pgc", join_type, postfix)
 
 
 def add_nsa(d, nsa):
@@ -220,6 +224,12 @@ def add_skycoord_stars(stars):
     return stars
 
 
+def add_HI_mass(d, HI_mass):
+    d = join_by_id(d, HI_mass["HOSTID", "LOG_MHI"], "HOSTID")
+    d["LOG_MHI"] = d["LOG_MHI"].filled(np.nan)
+    return d
+
+
 def find_nearby_brightest(
     d,
     other,
@@ -319,6 +329,7 @@ def clean_up_columns(d):
         "REMOVED_BY_HAND",
         "SGA_ID",
         "MORPHTYPE",
+        "LOG_MHI",
     ]
 
     needed_cols.extend(
@@ -405,6 +416,7 @@ def build_master_list(
     remove_list=None,
     stars=None,
     coverage_maps=None,
+    HI_mass=None,
 ):
 
     d = hyperleda.copy()
@@ -437,6 +449,9 @@ def build_master_list(
     if remove_list is not None:
         d = add_manual_remove_flag(d, remove_list)
         del remove_list
+
+    if HI_mass is not None:
+        d = add_HI_mass(d, HI_mass=HI_mass)
 
     d = calc_needed_quantities(d)
 

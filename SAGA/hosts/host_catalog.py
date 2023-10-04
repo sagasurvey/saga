@@ -376,6 +376,7 @@ class HostCatalog(object):
             sga=self._database["sga_v3.0"].read()["SGA_ID", "PGC", "MORPHTYPE"],
             remove_list=self._database["host_remove"].read(),
             stars=self._database["hipparcos2"].read(),
+            HI_mass=self._database["hosts_HI_mass"].read(),
             coverage_maps={
                 k.partition("_")[-1]: self._database[k].read()
                 for k in self._database.keys()

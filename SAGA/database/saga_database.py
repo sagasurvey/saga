@@ -138,6 +138,11 @@ known_google_sheets = {
         "1WB3aK-DOgtUuSyMQ9Eb-83tJmHsGYWSDI-vHh16Xz8g",
         382210667,
     ),
+    "hosts_HI_mass": GoogleSheets(
+        "1u1rEiRFixfUDaxuHjlIoO_0zz_PIOJssyU0BkxRB5qw",
+        0,
+        include_names=["HOSTID", "LOG_MHI"],
+    ),
 }
 
 known_google_sheets["manual_targets_mmt2020c"] = known_google_sheets["manual_targets_mmt2020b"]
