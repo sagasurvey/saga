@@ -156,6 +156,10 @@ basic_cut = is_clean & is_galaxy & fibermag_r_cut & faint_end_limit & sat_rcut
 basic_cut2 = is_clean2 & is_galaxy2 & faint_end_limit & sat_rcut
 basic_cut_lowz = is_clean2 & is_galaxy2 & lowz_mag_cut & gri_cut
 
+color_quenched_def = Query("g_mag - r_mag >= -0.041247 * Mr_phony - 0.089068")
+is_quenched = Query("quenched_phony == 1")
+is_star_forming = Query("quenched_phony == 0")
+
 has_sdss_spec = QueryMaker.contains("SPEC_REPEAT", "SDSS")
 has_nsa_spec = QueryMaker.contains("SPEC_REPEAT", "NSA")
 has_sdss_nsa_spec = has_sdss_spec | has_nsa_spec

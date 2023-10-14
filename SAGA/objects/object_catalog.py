@@ -844,8 +844,8 @@ class ObjectCatalog(object):
             d[new_key] = Query(d[key], C.is_sat)
 
         for key in [k for k in d if k.startswith("sats_")]:
-            new_key = key.replace("sats_", "sats_sf_")
-            d[new_key] = Query(d[key], "quenched == 0")
+            new_key = key.replace("sats_", "sats_quenched_")
+            d[new_key] = Query(d[key], C.is_quenched)
 
         for key in [k for k in d if k.startswith("specs_ours")]:
             new_key = key + "_rvir"
@@ -861,17 +861,23 @@ class ObjectCatalog(object):
         for k, q in d.items():
             data[k].append(q.count(base))
 
-        data["sats_missed_corrected"].append(
-            Query(basic_targeting_cuts, ~C.has_spec).filter(base, "p_sat_corrected").sum()
-        )
-        data["sats_gold"].append(
-            C.sample_gold.filter(base, "p_sat_corrected").sum()
-        )
-        data["sats_gold_silver"].append(
-            (C.sample_gold | C.sample_silver).filter(base, "p_sat_corrected").sum()
-        )
+        d = dict()
+        d["sats_missed_corrected"] = Query(basic_targeting_cuts, ~C.has_spec)
+        d["sats_gold"] = C.sample_gold
+        d["sats_gold_confirmed"] = Query(C.sample_gold, C.is_sat)
+        d["sats_gold_quenched"] = Query(C.sample_gold, C.is_quenched)
+        d["sats_gold_confirmed_quenched"] = Query(C.sample_gold, C.is_quenched, C.is_sat)
+        d["sats_gold_silver"] = (C.sample_gold | C.sample_silver)
+        d["sats_gold_silver_confirmed"] = Query((C.sample_gold | C.sample_silver), C.is_sat)
+        d["sats_gold_silver_quenched"] = Query((C.sample_gold | C.sample_silver), C.is_quenched)
+        d["sats_gold_silver_confirmed_quenched"] = Query((C.sample_gold | C.sample_silver), C.is_quenched, C.is_sat)
+        for k, q in d.items():
+            data[k].append(q.filter(base, "p_sat_corrected").sum())
+
         sat_mag = C.is_sat.filter(base, "Mr")
         data["brightest_sat"].append(sat_mag.min() if len(sat_mag) else np.nan)
+        sat_mass = C.is_sat.filter(base, "log_sm")
+        data["brightest_sat_mass"].append(sat_mass.max() if len(sat_mass) else np.nan)
 
         return data
 
