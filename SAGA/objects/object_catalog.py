@@ -877,7 +877,7 @@ class ObjectCatalog(object):
         sat_mag = C.is_sat.filter(base, "Mr")
         data["brightest_sat"].append(sat_mag.min() if len(sat_mag) else np.nan)
         sat_mass = C.is_sat.filter(base, "log_sm")
-        data["brightest_sat_mass"].append(sat_mass.max() if len(sat_mass) else np.nan)
+        data["most_massive_sat"].append(sat_mass.max() if len(sat_mass) else np.nan)
 
         return data
 
