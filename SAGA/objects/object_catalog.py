@@ -938,7 +938,7 @@ class ObjectCatalog(object):
             hosts="good",
             cuts=Query(C.is_clean2, C.is_galaxy2, (
                 Query(C.sat_rcut, C.has_spec | "r_mag < 21" | "dr3_sample > 0")
-                | Query(C.has_spec, C.is_low_z)
+                | Query(C.has_spec, "SPEC_Z >= 0.002", "SPEC_Z < 0.06")
             )),
             return_as="stack",
             add_skycoord=False,
