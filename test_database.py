@@ -1,6 +1,6 @@
 import os
 import tempfile
-
+import numpy as np
 from SAGA.database import *
 
 try:
@@ -24,7 +24,7 @@ def test_download_google():
         d["hosts"].remote = None
         d2 = d["hosts"].read()
         for k in d1.columns:
-            assert (d1[k] == d2[k]).all()
+            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
     finally:
         os.unlink(t)
 
@@ -40,7 +40,7 @@ def test_set_local():
         d["hosts"].local = t
         d2 = d["hosts"].read()
         for k in d1.columns:
-            assert (d1[k] == d2[k]).all()
+            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
     finally:
         os.unlink(t)
 
@@ -68,6 +68,6 @@ def test_download_default():
         dobj.remote = None
         d2 = dobj.read()
         for k in d1.columns:
-            assert (d1[k] == d2[k]).all()
+            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
     finally:
         os.unlink(t)
