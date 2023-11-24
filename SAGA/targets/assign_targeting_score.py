@@ -155,7 +155,7 @@ def assign_targeting_score_v1(base, manual_selected_objids=None, gmm_parameters=
     if len(need_random_selection) > 50:
         random_mask = np.zeros(len(need_random_selection), dtype=bool)
         random_mask[:50] = True
-        np.random.RandomState(123).shuffle(random_mask)  # pylint: disable=no-member
+        np.random.RandomState(123).shuffle(random_mask)
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 600
 
@@ -247,7 +247,7 @@ def assign_targeting_score_v2(
                         base_this["".join((b2, "_err", postfix))],
                     )
 
-            bands = getattr(utils, "get_{}_bands".format(survey))()  # pylint: disable=not-callable
+            bands = getattr(utils, "get_{}_bands".format(survey))()
 
             base_this["P_GMM"] = ensure_proper_prob(
                 calc_gmm_satellite_probability(
@@ -361,7 +361,7 @@ def assign_targeting_score_v2(
     if len(need_random_selection) > n_random:
         random_mask = np.zeros(len(need_random_selection), dtype=bool)
         random_mask[:n_random] = True
-        np.random.RandomState(seed).shuffle(random_mask)  # pylint: disable=no-member
+        np.random.RandomState(seed).shuffle(random_mask)
         need_random_selection = need_random_selection[random_mask]
     base["TARGETING_SCORE"][need_random_selection] = 500
 
@@ -572,7 +572,7 @@ def assign_targeting_score_v2plus(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                # pylint: disable=no-member
+
                 idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
                 base["TARGETING_SCORE"][idx] = new_score
             else:
@@ -725,7 +725,7 @@ def assign_targeting_score_v3(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                # pylint: disable=no-member
+
                 idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
                 base["TARGETING_SCORE"][idx] = new_score
             else:
@@ -876,7 +876,7 @@ def assign_targeting_score_v3_extended(
         n = score_this.count(base)
         if n > n_limit:
             if random_choice:
-                # pylint: disable=no-member
+
                 idx = np.random.RandomState(seed).choice(np.flatnonzero(score_this.mask(base)), n - n_limit, False)
                 base["TARGETING_SCORE"][idx] = new_score
             else:

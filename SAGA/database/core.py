@@ -16,9 +16,9 @@ from ..utils import makedirs_if_needed
 from ..version import __version__
 
 try:
-    FileExistsError  # pylint: disable=used-before-assignment
+    FileExistsError
 except NameError:
-    FileExistsError = OSError  # pylint: disable=redefined-builtin
+    FileExistsError = OSError
 
 
 # Hot fix on ECSV_DATATYPES for newer astropy versions
@@ -98,7 +98,7 @@ class FileObject(DownloadableBase):
                     with file_open(file_path, "wb") as f:
                         for chunk in r.iter_content(chunk_size=(16 * 1024 * 1024)):
                             f.write(chunk)
-                except:  # noqa: E722
+                except Exception:
                     if os.path.isfile(file_path):
                         os.unlink(file_path)
                     raise
@@ -164,10 +164,10 @@ class FitsTable(FileObject):
             t = Table(hdu_list[1].data, masked=False)
         finally:
             try:
-                del hdu_list[1].data  # pylint: disable=no-member
+                del hdu_list[1].data
                 hdu_list.close()
                 del hdu_list
-            except:  # pylint: disable=bare-except  # noqa: E722
+            except Exception:
                 pass
 
         return t
@@ -281,13 +281,13 @@ class DataObject(object):
                 self.download()
             try:
                 table = self.local.read()
-            except (IOError, OSError):
+            except OSError:
                 logging.warning("Failed to read local file; attempt to read remote file...")
                 table = self.remote.read(**kwargs)
         else:
             try:
                 table = self.remote.read(**kwargs)
-            except Exception as read_exception:  # pylint: disable=W0703
+            except Exception as read_exception:
                 if self.local is None:
                     raise read_exception
                 logging.warning("Failed to read remote; fall back to read local file...")

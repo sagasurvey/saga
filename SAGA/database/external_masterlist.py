@@ -62,7 +62,7 @@ class EddQuery(DownloadableBase):
                     f.write("# QUERY: {}\n".format(self.query))
                     f.write("# TIME:  {}\n".format(time.ctime()))
                     f.write(self._get_raw_output())
-            except:  # pylint: disable=bare-except # noqa: E722
+            except Exception:
                 if os.path.isfile(file_path):
                     os.unlink(file_path)
                 raise

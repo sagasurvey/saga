@@ -119,7 +119,7 @@ def get_decals_viewer_image(ra, dec, pixscale=0.262, layer="ls-dr9", size=256,
         try:
             with open(cache_path, "rb") as f:
                 content = f.read()
-        except (IOError, OSError):
+        except OSError:
             pass
         else:
             cache_path = None

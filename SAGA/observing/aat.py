@@ -7,7 +7,6 @@ from astropy import table
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
 
-# pylint: disable=no-member
 
 __all__ = [
     "get_gaia_guidestars",
@@ -154,7 +153,7 @@ def write_fld_file(
         formats={
             "RA": lambda x: Angle(x, "deg")
             .wrap_at(360 * u.deg)
-            .to_string("hr", sep=" ", precision=2),  # pylint: disable=E1101
+            .to_string("hr", sep=" ", precision=2),
             "Dec": lambda x: Angle(x, "deg").to_string("deg", sep=" ", precision=2),
             "Magnitude": "%.2f",
         },

@@ -3,7 +3,7 @@ import astropy.units as u
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 
-SPEED_OF_LIGHT = astropy.constants.c.to_value("km/s")  # pylint: disable=no-member
+SPEED_OF_LIGHT = astropy.constants.c.to_value("km/s")
 COSMO = FlatLambdaCDM(70, 0.27)  # same as HyperLEDA
 
 

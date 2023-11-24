@@ -14,7 +14,7 @@ from easyquery import Query, QueryMaker
 from ..database import Database
 from ..utils import add_skycoord, find_near_ra_dec
 from . import cuts
-from .build import build_master_list  # pylint: disable=no-name-in-module
+from .build import build_master_list
 
 __all__ = ["HostCatalog", "FieldCatalog"]
 
@@ -83,7 +83,7 @@ class HostCatalog(object):
             else:
                 try:
                     self._master_table_ = self._database["master_list"].read()
-                except:  # pylint: disable=bare-except # noqa: E722
+                except Exception:
                     logging.warning("Cannot load master list; attempt to build from scratch...")
                     self._master_table_ = self.build_master_list()
                 self._master_table_["SAGA_NAME"].fill_value = ""
@@ -103,7 +103,7 @@ class HostCatalog(object):
             else:
                 try:
                     self._host_table_ = self._database["hosts"].read()
-                except:  # pylint: disable=bare-except # noqa: E722
+                except Exception:
                     logging.warning("Cannot load host list; attempt to load master list...")
                     self._host_table_ = cuts.potential_hosts.filter(self._master_table)
                 self._host_table_["SAGA_NAME"].fill_value = ""

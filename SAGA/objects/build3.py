@@ -500,7 +500,7 @@ def add_galex(base, galex):
     galex_coord = get_coord(galex)
 
     matches = Table(
-        data=search_around_sky(base["coord"], galex_coord, 40 * u.arcsec),  # pylint: disable=no-member
+        data=search_around_sky(base["coord"], galex_coord, 40 * u.arcsec),
         names=["idx_base", "idx_galex", "sep", "sep_3d"],
     )
     del matches["sep_3d"]
@@ -626,7 +626,7 @@ def add_quenched_flag(base):
     return base
 
 
-def build_full_stack(  # pylint: disable=unused-argument
+def build_full_stack(
     host,
     decals=None,
     decals_remove=None,

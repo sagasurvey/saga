@@ -26,10 +26,10 @@ __all__ = [
 
 param_labels_sat = ("xmean_sat", "xcovar_sat", "xamp_sat")
 param_labels_nosat = ("xmean_nosat", "xcovar_nosat", "xamp_nosat")
+_sdss_bands = tuple(get_sdss_bands())
 
 
 def logsumexp(a, axis=None, b=None, keepdims=False):
-    # pylint: disable=no-member,unexpected-keyword-arg
     tmp = np.add(a, np.log(b)) if b is not None else a
     return np.logaddexp.reduce(tmp, axis=axis, keepdims=keepdims)
 
@@ -62,7 +62,7 @@ class XDGMM(object):
 
 def get_input_data(
     catalog,
-    bands=tuple(get_sdss_bands()),
+    bands=_sdss_bands,
     mag_err_postfix="_err",
     color_postfix="",
     color_err_postfix="_err",
@@ -125,7 +125,7 @@ def calc_gmm_satellite_probability(
     base,
     model_parameters,
     p_sat_prior=None,
-    bands=tuple(get_sdss_bands()),
+    bands=_sdss_bands,
     mag_err_postfix="_err",
     color_postfix="",
     color_err_postfix="_err",

@@ -7,7 +7,7 @@ This file contains the functions to build the master list and host list
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import Distance, SkyCoord, match_coordinates_3d, search_around_3d
-from astropy.cosmology import WMAP9  # pylint: disable=no-name-in-module
+from astropy.cosmology import WMAP9
 from astropy.table import Table, join, vstack
 from astropy.time import Time
 from easyquery import Query, QueryMaker
@@ -125,7 +125,7 @@ def add_nsa(d, nsa):
         nsa[col] = d[col][idx]
     nsa["sep"] = sep.arcsec
 
-    fill_values_by_query(nsa, ~q_match, {"pgc": -1})  # pylint: disable=invalid-unary-operand-type
+    fill_values_by_query(nsa, ~q_match, {"pgc": -1})
     del nsa["coord"]
     nsa.sort(["pgc", "sep"])
     mask = np.insert(np.ediff1d(nsa["pgc"]), 0, 1) == 0
@@ -212,7 +212,7 @@ def calc_needed_quantities(d):
 
 
 def add_skycoord_stars(stars):
-    # pylint: disable=no-member
+
     stars["coord"] = SkyCoord(
         ra=stars["RArad"] * u.rad,
         dec=stars["DErad"] * u.rad,
@@ -392,7 +392,7 @@ def find_local_group_like(d):
         d[f"NEAREST_{key}_DIST"][rematch_idx] = dist.to_value("Mpc")
         d[f"NEAREST_{key}_SEP"][rematch_idx] = sep.deg
 
-        idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)  # pylint: disable=no-member
+        idx1, _, _, dist = search_around_3d(d["coord"], mw_mass["coord"], 2 * u.Mpc)
         dist = dist.to_value("Mpc")
         mask = (dist > 0)
 

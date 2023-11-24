@@ -48,7 +48,7 @@ except ImportError:
 
 # fix astropy six
 try:
-    import astropy.extern.six  # noqa: F401
+    import astropy.extern.six
 except ImportError:
     import sys
 
@@ -81,7 +81,7 @@ def get_random_string(length=6):
 
 def ensure_deg(value):
     if isinstance(value, u.Quantity):
-        return value.to(u.deg).value  # pylint: disable=E1101
+        return value.to(u.deg).value
     return float(value)
 
 
@@ -443,7 +443,7 @@ class DatalabQuery(DownloadableBase):
         query : str
             The SQL query to send to the Datalab skyserver
         """
-        # pylint: disable=possibly-unused-variable
+
         ra = ensure_deg(ra)
         dec = ensure_deg(dec)
         r_deg = ensure_deg(radius)
@@ -566,7 +566,7 @@ class DecalsPrebuilt(DownloadableBase):
 
     requires_host_id = True
 
-    def __init__(self, ra, dec, host_id):  # pylint: disable=unused-argument
+    def __init__(self, ra, dec, host_id):
         try:
             host_id = int(host_id)
         except ValueError:
@@ -642,7 +642,7 @@ class DecalsQuery(DownloadableBase):
 
         for sweep_dir in self.sweep_dirs:
             if not os.path.isdir(sweep_dir):
-                warnings.warn("Cannot access sweep directory {}".format(sweep_dir))
+                warnings.warn("Cannot access sweep directory {}".format(sweep_dir), stacklevel=2)
                 self.sweep_dirs.remove(sweep_dir)
         if not self.sweep_dirs:
             raise ValueError("No DECaLS sweep directory found! Abort!")
@@ -697,7 +697,7 @@ class DecalsQuery(DownloadableBase):
 class GaiaQuery(DownloadableBase):
     def __init__(self, ra, dec, radius=1.0):
         self.coord = SkyCoord(ra, dec, unit="deg")
-        self.radius = radius * u.deg  # pylint: disable=no-member
+        self.radius = radius * u.deg
 
     def get_catalog(self):
         if not _HAS_GAIA_:
@@ -714,7 +714,7 @@ class GaiaQuery(DownloadableBase):
 class GalexQuery(DownloadableBase):
     def __init__(self, ra, dec, radius=1.0):
         self.coord = SkyCoord(ra, dec, unit="deg")
-        self.radius = radius * u.deg  # pylint: disable=no-member
+        self.radius = radius * u.deg
 
     def get_catalog(self):
         if not _HAS_MAST_:

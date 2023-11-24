@@ -525,7 +525,7 @@ class ObjectCatalog(object):
             overwrite = Time(overwrite)
 
         host_table = self._host_catalog.load(hosts)
-        HOSTID_COLNAME = self._host_catalog._ID_COLNAME  # pylint: disable=protected-access
+        HOSTID_COLNAME = self._host_catalog._ID_COLNAME
 
         nhosts = len(host_table)
         if not nhosts:
@@ -714,7 +714,7 @@ class ObjectCatalog(object):
                     **manual_lists,
                     **catalog_dict,
                 )
-            except Exception as e:  # pylint: disable=W0703
+            except Exception as e:
                 print(
                     time.strftime("[%m/%d %H:%M:%S]"),
                     "[ERROR] Fail to build base catalog for {}".format(host_id),
@@ -736,7 +736,7 @@ class ObjectCatalog(object):
             )
             try:
                 data_obj.write(base, add_meta=True)
-            except (IOError, OSError) as e:
+            except OSError as e:
                 print(
                     time.strftime("[%m/%d %H:%M:%S]"),
                     "[ERROR] Fail to write base catalog for {}".format(host_id),

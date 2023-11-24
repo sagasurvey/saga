@@ -5,13 +5,14 @@ import astropy.constants
 import numpy as np
 from astropy.coordinates import EarthLocation, SkyCoord
 from astropy.io import fits
-from astropy.io.ascii.cparser import CParserError  # pylint: disable=E0611
+from astropy.io.ascii.cparser import CParserError
 from astropy.table import Table, vstack
 from astropy.time import Time
 from easyquery import Query
 
 from ..database import CsvTable, FitsTable
 from .common import SPEED_OF_LIGHT, ensure_specs_dtype
+
 
 __all__ = [
     "read_generic_spectra",
@@ -24,8 +25,6 @@ __all__ = [
     "read_palomar",
     "read_coadd",
 ]
-
-# pylint: disable=logging-format-interpolation
 
 
 def get_obs_info_from_fits(
@@ -47,7 +46,7 @@ def heliocentric_correction(sc, obstime, site_name):
     helio_corr = sc.radial_velocity_correction(
         "heliocentric", obstime=obstime, location=EarthLocation.of_site(site_name)
     )
-    return helio_corr.to_value(astropy.constants.c)  # pylint: disable=no-member
+    return helio_corr.to_value(astropy.constants.c)
 
 
 def read_generic_spectra(
@@ -111,7 +110,7 @@ def read_generic_spectra(
 
             try:
                 sc, obstime = get_obs_info_from_fits(fits_path, **(fits_hdr_kwargs or {}))
-            except (IOError, OSError):
+            except OSError:
                 logging.warning("Cannot find or read corresponding fits file for {}".format(filepath))
             else:
                 if before_time is not None and obstime > before_time:

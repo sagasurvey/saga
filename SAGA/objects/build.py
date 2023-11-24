@@ -13,7 +13,6 @@ from ..utils.distance import d2z, v2z, z2m, z2v, z2d
 from . import cuts as C
 from .manual_fixes import fixes_by_sdss_objid
 
-# pylint: disable=logging-format-interpolation
 
 __all__ = [
     "initialize_base_catalog",
@@ -785,7 +784,7 @@ def find_satellites(base, version=1):
     fill_values_by_query(base, clean_obj & C.sat_rcut & C.sat_vcut, {"SATS": 1})
 
     # removed objects
-    removed_obj = C.has_spec & ~(is_clean & is_galaxy)  # pylint: disable=invalid-unary-operand-type
+    removed_obj = C.has_spec & ~(is_clean & is_galaxy)
     fill_values_by_query(base, removed_obj & C.is_high_z, {"SATS": 90})
     fill_values_by_query(base, removed_obj & C.is_low_z, {"SATS": 92})
     fill_values_by_query(base, removed_obj & C.is_very_low_z, {"SATS": 94})
@@ -917,7 +916,7 @@ def add_stellar_mass(base):
     return base
 
 
-def build_full_stack(  # pylint: disable=unused-argument
+def build_full_stack(
     sdss,
     host,
     wise=None,

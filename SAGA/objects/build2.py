@@ -29,8 +29,6 @@ except ImportError:
     _HAS_FAST3TREE_ = False
 
 
-# pylint: disable=logging-format-interpolation
-
 __all__ = [
     "prepare_sdss_catalog_for_merging",
     "prepare_des_catalog_for_merging",
@@ -534,7 +532,7 @@ def merge_catalogs(debug=None, **catalog_dict):
 
     merged_catalog = Query("chosen == 2").filter(stacked_catalog)
     for name in catalog_dict:
-        # pylint: disable=undefined-loop-variable
+
         merged_catalog = join(
             merged_catalog,
             Query("chosen > 0", (lambda x: x == name, "survey")).filter(stacked_catalog)[
@@ -615,7 +613,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
     specs_idx, base_idx, sep, _ = search_around_sky(
         specs["coord"],
         base["coord"],
-        20.0 * astropy.units.arcsec,  # pylint: disable=E1101
+        20.0 * astropy.units.arcsec,
     )
     sep = sep.arcsec
 
@@ -784,7 +782,9 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
 def add_spectra(base, specs, debug=None, matching_order=None):
 
     # Print spec counts
-    print(f"  [SPEC COUNT for {base['HOSTID'][0]}]", " ".join([f"{t}:{c}" for t, c in zip(*np.unique(specs["TELNAME"][specs["ZQUALITY"] >= 3], return_counts=True))]))
+    print(f"  [SPEC COUNT for {base['HOSTID'][0]}]", " ".join(
+        [f"{t}:{c}" for t, c in zip(*np.unique(specs["TELNAME"][specs["ZQUALITY"] >= 3], return_counts=True))]
+    ))
 
     # map ZQ >=4, 3, 2, <=1 to 0, 1, 2, 3
     specs["ZQUALITY_sort_key"] = 4 - specs["ZQUALITY"]
@@ -1092,7 +1092,7 @@ def identify_host(base):
     return base
 
 
-def build_full_stack(  # pylint: disable=unused-argument
+def build_full_stack(
     host,
     sdss=None,
     des=None,

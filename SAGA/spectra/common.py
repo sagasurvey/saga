@@ -3,7 +3,7 @@ import numpy as np
 
 __all__ = ["SPECS_COLUMNS", "SPEED_OF_LIGHT", "ensure_specs_dtype"]
 
-SPEED_OF_LIGHT = astropy.constants.c.to_value("km/s")  # pylint: disable=E1101
+SPEED_OF_LIGHT = astropy.constants.c.to_value("km/s")
 
 _SPECS_COLUMNS = (
     ("RA", "<f8"),

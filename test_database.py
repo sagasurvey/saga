@@ -10,8 +10,8 @@ except NameError:
 
 
 def test_create_database():
-    d = Database()
-    d = Database(".")
+    _ = Database()
+    _ = Database(".")
 
 
 def test_download_google():

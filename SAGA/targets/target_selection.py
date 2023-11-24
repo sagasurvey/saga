@@ -151,7 +151,7 @@ class TargetSelection(object):
 
     def _load_gmm_parameters(self, gmm_parameters):
         prefix = "gmm_parameters_"
-        keys = [k[len(prefix) :] for k in self._database.keys() if not isinstance(k, tuple) and k.startswith(prefix)]
+        keys = [k[len(prefix):] for k in self._database.keys() if not isinstance(k, tuple) and k.startswith(prefix)]
 
         if gmm_parameters is None:
             return {k: self._database[prefix + k].read() for k in keys}
@@ -161,7 +161,7 @@ class TargetSelection(object):
 
         try:
             if gmm_parameters.startswith(prefix):
-                gmm_parameters = gmm_parameters[len(prefix) :]
+                gmm_parameters = gmm_parameters[len(prefix):]
         except AttributeError:
             return gmm_parameters
 
@@ -455,8 +455,8 @@ def prepare_mmt_catalog(
                 format="ascii.fast_no_header",
                 formats={
                     "ra": lambda x: Angle(x, "deg")
-                    .wrap_at(360 * u.deg)  # pylint: disable=no-member
-                    .to_string("hr", sep=":", precision=3),  # pylint: disable=E1101
+                    .wrap_at(360 * u.deg)
+                    .to_string("hr", sep=":", precision=3),
                     "dec": lambda x: Angle(x, "deg").to_string("deg", sep=":", precision=3),
                     "mag": "%.2f",
                     "rank": lambda x: "" if int(x) == 99 else "{:d}".format(int(x)),
@@ -502,7 +502,6 @@ def prepare_aat_catalog(
     1237648721248518305 14 42 17.79 -0 12 05.95 P 2 22.03 0 magcol=fiber2mag_r, model_r=20.69
     1237648721786045341 14 48 37.16 +0 21 33.81 P 1 21.56 0 magcol=fiber2mag_r, model_r=20.55
     """
-    # pylint: disable=no-member
 
     if "TARGETING_SCORE" not in target_catalog.colnames:
         return KeyError(

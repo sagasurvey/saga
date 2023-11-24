@@ -168,7 +168,7 @@ has_aat_spec = QueryMaker.contains("SPEC_REPEAT", "AAT")
 has_mmt_spec = QueryMaker.contains("SPEC_REPEAT", "MMT")
 has_aat_mmt_spec = has_aat_spec | has_mmt_spec
 
-_our_telnames = {"AAT", "BINO", "MMT", "COADD", "IMACS", "KECK", "MIKE", "PAL", "SALT" , "WIYN"}
+_our_telnames = {"AAT", "BINO", "MMT", "COADD", "IMACS", "KECK", "MIKE", "PAL", "SALT", "WIYN"}
 _ext_telnames = _known_telnames = {
     "HOST",
     "2dF",

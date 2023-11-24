@@ -12,11 +12,11 @@ import os
 from setuptools import find_packages, setup
 
 with open(os.path.join(os.path.dirname(__file__), "SAGA", "version.py")) as f:
-    exec(f.read())  # pylint: disable=W0122
+    exec(f.read())
 
 setup(
     name="SAGA",
-    version=__version__,  # pylint: disable=E0602 # noqa: F821
+    version=__version__,  # noqa: F821
     description="Code to access, create and edit SAGA Survey data catalogs.",
     url="https://github.com/sagasurvey/saga",
     download_url="https://github.com/sagasurvey/saga/archive/master.tar.gz",
