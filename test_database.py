@@ -9,6 +9,10 @@ except NameError:
     FileNotFoundError = IOError
 
 
+def safe_array_equal(a1, a2):
+    return np.array_equal(a1, a2) or np.array_equal(a1, a2, equal_nan=True)
+
+
 def test_create_database():
     _ = Database()
     _ = Database(".")
@@ -24,7 +28,7 @@ def test_download_google():
         d["hosts"].remote = None
         d2 = d["hosts"].read()
         for k in d1.columns:
-            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
+            assert safe_array_equal(d1[k], d2[k])
     finally:
         os.unlink(t)
 
@@ -40,7 +44,7 @@ def test_set_local():
         d["hosts"].local = t
         d2 = d["hosts"].read()
         for k in d1.columns:
-            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
+            assert safe_array_equal(d1[k], d2[k])
     finally:
         os.unlink(t)
 
@@ -68,6 +72,6 @@ def test_download_default():
         dobj.remote = None
         d2 = dobj.read()
         for k in d1.columns:
-            assert np.array_equal(d1[k], d2[k], equal_nan=True).all()
+            assert safe_array_equal(d1[k], d2[k])
     finally:
         os.unlink(t)
