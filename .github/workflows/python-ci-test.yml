@@ -33,8 +33,8 @@ jobs:
     - name: Lint with flake8
       uses: py-actions/flake8@v2
       with:
-        ignore: "F4,W503,B023"
-        max-line-length: "159"
+        args: "--extend-ignore=F401,F403,B023"
+        max-line-length: "149"
         plugins: "flake8-bugbear"
     - name: Install SAGA
       run: |

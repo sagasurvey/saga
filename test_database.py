@@ -1,7 +1,7 @@
 import os
 import tempfile
 import numpy as np
-from SAGA.database import *
+from SAGA.database import Database, DataObject, CsvTable, FitsTable
 
 try:
     FileNotFoundError
