@@ -615,7 +615,12 @@ def add_quenched_flag(base):
         fill_values_by_query(base, Query("EW_Halpha - abs(EW_Halpha_err) >= 2"), {"quenched": 0})
 
     if "nuv_sfr" in base.colnames:
-        fill_values_by_query(base, Query("nuv_sfr - log_sm - abs(nuv_sfr_err) >= -11", "nuv_mag_flag == 1"), {"quenched": 0})
+        # assuming an error of 0.2 dex in log_sm, 0.2 ** 2 = 0.04
+        fill_values_by_query(
+            base,
+            Query("nuv_sfr - log_sm - sqrt(nuv_sfr_err ** 2 + 0.04) >= -11", "nuv_mag_flag == 1"),
+            {"quenched": 0},
+        )
 
     # Set by hand:
     fill_values_by_query(base, Query("OBJID == 902436850000000279"), {"quenched": 1})  # foreground stars w/uv
