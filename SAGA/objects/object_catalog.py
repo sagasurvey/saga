@@ -595,7 +595,8 @@ class ObjectCatalog(object):
         halpha = self._database["spectra_halpha"].read() if build_version >= 2 else None
         galex_precalculated_lists = []
         if build_version >= 3:
-            for key in ["galex_sfr", "galex_sfr_host", "galex_sfr_lowz"]:
+            # galex_sfr_lowz goes BEFORE galex_sfr_host as the latter overwrites overlapping entries in the former
+            for key in ["galex_sfr_lowz", "galex_sfr_host"]:
                 try:
                     t = self._database[key]
                 except KeyError:

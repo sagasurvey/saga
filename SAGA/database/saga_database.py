@@ -389,12 +389,6 @@ class Database(object):
                     format="ascii.fast_basic",
                 )
             ),
-            "galex_sfr": DataObject(
-                FileObject(
-                    os.path.join(self._shared_dir, "Spectra", "galex_sfr_NUV.dat"),
-                    format="ascii.fast_basic",
-                )
-            ),
             "spectra_hecs": DataObject(
                 FitsTable(os.path.join(self._shared_dir, "Spectra", "Final", "other", "rines_2013.fits")),
             ),
