@@ -623,7 +623,6 @@ def add_quenched_flag(base):
         )
 
     # Set by hand:
-    fill_values_by_query(base, Query("OBJID == 902436850000000279"), {"quenched": 1})  # foreground stars w/uv
     fill_values_by_query(base, Query("OBJID == 902122170000000530"), {"quenched": 0})  # no galex data
 
     base["quenched_phony"] = np.where(base["quenched"] == -1, C.color_quenched_def.mask(base).astype(np.int32), base["quenched"])
