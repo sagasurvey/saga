@@ -302,19 +302,21 @@ def read_alfalfa(file_path):
         "RAdeg_OC",
         "DECdeg_OC",
         "Vhelio",
-        "W50",
-        "logMH",
+        "sigW",
+        "HIflux",
+        "sigflux",
     ]
 
     specs.rename_column("AGCNr", "SPECOBJID")
-    specs.rename_column("logMH", "LOG_MHI")
+    specs.rename_column("HIflux", "HI_FLUX")
+    specs.rename_column("sigflux", "HI_FLUX_ERR")
 
     valid_oc_coord = Query("abs(RAdeg_OC) + abs(DECdeg_OC) > 0").mask(specs)
     specs["RA"] = np.where(valid_oc_coord, specs["RAdeg_OC"], specs["RAdeg_HI"])
     specs["DEC"] = np.where(valid_oc_coord, specs["DECdeg_OC"], specs["DECdeg_HI"])
 
     specs["SPEC_Z"] = specs["Vhelio"].astype(np.float64) / SPEED_OF_LIGHT
-    specs["SPEC_Z_ERR"] = specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
+    specs["SPEC_Z_ERR"] = specs["sigW"].astype(np.float64) * 0.5 / SPEED_OF_LIGHT
     specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
 
     specs["TELNAME"] = "ALFALF"
@@ -335,12 +337,15 @@ def read_fashi(file_path):
     specs.rename_column("ID_FASHI", "SPECOBJID")
     specs.rename_column("z", "SPEC_Z")
     specs.rename_column("z_err", "SPEC_Z_ERR")
-    specs.rename_column("log10Mass", "LOG_MHI")
+    specs.rename_column("S_bf", "HI_FLUX")
+    specs.rename_column("S_bf_err", "HI_FLUX_ERR")
 
     valid_oc_coord = Query("oc_flag > 0.9995", "abs(RA_oc) + abs(DEC_oc) > 0").mask(specs)
     specs["RA"] = np.where(valid_oc_coord, specs["RA_oc"], specs["RA"])
     specs["DEC"] = np.where(valid_oc_coord, specs["DEC_oc"], specs["DEC"])
     specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
+    specs["HI_FLUX"] *= 1.0e-3  # convret from mJy to Jy
+    specs["HI_FLUX_ERR"] *= 1.0e-3  # convret from mJy to Jy
 
     specs["TELNAME"] = "FASHI"
     specs["MASKNAME"] = "FASHI"

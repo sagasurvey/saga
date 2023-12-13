@@ -15,7 +15,8 @@ _SPECS_COLUMNS = (
     ("MASKNAME", "<U48"),
     ("TELNAME", "<U6"),
     ("HELIO_CORR", "|b1"),
-    ("LOG_MHI", "<f4"),
+    ("HI_FLUX", "<f4"),
+    ("HI_FLUX_ERR", "<f4"),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)

@@ -894,24 +894,33 @@ def add_stellar_mass(base):
     if "z_cosmo" not in base.colnames:
         base = add_z_cosmo(base)
 
+    # HOST_ZCOSMO is calculated using host's distance, not measured redshift
     z = np.where(np.isfinite(base["z_cosmo"]), base["z_cosmo"], base["HOST_ZCOSMO"])
     z = np.clip(z, np.finfo(np.float32).eps, None)
     gr = base["g_mag"] - base["r_mag"]
 
     with np.errstate(invalid="ignore"):
-        base["Mr_phony"] = (base["r_mag"] - z2m(z) - calc_kcor("r", z, "g - r", gr)).astype(np.float32)
-        base["log_sm_phony"] = (1.254 + 1.0976 * gr - 0.4 * base["Mr_phony"]).astype(np.float32)
+        base["Mr_phony"] = (base["r_mag"] - z2m(z) - calc_kcor("r", z, "g - r", gr))
+        base["log_sm_phony"] = (1.254 + 1.0976 * gr - 0.4 * base["Mr_phony"])
+        base["log_MHI_phony"] = np.log10(2.356e5 / (z + 1.0) * (z2d(z) ** 2) * base["HI_FLUX"])
 
     ok_to_calculate = Query(
         QueryMaker.isfinite("Mr_phony"),
-        QueryMaker.isfinite("z_cosmo"),
         "z_cosmo >= 0.001",
         "z_cosmo < 0.5",
         "abs(g_mag - r_mag) < 10",
     ).mask(base)
 
-    base["Mr"] = np.where(ok_to_calculate, base["Mr_phony"], np.float32(np.nan))
-    base["log_sm"] = np.where(ok_to_calculate, base["log_sm_phony"], np.float32(np.nan))
+    base["Mr"] = np.where(ok_to_calculate, base["Mr_phony"], np.nan).astype(np.float32)
+    base["log_sm"] = np.where(ok_to_calculate, base["log_sm_phony"], np.nan).astype(np.float32)
+
+    ok_to_calculate = Query(
+        "HI_FLUX > 0",
+        "z_cosmo >= 0.001",
+        "z_cosmo < 0.5",
+    ).mask(base)
+
+    base["log_MHI"] = np.where(ok_to_calculate, base["log_MHI_phony"], np.nan).astype(np.float32)
 
     return base
 
