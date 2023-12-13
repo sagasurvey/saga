@@ -337,7 +337,7 @@ def read_fashi(file_path):
     specs.rename_column("z_err", "SPEC_Z_ERR")
     specs.rename_column("log10Mass", "LOG_MHI")
 
-    valid_oc_coord = Query("abs(RA_oc) + abs(DEC_oc) > 0").mask(specs)
+    valid_oc_coord = Query("oc_flag > 0.9995", "abs(RA_oc) + abs(DEC_oc) > 0").mask(specs)
     specs["RA"] = np.where(valid_oc_coord, specs["RA_oc"], specs["RA"])
     specs["DEC"] = np.where(valid_oc_coord, specs["DEC_oc"], specs["DEC"])
     specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)

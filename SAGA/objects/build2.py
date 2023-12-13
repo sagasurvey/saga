@@ -740,6 +740,9 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
             set(specs_to_merge["TELNAME"][mask_within_dz & mask_same_zq_class])
         )
         specs["SPEC_REPEAT_ALL"][best_spec_index] = "+".join(set(specs_to_merge["TELNAME"]))
+        log_MHI = specs_to_merge["LOG_MHI"][mask_within_dz & np.isfinite(specs_to_merge["LOG_MHI"])]
+        if len(log_MHI):
+            specs["LOG_MHI"][best_spec_index] = log_MHI[0]
 
         nsa_specs = specs_to_merge[specs_to_merge["TELNAME"] == "NSA"]
         specs["OBJ_NSAID"][best_spec_index] = int(nsa_specs["SPECOBJID"][0]) if len(nsa_specs) else -1
