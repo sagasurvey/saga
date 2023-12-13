@@ -671,7 +671,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
 
     def get_tel_rank(
         tel,
-        ranks=("MMT", "AAT", "PAL", "BINO", "NSA", "_OTHERS", "SDSS", "ALFALF", "WIYN"),
+        ranks=("MMT", "AAT", "PAL", "BINO", "NSA", "_OTHERS", "SDSS", "WIYN", "FASHI", "ALFALF"),
     ):
         try:
             return ranks.index(tel)
@@ -696,12 +696,14 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         # now it's the real thing, we have more than one specs
         # we design a rank for each spec, using ZQUALITY, TELNAME, and SPEC_Z_ERR
         specs_to_merge = specs[group_slice]
-        rank = np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.int32, len(specs_to_merge))
-        rank += (10 - specs_to_merge["ZQUALITY"]) * (rank.max() + 1)
-        rank = rank.astype(np.float32) + np.where(
-            Query((np.isfinite, "SPEC_Z_ERR"), "SPEC_Z_ERR > 0", "SPEC_Z_ERR < 1").mask(specs_to_merge),
-            specs_to_merge["SPEC_Z_ERR"],
-            0.99999,
+        rank = ((10 - specs_to_merge["ZQUALITY"])).astype(np.uint64)
+        rank *= np.uint64(100)
+        rank += np.fromiter(map(get_tel_rank, specs_to_merge["TELNAME"]), np.uint64, len(specs_to_merge))
+        rank *= np.uint64(10000)
+        rank += np.where(
+            Query("SPEC_Z_ERR >= 1e-10", "SPEC_Z_ERR < 1").mask(specs_to_merge),
+            np.floor((np.log10(np.maximum(specs_to_merge["SPEC_Z_ERR"], 1e-10)) + 10) * 1000).astype(np.uint64),
+            9999,
         )
         specs_to_merge = specs_to_merge[rank.argsort()]
         best_spec = specs_to_merge[0]

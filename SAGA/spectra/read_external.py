@@ -23,6 +23,7 @@ __all__ = [
     "read_lcrs",
     "read_slackers",
     "read_alfalfa",
+    "read_fashi",
     "read_hecs",
     "read_hectomap",
     "read_vipers",
@@ -302,26 +303,47 @@ def read_alfalfa(file_path):
         "DECdeg_OC",
         "Vhelio",
         "W50",
-        "HIcode",
+        "logMH",
     ]
 
     specs.rename_column("AGCNr", "SPECOBJID")
+    specs.rename_column("logMH", "LOG_MHI")
 
-    valid_oc_coord = Query(
-        "abs(RAdeg_OC) + abs(DECdeg_OC) > 0",
-        Query(np.isfinite, "RAdeg_OC"),
-        Query(np.isfinite, "DECdeg_OC"),
-    )
-
+    valid_oc_coord = Query("abs(RAdeg_OC) + abs(DECdeg_OC) > 0").mask(specs)
     specs["RA"] = np.where(valid_oc_coord, specs["RAdeg_OC"], specs["RAdeg_HI"])
     specs["DEC"] = np.where(valid_oc_coord, specs["DECdeg_OC"], specs["DECdeg_HI"])
 
     specs["SPEC_Z"] = specs["Vhelio"].astype(np.float64) / SPEED_OF_LIGHT
     specs["SPEC_Z_ERR"] = specs["W50"].astype(np.float64) / SPEED_OF_LIGHT / np.sqrt(2 * np.log(2))
-    specs["ZQUALITY"] = np.where(specs["HIcode"] == 1, 4, 3)
+    specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
 
     specs["TELNAME"] = "ALFALF"
     specs["MASKNAME"] = "ALFALFA"
+    specs["HELIO_CORR"] = True
+
+    return ensure_specs_dtype(specs, remove_extra_cols=True)
+
+
+def read_fashi(file_path):
+
+    if not hasattr(file_path, "read"):
+        file_path = FastCsvTable(file_path)
+
+    specs = file_path.read()
+
+    # ID_FASHI,RA,DEC,z,z_err,log10Mass,RA_oc,DEC_oc
+    specs.rename_column("ID_FASHI", "SPECOBJID")
+    specs.rename_column("z", "SPEC_Z")
+    specs.rename_column("z_err", "SPEC_Z_ERR")
+    specs.rename_column("log10Mass", "LOG_MHI")
+
+    valid_oc_coord = Query("abs(RA_oc) + abs(DEC_oc) > 0").mask(specs)
+    specs["RA"] = np.where(valid_oc_coord, specs["RA_oc"], specs["RA"])
+    specs["DEC"] = np.where(valid_oc_coord, specs["DEC_oc"], specs["DEC"])
+    specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
+
+    specs["TELNAME"] = "FASHI"
+    specs["MASKNAME"] = "FASHI"
     specs["HELIO_CORR"] = True
 
     return ensure_specs_dtype(specs, remove_extra_cols=True)

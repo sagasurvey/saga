@@ -15,6 +15,7 @@ _SPECS_COLUMNS = (
     ("MASKNAME", "<U48"),
     ("TELNAME", "<U6"),
     ("HELIO_CORR", "|b1"),
+    ("LOG_MHI", "<f4"),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
@@ -38,7 +39,8 @@ def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_col
                 spectra[c] = False
             else:
                 raise ValueError("unknown spec type!")
-        cols.append(c)
+        else:
+            cols.append(c)
         if spectra[c].dtype.str != t:
             spectra.replace_column(c, spectra[c].astype(t))
         if spectra[c].description:

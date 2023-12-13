@@ -185,6 +185,7 @@ _ext_telnames = _known_telnames = {
     "LCRS",
     "slack",
     "ALFALF",
+    "FASHI",
     "SGA",
     "HECS",
     "HECMAP",

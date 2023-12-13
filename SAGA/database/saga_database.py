@@ -383,6 +383,9 @@ class Database(object):
                 ),
                 use_local_first=True,
             ),
+            "spectra_fashi": DataObject(
+                FastCsvTable(os.path.join(self._shared_dir, "Spectra", "Final", "FASHI", "FASHI_oc_included.csv")),
+            ),
             "spectra_halpha": DataObject(
                 FileObject(
                     os.path.join(self._shared_dir, "Spectra", "saga_halpha.dat"),
@@ -448,6 +451,7 @@ class Database(object):
                     "slackers": self._tables["spectra_slackers"],
                     "palomar": self._tables["spectra_palomar"],
                     "alfalfa": self._tables["spectra_alfalfa"],
+                    "fashi": self._tables["spectra_fashi"],
                     "hecs": self._tables["spectra_hecs"],
                     "hectomap": self._tables["spectra_hectomap"],
                     "vipers": (self._tables["spectra_vipers_w1"], self._tables["spectra_vipers_w4"]),
