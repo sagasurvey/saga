@@ -6,7 +6,7 @@ import numpy as np
 __all__ = ["calc_SFR_NUV", "calc_SFR_Halpha"]
 
 
-def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=1.0):
+def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.9):
     """
     Convert NUV magnitudes into a SFR
     Based on Iglesias-Paramo (2006), Eq 3
@@ -40,7 +40,7 @@ def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=1.0):
     return log_SFR_NUV, log_SFR_NUV_err
 
 
-def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, EWc=2.5, BD=3.4):
+def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, EWc=2.5, BD=3.25):
     """
     Calculate Halpha-based EW SFR
     Bauer+ (2013) https://ui.adsabs.harvard.edu/abs/2013MNRAS.434..209B/abstract
