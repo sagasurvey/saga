@@ -8,6 +8,7 @@ __all__ = ["calc_SFR_NUV", "calc_SFR_Halpha"]
 # Salpeter -> Koupa IMF using Madua & Dickinson 2014 (Figure 4)
 _IMF_FACTOR = 0.66
 
+
 def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.9):
     """
     Convert NUV magnitudes into a SFR
