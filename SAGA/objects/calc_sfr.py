@@ -5,6 +5,8 @@ import numpy as np
 
 __all__ = ["calc_SFR_NUV", "calc_SFR_Halpha"]
 
+# Salpeter -> Koupa IMF using Madua & Dickinson 2014 (Figure 4)
+_IMF_FACTOR = 0.66
 
 def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.9):
     """
@@ -32,9 +34,8 @@ def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.9):
     # CONVERT TO SOLAR LUMINOSITY
     l_nuv_msun = log_L_nuv - np.log10(3.826e33)
 
-    # CONVVERT TO SFR:   EQ 3, inglesias- paramo 2006
-    # Salpeter -> Koupa IMF using Madua & Dickinson 2014 (Figure 4)
-    log_SFR_NUV = l_nuv_msun - 9.33 + np.log10(0.66)
+    # CONVVERT TO SFR: EQ 3, inglesias- paramo 2006, also account for Salpeter -> Koupa IMF
+    log_SFR_NUV = l_nuv_msun - 9.33 + np.log10(_IMF_FACTOR)
     log_SFR_NUV_err = log_flux_nuv_err
 
     return log_SFR_NUV, log_SFR_NUV_err
@@ -59,10 +60,9 @@ def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, EWc=2.5, BD=3.25):
     L_Halpha = term1 * term2 * term3
     L_Halpha_err = term1_err * term2 * term3
 
-    # EQ 3, Bauer et al above
-    # Account for IMF, Madua & Dickinson 2014 (Figure $=4)
-    SFR = (L_Halpha * 0.66) / 1.27e34 
-    SFR_err = (L_Halpha_err * 0.66)/ 1.27e34 
+    # EQ 3, Bauer et al above, also account for Salpeter -> Koupa IMF
+    SFR = (L_Halpha * _IMF_FACTOR) / 1.27e34 
+    SFR_err = (L_Halpha_err * _IMF_FACTOR) / 1.27e34 
 
     log_Ha_SFR = np.log10(SFR)
 
