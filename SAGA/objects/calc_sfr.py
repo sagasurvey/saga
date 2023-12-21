@@ -61,8 +61,8 @@ def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, EWc=2.5, BD=3.25):
     L_Halpha_err = term1_err * term2 * term3
 
     # EQ 3, Bauer et al above, also account for Salpeter -> Koupa IMF
-    SFR = (L_Halpha * _IMF_FACTOR) / 1.27e34 
-    SFR_err = (L_Halpha_err * _IMF_FACTOR) / 1.27e34 
+    SFR = (L_Halpha * _IMF_FACTOR) / 1.27e34
+    SFR_err = (L_Halpha_err * _IMF_FACTOR) / 1.27e34
 
     log_Ha_SFR = np.log10(SFR)
 
