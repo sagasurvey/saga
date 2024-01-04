@@ -819,59 +819,44 @@ class ObjectCatalog(object):
         basic_targeting_cuts = Query(C.faint_end_limit, C.sat_rcut)
         d = dict()
 
-        # fmt: off
-        d["paper2_need_spec"] = Query(basic_targeting_cuts, C.paper2_targeting_cut, ~C.has_spec)
-        d["paper2_total"] = Query(basic_targeting_cuts, C.paper2_targeting_cut)
-        d["paper3_need_spec"] = Query(basic_targeting_cuts, C.paper3_targeting_cut, ~C.has_spec)
-        d["paper3_total"] = Query(basic_targeting_cuts, C.paper3_targeting_cut)
-        d["paper3_failed"] = Query(d["paper3_need_spec"], C.has_been_targeted)
-        d["paper3_targeted"] = Query(d["paper3_total"], C.has_been_targeted)
-        d["paper3plus_need_spec"] = Query(basic_targeting_cuts, C.paper3plus_targeting_cut, ~C.has_spec)
-        d["paper3plus_total"] = Query(basic_targeting_cuts, C.paper3plus_targeting_cut)
-        d["paper3plus_failed"] = Query(d["paper3plus_need_spec"], C.has_been_targeted)
-        d["paper3plus_targeted"] = Query(d["paper3plus_total"], C.has_been_targeted)
+        d["ptr_total"] = Query(basic_targeting_cuts, C.paper2_targeting_cut)
+        d["ptr_has_spec"] = Query(d["ptr_total"], C.has_spec)
+        d["ptr_targeted"] = Query(d["ptr_total"], C.has_been_targeted)
+        d["ptr_failed"] = Query(d["ptr_targeted"], ~C.has_spec)
+
+        d["nptr_total"] = Query(basic_targeting_cuts, ~C.paper2_targeting_cut)
+        d["nptr_has_spec"] = Query(d["nptr_total"], C.has_spec)
+        d["nptr_targeted"] = Query(d["nptr_total"], C.has_been_targeted)
+        d["nptr_failed"] = Query(d["nptr_targeted"], ~C.has_spec)
 
         d["specs_total"] = C.has_spec
-        d["specs_r_limit"] = Query(C.has_spec, C.faint_end_limit)
-        d["specs_Mr_limit"] = Query(C.has_spec, C.r_abs_limit)
-        d["specs_bright"] = Query(C.has_spec, C.sdss_limit)
+        d["specs_rvir"] = Query(C.has_spec, C.sat_rcut)
+        for k, q in [
+            ("ours", C.has_our_specs_only),
+            ("aat", C.has_aat_spec),
+            ("mmt", C.has_mmt_spec),
+        ]:
+            d[f"specs_{k}"] = Query(C.has_spec, q)
+            d[f"specs_{k}_rvir"] = Query(C.has_spec, q, C.sat_rcut)
 
-        for key in [k for k in d if k.startswith("specs_")]:
-            new_key = key.replace("specs_", "specs_ours_").replace("_total", "")
-            d[new_key] = Query(d[key], C.has_our_specs_only)
-
-        for key in [k for k in d if k.startswith("specs_")]:
-            new_key = key.replace("specs_", "sats_")
-            d[new_key] = Query(d[key], C.is_sat)
-
-        for key in [k for k in d if k.startswith("sats_")]:
-            new_key = key.replace("sats_", "sats_quenched_")
-            d[new_key] = Query(d[key], C.is_quenched)
-
-        for key in [k for k in d if k.startswith("specs_ours")]:
-            new_key = key + "_rvir"
-            d[new_key] = Query(d[key], C.sat_rcut)
-
-        d["low_z_total"] = Query(d["specs_total"], C.is_very_low_z)
-        d["low_z_ours"] = Query(d["specs_ours"], C.is_very_low_z)
-
-        d["specs_ours_aat"] = Query(d["specs_ours"], C.has_aat_spec)
-        d["specs_ours_mmt"] = Query(d["specs_ours"], C.has_mmt_spec)
-        # fmt: on
+        d["sats_total"] = C.is_sat
+        d["sats_ours"] = Query(C.is_sat, C.has_our_specs_only)
 
         for k, q in d.items():
             data[k].append(q.count(base))
 
         d = dict()
-        d["sats_missed_corrected"] = Query(basic_targeting_cuts, ~C.has_spec)
-        d["sats_gold"] = C.sample_gold
-        d["sats_gold_confirmed"] = Query(C.sample_gold, C.is_sat)
-        d["sats_gold_quenched"] = Query(C.sample_gold, C.is_quenched)
-        d["sats_gold_confirmed_quenched"] = Query(C.sample_gold, C.is_quenched, C.is_sat)
-        d["sats_gold_silver"] = (C.sample_gold | C.sample_silver)
-        d["sats_gold_silver_confirmed"] = Query((C.sample_gold | C.sample_silver), C.is_sat)
-        d["sats_gold_silver_quenched"] = Query((C.sample_gold | C.sample_silver), C.is_quenched)
-        d["sats_gold_silver_confirmed_quenched"] = Query((C.sample_gold | C.sample_silver), C.is_quenched, C.is_sat)
+        for k, q in [
+            ("gold", C.sample_gold),
+            ("gold_silver", (C.sample_gold | C.sample_silver)),
+        ]:
+            d[f"sats_{k}"] = q
+            d[f"sats_{k}_confirmed"] = Query(C.is_sat, q)
+            d[f"sats_{k}_confirmed_ours"] = Query(C.is_sat, C.has_our_specs_only, q)
+            d[f"sats_{k}_quenched"] = Query(C.is_quenched, q)
+            d[f"sats_{k}_confirmed_quenched"] = Query(C.is_sat, C.is_quenched, q)
+            d[f"sats_{k}_missed"] = Query(~C.is_sat, q)
+
         for k, q in d.items():
             data[k].append(q.filter(base, "p_sat_corrected").sum())
 
