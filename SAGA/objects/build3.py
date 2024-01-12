@@ -456,6 +456,12 @@ def identify_host(base):
     return base
 
 
+def apply_specs_manual_fixes(base):
+    fill_values_by_query(base, Query("OBJID == 902422980000000214"), {"HI_FLUX": 7.1, "HI_FLUX_ERR": 0.0178885438, "HI_SOURCE": "HIPASS"})
+    fill_values_by_query(base, Query("OBJID == 902799740000002207"), {"HI_FLUX": 16.9, "HI_FLUX_ERR": 0.0178885438, "HI_SOURCE": "HIPASS"})
+    return base
+
+
 def add_spec_phot_sep(base):
     has_any_spec_mask = base["ZQUALITY"] > -1
 
@@ -700,6 +706,7 @@ def build_full_stack(
         base = add_sga_specs(base, sga)
         del sga
 
+    base = apply_specs_manual_fixes(base)
     base = build2.remove_shreds_near_spec_obj(base)
 
     if halpha is not None:
