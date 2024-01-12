@@ -43,6 +43,8 @@ def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_col
                 raise ValueError("unknown spec type!")
         else:
             cols.append(c)
+        if hasattr(spectra[c], "unit") and hasattr(spectra[c], "value"):
+            spectra.replace_column(c, spectra[c].value)
         if spectra[c].dtype.str != t:
             spectra.replace_column(c, spectra[c].astype(t))
         if spectra[c].description:
