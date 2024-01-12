@@ -319,6 +319,7 @@ def read_alfalfa(file_path):
     specs["SPEC_Z_ERR"] = specs["sigW"].astype(np.float64) * 0.5 / SPEED_OF_LIGHT
     specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
 
+    specs["HI_SOURCE"] = "ALFALFA"
     specs["TELNAME"] = "ALFALF"
     specs["MASKNAME"] = "ALFALFA"
     specs["HELIO_CORR"] = True
@@ -346,6 +347,7 @@ def read_fashi(file_path):
     specs["ZQUALITY"] = np.where(valid_oc_coord, 3, 2)
     specs["HI_FLUX"] *= 1.0e-3  # convret from mJy to Jy
     specs["HI_FLUX_ERR"] *= 1.0e-3  # convret from mJy to Jy
+    specs["HI_SOURCE"] = "FASHI"
 
     specs["TELNAME"] = "FASHI"
     specs["MASKNAME"] = "FASHI"

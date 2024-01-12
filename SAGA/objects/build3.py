@@ -83,6 +83,74 @@ def prepare_objid(catalog):
     return release_short * np.int64(1e16) + catalog["BRICKID"] * np.int64(1e10) + catalog["OBJID"].astype(np.int64)
 
 
+def update_star_galaxy_flag(catalog):
+    sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
+    fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
+
+    bright_stars = Query(
+        "SHAPE_R < 1",
+        "r_mag < 17",
+        (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
+    )
+
+    type_queries = {
+        0: bright_stars,
+        1: QueryMaker.equal("TYPE", "PSF"),
+        2: QueryMaker.equal("TYPE", "REX"),
+        3: QueryMaker.equal("TYPE", "EXP"),
+        4: QueryMaker.equal("TYPE", "DEV"),
+        5: QueryMaker.equal("TYPE", "SER"),
+        6: QueryMaker.equal("REF_CAT", "L3"),
+        7: Query("FITBITS % 2 > 0", "(FITBITS >> 5) % 16 == 0"),
+        8: reduce_compare(fracflux_grz, np.max, np.less, 0.7),
+        9: reduce_compare(sigma_grz, np.max, np.greater, 100),
+    }
+
+    catalog["morphology_info"] = get_remove_flag(catalog, type_queries)
+    catalog["is_galaxy"] = (
+        Query("morphology_info % 4 == 0")
+        | Query("(morphology_info >> 6) % 2 == 1")
+        | Query("(morphology_info >> 7) % 8 == 7")
+    ).mask(catalog)
+
+    return catalog
+
+
+def set_remove_flag(catalog, to_remove=None, to_recover=None, trim=True):
+    allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
+    sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
+    sigma_wise = [f"SIGMA_GOOD_W{b}" for b in "1234"]
+    fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
+
+    remove_queries = {
+        1: reduce_compare(allmask_grz, np.median, np.greater, 0),
+        2: Query("FLUX_R <= 0"),
+        3: Query("FLUX_G <= 0", "FLUX_Z <= 0"),
+        4: (reduce_compare(sigma_grz, np.max, np.less, 60) & reduce_compare(fracflux_grz, np.max, np.greater, 2)),
+        5: reduce_compare(sigma_grz + sigma_wise, np.max, np.less, 20),
+        6: Query("(morphology_info >> 7) % 2 == 1", "(morphology_info >> 8) % 4 < 3"),
+    }
+
+    catalog["REMOVE"] = np.where(np.char.isalnum(catalog["REF_CAT"]), 0, get_remove_flag(catalog, remove_queries))
+    catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
+    catalog["SGA_ID"] = np.where(QueryMaker.equal("REF_CAT", "L3").mask(catalog), catalog["REF_ID"], -1)
+
+    if trim:
+        catalog = catalog[MERGED_CATALOG_COLUMNS]
+    catalog["survey"] = "decals"
+    catalog["OBJID_decals"] = catalog["OBJID"]
+    catalog["REMOVE_decals"] = catalog["REMOVE"]
+
+    if to_remove is not None:
+        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int32)
+
+    if to_recover is not None:
+        idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
+        catalog["REMOVE"][idx] = 0
+
+    return catalog
+
+
 def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None, trim=True):
     """
     Refs:
@@ -163,63 +231,8 @@ def prepare_decals_catalog_for_merging(catalog, to_remove=None, to_recover=None,
         catalog["r_mag"],
     )
 
-    allmask_grz = [f"ALLMASK_{b}" for b in "GRZ"]
-    sigma_grz = [f"SIGMA_GOOD_{b}" for b in "GRZ"]
-    sigma_wise = [f"SIGMA_GOOD_W{b}" for b in "1234"]
-    fracflux_grz = [f"FRACFLUX_{b}" for b in "GRZ"]
-
-    # Do galaxy/star separation
-    bright_stars = Query(
-        "SHAPE_R < 1",
-        "r_mag < 17",
-        (Query("abs(PMRA * sqrt(PMRA_IVAR)) >= 2") | Query("abs(PMDEC * sqrt(PMDEC_IVAR)) >= 2")),
-    )
-
-    type_queries = {
-        0: bright_stars,
-        1: QueryMaker.equal("TYPE", "PSF"),
-        2: QueryMaker.equal("TYPE", "REX"),
-        3: QueryMaker.equal("TYPE", "EXP"),
-        4: QueryMaker.equal("TYPE", "DEV"),
-        5: QueryMaker.equal("TYPE", "SER"),
-        6: QueryMaker.equal("REF_CAT", "L3"),
-        7: Query("FITBITS % 2 > 0", "(FITBITS >> 5) % 16 == 0"),
-        8: reduce_compare(fracflux_grz, np.max, np.less, 0.7),
-        9: reduce_compare(sigma_grz, np.max, np.greater, 100),
-    }
-
-    catalog["morphology_info"] = get_remove_flag(catalog, type_queries)
-    catalog["is_galaxy"] = (
-        Query("morphology_info % 4 == 0")
-        | Query("(morphology_info >> 6) % 2 == 1")
-        | Query("(morphology_info >> 7) % 8 == 7")
-    ).mask(catalog)
-
-    remove_queries = {
-        1: reduce_compare(allmask_grz, np.median, np.greater, 0),
-        2: Query("FLUX_R <= 0"),
-        3: Query("FLUX_G <= 0", "FLUX_Z <= 0"),
-        4: (reduce_compare(sigma_grz, np.max, np.less, 60) & reduce_compare(fracflux_grz, np.max, np.greater, 2)),
-        5: reduce_compare(sigma_grz + sigma_wise, np.max, np.less, 20),
-        6: Query("(morphology_info >> 7) % 2 == 1", "(morphology_info >> 8) % 4 < 3"),
-    }
-
-    catalog["REMOVE"] = np.where(np.char.isalnum(catalog["REF_CAT"]), 0, get_remove_flag(catalog, remove_queries))
-    catalog["REF_CAT"] = np.char.strip(catalog["REF_CAT"])
-    catalog["SGA_ID"] = np.where(QueryMaker.equal("REF_CAT", "L3").mask(catalog), catalog["REF_ID"], -1)
-
-    if trim:
-        catalog = catalog[MERGED_CATALOG_COLUMNS]
-    catalog["survey"] = "decals"
-    catalog["OBJID_decals"] = catalog["OBJID"]
-    catalog["REMOVE_decals"] = catalog["REMOVE"]
-
-    if to_remove is not None:
-        catalog["REMOVE"] |= np.isin(catalog["OBJID"], to_remove).astype(np.int32)
-
-    if to_recover is not None:
-        idx = np.flatnonzero(np.isin(catalog["OBJID"], to_recover))
-        catalog["REMOVE"][idx] = 0
+    catalog = update_star_galaxy_flag(catalog)
+    catalog = set_remove_flag(catalog, to_remove, to_recover, trim)
 
     return catalog
 
@@ -453,6 +466,12 @@ def cap_sma_value(base):
 
 def identify_host(base):
     fill_values_by_query(base, C.obj_is_host3, {"SATS": 3, "REMOVE": 0})
+    return base
+
+
+def apply_specs_manual_fixes(base):
+    fill_values_by_query(base, Query("OBJID == 902422980000000214"), {"HI_FLUX": 7.1, "HI_FLUX_ERR": 0.0178885438, "HI_SOURCE": "HIPASS"})
+    fill_values_by_query(base, Query("OBJID == 902799740000002207"), {"HI_FLUX": 16.9, "HI_FLUX_ERR": 0.0178885438, "HI_SOURCE": "HIPASS"})
     return base
 
 
@@ -700,6 +719,7 @@ def build_full_stack(
         base = add_sga_specs(base, sga)
         del sga
 
+    base = apply_specs_manual_fixes(base)
     base = build2.remove_shreds_near_spec_obj(base)
 
     if halpha is not None:

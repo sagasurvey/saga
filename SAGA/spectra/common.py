@@ -17,6 +17,7 @@ _SPECS_COLUMNS = (
     ("HELIO_CORR", "|b1"),
     ("HI_FLUX", "<f4"),
     ("HI_FLUX_ERR", "<f4"),
+    ("HI_SOURCE", "<U8"),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
@@ -42,6 +43,8 @@ def ensure_specs_dtype(spectra, cols_definition=_SPECS_COLUMNS, skip_missing_col
                 raise ValueError("unknown spec type!")
         else:
             cols.append(c)
+        if hasattr(spectra[c], "unit") and hasattr(spectra[c], "value"):
+            spectra.replace_column(c, spectra[c].value)
         if spectra[c].dtype.str != t:
             spectra.replace_column(c, spectra[c].astype(t))
         if spectra[c].description:

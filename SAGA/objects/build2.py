@@ -743,7 +743,7 @@ def match_spectra_to_base_and_merge_duplicates(specs, base, debug=None, matching
         has_HI = mask_within_dz & (specs_to_merge["HI_FLUX"] > 0)
         if has_HI.any():
             has_HI = np.argmax(has_HI)
-            for c in ["HI_FLUX", "HI_FLUX_ERR"]:
+            for c in ["HI_FLUX", "HI_FLUX_ERR", "HI_SOURCE"]:
                 specs[c][best_spec_index] = specs_to_merge[c][has_HI]
 
         nsa_specs = specs_to_merge[specs_to_merge["TELNAME"] == "NSA"]
