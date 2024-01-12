@@ -17,6 +17,7 @@ _SPECS_COLUMNS = (
     ("HELIO_CORR", "|b1"),
     ("HI_FLUX", "<f4"),
     ("HI_FLUX_ERR", "<f4"),
+    ("HI_SOURCE", "<U8"),
 )
 
 SPECS_COLUMNS = dict(_SPECS_COLUMNS)
