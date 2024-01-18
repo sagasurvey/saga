@@ -48,12 +48,10 @@ except ImportError:
 
 # fix astropy six
 try:
-    import astropy.extern.six
+    import astropy.extern.six  # noqa: F401
 except ImportError:
     import sys
-
     import six
-
     sys.modules["astropy.extern.six"] = six
 
 _HAS_DATALAB_ = True
@@ -624,8 +622,8 @@ class DecalsQuery(DownloadableBase):
         except ValueError:
             try:
                 dr_number = int(decals_dr[2])
-            except ValueError:
-                raise ValueError("Cannot recognize `decals_dr` specification:", decals_dr)
+            except ValueError as e:
+                raise ValueError("Cannot recognize `decals_dr` specification:", decals_dr) from e
 
         if dr_number not in (6, 7, 8, 9):
             raise ValueError("{} not supported".format(decals_dr))
