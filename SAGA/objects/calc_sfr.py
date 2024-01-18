@@ -44,7 +44,7 @@ def calc_SFR_NUV(NUV_mag, NUV_mag_err, dist_mpc, internal_ext=0.9, internal_ext_
     return log_SFR_NUV, log_SFR_NUV_err
 
 
-def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, r_err, EWc=2.5, BD=3.25, BD_err=0.1):
+def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, spec_z_err, Mr, r_err, EWc=2.5, BD=3.25, BD_err=0.1):
     """
     Calculate Halpha-based EW SFR
     Bauer+ (2013) https://ui.adsabs.harvard.edu/abs/2013MNRAS.434..209B/abstract
@@ -69,8 +69,9 @@ def calc_SFR_Halpha(EW_Halpha, EW_Halpha_err, spec_z, Mr, r_err, EWc=2.5, BD=3.2
     term1_EW_frac_err = EW_Halpha_err / (EW_Halpha + EWc)
     term1_Mr_frac_err = 0.4 * np.log(10) * r_err
     term1_frac_err = np.hypot(term1_EW_frac_err, term1_Mr_frac_err)
+    term2_frac_err = 2.0 * spec_z_err / (1.0 + spec_z)
     term3_frac_err = 2.36 * (BD_err / BD)
-    L_Halpha_frac_err = np.hypot(term1_frac_err, term3_frac_err)
+    L_Halpha_frac_err = np.sqrt(term1_frac_err ** 2 + term2_frac_err ** 2 + term3_frac_err ** 2)
     log_Ha_SFR_err  = L_Halpha_frac_err / np.log(10)
 
     return log_Ha_SFR, log_Ha_SFR_err
