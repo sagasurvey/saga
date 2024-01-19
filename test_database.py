@@ -3,11 +3,6 @@ import tempfile
 import numpy as np
 from SAGA.database import Database, DataObject, CsvTable, FitsTable
 
-try:
-    FileNotFoundError
-except NameError:
-    FileNotFoundError = IOError
-
 
 def safe_array_equal(a1, a2):
     return np.array_equal(a1, a2) or np.array_equal(a1, a2, equal_nan=True)

@@ -190,9 +190,9 @@ def prepare_des_catalog_for_merging(catalog, to_remove=None, to_recover=None, co
         catalog.rename_column("ra", "RA")
         catalog.rename_column("dec", "DEC")
         catalog.rename_column("objid", "OBJID")
-    except KeyError:
+    except KeyError as e:
         if not all((col in catalog.colnames for col in ("RA", "DEC", "OBJID"))):
-            raise RuntimeError("Cannot rename `RA`, `DEC`, and/or `OBJID` in DES catalog")
+            raise RuntimeError("Cannot rename `RA`, `DEC`, and/or `OBJID` in DES catalog") from e
 
     if convert_to_sdss_filters:
         gi = catalog["g_mag"] - catalog["i_mag"]
