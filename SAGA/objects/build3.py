@@ -601,7 +601,7 @@ def add_sfr(base):
         base["Halpha_sfr_err"] = np.float32(np.nan)
 
         mask = Query(C.valid_Halpha, "dist_estimate > 0").mask(base)
-        t = base[["EW_Halpha", "EW_Halpha_err", "SPEC_Z", "Mr"]][mask]
+        t = base[["EW_Halpha", "EW_Halpha_err", "SPEC_Z", "SPEC_Z_ERR", "Mr", "r_err"]][mask]
         with np.errstate(all="ignore"):
             log_sfr, log_sfr_err = calc_sfr.calc_SFR_Halpha(*(c.astype(np.float64) for c in t.itercols()))
 
