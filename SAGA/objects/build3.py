@@ -630,8 +630,11 @@ def add_quenched_flag(base):
 
     if "EW_Halpha" in base.colnames:
         # assume quenched until showing SF
+        halpha_sf = Query("EW_Halpha - abs(EW_Halpha_err) >= 2")
         fill_values_by_query(base, C.valid_Halpha, {"quenched": 1})
-        fill_values_by_query(base, Query("EW_Halpha - abs(EW_Halpha_err) >= 2"), {"quenched": 0})
+        fill_values_by_query(base, halpha_sf, {"quenched": 0})
+        if "Halpha_sfr" in base.colnames:
+            fill_values_by_query(base, ~Query(C.valid_Halpha, halpha_sf), {"Halpha_sfr": np.nan, "Halpha_sfr_err": np.nan})
 
     if "nuv_sfr" in base.colnames:
         # assuming an error of 0.2 dex in log_sm, 0.2 ** 2 = 0.04

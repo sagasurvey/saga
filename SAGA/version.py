@@ -2,4 +2,4 @@
 SAGA package version
 """
 
-__version__ = "0.72.0"
+__version__ = "3.0.0-rc.1"
